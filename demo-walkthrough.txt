@@ -5,9 +5,29 @@ Let me show you what I built and how to use it.
 This is the AI Flight Deck dashboard. It has four main sections: Set up,
 Assessment, Corrections, and Decision.
 
-We start on Set up. Click Run baseline scan, then complete the Microsoft
-device sign-in using the code shown on the screen. The connection is read-only,
-so the tool does not change anything in the tenant.
+We start on Set up. There are three ways to bring in evidence.
+
+The fast path is the Microsoft 365 admin center Copilot Readiness CSV. Choose
+the report date, import the CSV, and the tool shows the users Microsoft
+observed, their licence state, update channel, and suggested candidates. If
+Microsoft has hidden the user names, the tool says so and will not pretend it
+can build a named pilot.
+
+The second path imports the CSV from Microsoft's open-source automated
+readiness assessment. We enter the source commit or release so the result is
+traceable. Checks that have an exact verified match are used carefully. Rows
+that do not have a safe match stay in a visible review list instead of being
+guessed.
+
+The live path is Connect and scan tenant. Complete the Microsoft device sign-in
+using the code shown on the screen. The connection is read-only, so the tool
+does not change anything in the tenant. Live evidence stays authoritative if
+it conflicts with an imported report.
+
+After importing the admin-center report, select the people for the pilot, enter
+the cohort name and owner, and save it. Then run the live scan again. The tool
+checks that every selected person really exists in Microsoft Entra before it
+treats the cohort as approved.
 
 Once the scan finishes, go to Assessment. This shows all 13 readiness areas and
 77 individual checks.
@@ -44,15 +64,19 @@ mission.
 We can also export the full assessment as a CSV if we want to review all 77
 controls in Excel or share them with the team.
 
-That is the complete workflow: run the scan, review the assessment, understand
-why missions are blocked, export the corrections, make the changes, and scan
-again to verify them.
+That is the complete workflow: combine Microsoft's evidence with a live scan,
+approve the actual pilot group, review the assessment, understand why missions
+are blocked, export the corrections, make the changes, and scan again to prove
+the result.
 
 Click sequence while speaking
 
-1. Set up -> Run baseline scan
-2. Assessment -> open a domain -> expand a control
-3. Missions -> open Mission 1
-4. Corrections -> select an action -> Export administrator remediation plan
-5. Decision -> expand a blocker
-6. Export detailed CSV
+1. Set up -> import Microsoft 365 Copilot Readiness CSV
+2. Set up -> select pilot users -> save approved cohort
+3. Set up -> import Microsoft automated assessment CSV
+4. Set up -> Connect and scan tenant
+5. Assessment -> open a domain -> expand a control
+6. Missions -> open Mission 1
+7. Corrections -> select an action -> Export administrator remediation plan
+8. Decision -> expand a blocker
+9. Export detailed CSV

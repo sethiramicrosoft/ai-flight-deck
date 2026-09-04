@@ -202,6 +202,37 @@
       font: 12px/1.5 Consolas, "Courier New", Courier, monospace;
       white-space: pre-wrap;
     }
+    .evidence-source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+    .field { display: grid; gap: 6px; color: var(--cp-text-muted); font-size: 12px; font-weight: 700; }
+    .field input {
+      width: 100%;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      padding: 9px 10px;
+      background: var(--cp-bg-elevated);
+      color: var(--cp-text);
+      font: inherit;
+      font-weight: 500;
+    }
+    .source-status {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface-soft);
+      color: var(--cp-text-muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .source-status strong { color: var(--cp-text); }
+    .source-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .source-metric { padding: 10px; border: 1px solid var(--cp-border); border-radius: 0.625rem; background: var(--cp-bg-elevated); }
+    .source-metric strong { display: block; color: var(--cp-text); font-size: 18px; }
+    .candidate-list { display: grid; gap: 8px; max-height: 240px; overflow: auto; margin-top: 12px; }
+    .candidate-row { display: flex; align-items: flex-start; gap: 8px; padding: 9px; border: 1px solid var(--cp-border); border-radius: 0.625rem; }
+    .candidate-row small { display: block; color: var(--cp-text-muted); margin-top: 2px; }
+    .staged-list { margin: 10px 0 0; padding-left: 18px; color: var(--cp-text-muted); font-size: 12px; }
     .page { display: none; animation: enter .2s ease-out; }
     .page.active { display: block; }
     @keyframes enter { from { opacity: 0; transform: translateY(4px); } }
@@ -936,6 +967,7 @@
       .mission-workspace { grid-template-columns: 1fr; }
       .mission-map-wrap { min-height: 620px; border-right: 0; border-bottom: 1px solid var(--cp-border); }
       .mission-map { min-height: 620px; }
+      .evidence-source-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 760px) {
       .app { display: block; }
@@ -953,6 +985,7 @@
       .mission-hud { grid-template-columns: 1fr; }
       .mission-telemetry { justify-content: flex-start; }
       .mission-lifecycle { grid-template-columns: 1fr 1fr; }
+      .field-grid, .source-metrics { grid-template-columns: 1fr; }
       .mission-map-wrap { min-height: auto; padding: 18px; }
       .mission-map {
         position: static;
@@ -1035,6 +1068,7 @@
       <div class="error-banner" id="import-error" role="alert" hidden></div>
 
       <section class="page" id="overview">
+        <article class="card" id="assessment-upstream-summary" hidden></article>
         <article class="card decision-panel" id="decision-panel" role="status" aria-live="polite" aria-atomic="true">
           <div>
             <div class="decision-label" id="decision-label">Demonstration</div>
@@ -1183,6 +1217,7 @@
       </section>
 
       <section class="page" id="clearance">
+        <article class="card" id="decision-upstream-summary" hidden></article>
         <article class="card clearance" id="clearance-card" role="status" aria-live="polite" aria-atomic="true">
           <div class="clearance-icon" id="clearance-icon" aria-hidden="true">!</div>
           <p class="eyebrow">Estate readiness decision</p>
@@ -1271,6 +1306,66 @@
               <li><span><strong>Copilot program owner</strong><br>Makes the pilot or rollout decision.</span></li>
               <li><span><strong>Site and data owners</strong><br>Confirm whether broad access is intentional.</span></li>
             </ul>
+          </article>
+        </div>
+
+        <div class="section-head">
+          <div><h2>Microsoft evidence sources</h2><p>Combine Microsoft reports with the live tenant scan. Imported evidence never replaces a fresh conclusive live result.</p></div>
+        </div>
+        <div class="evidence-source-grid">
+          <article class="card">
+            <p class="eyebrow">Fast path</p>
+            <h3>Microsoft 365 Copilot Readiness report</h3>
+            <p class="subtitle">Import the CSV exported from the Microsoft 365 admin center. It provides 28-day activity, licence, eligible update-channel, and suggested-candidate evidence.</p>
+            <div class="field-grid">
+              <label class="field">Report as-of date
+                <input type="date" id="readiness-reported-at">
+              </label>
+              <label class="field">CSV file
+                <input type="file" id="readiness-file" accept=".csv,text/csv">
+              </label>
+            </div>
+            <div class="actions" style="margin-top:12px">
+              <button class="btn primary" id="import-readiness" type="button">Import readiness CSV</button>
+            </div>
+            <div class="source-status" id="readiness-source-status">No Microsoft 365 Copilot Readiness report imported.</div>
+            <div id="cohort-builder" hidden>
+              <h3 style="margin-top:18px">Approve a named pilot cohort</h3>
+              <p class="subtitle">Select identified users, name the accountable owner, then save. Rerun the live scan to resolve the selected users to Microsoft Graph identities.</p>
+              <div class="candidate-list" id="candidate-list"></div>
+              <div class="field-grid">
+                <label class="field">Cohort name
+                  <input type="text" id="cohort-name" value="Microsoft 365 Copilot pilot">
+                </label>
+                <label class="field">Accountable owner
+                  <input type="text" id="cohort-owner" placeholder="Name or role">
+                </label>
+              </div>
+              <div class="actions" style="margin-top:12px">
+                <button class="btn" id="save-cohort" type="button">Save approved cohort</button>
+              </div>
+              <div class="source-status" id="cohort-status" hidden></div>
+            </div>
+          </article>
+          <article class="card">
+            <p class="eyebrow">Microsoft assessment path</p>
+            <h3>Microsoft automated readiness assessment</h3>
+            <p class="subtitle">Import the assessment's recommendation CSV. Exact checks from a pinned source revision are mapped conservatively; every unverified row remains staged for review.</p>
+            <div class="field-grid">
+              <label class="field">Assessment as-of date
+                <input type="date" id="assessment-reported-at">
+              </label>
+              <label class="field">Upstream commit or release
+                <input type="text" id="assessment-version" value="f542406ffba2066d943643de8d7a87b755b98cab">
+              </label>
+            </div>
+            <label class="field" style="margin-top:12px">Recommendation CSV
+              <input type="file" id="assessment-file" accept=".csv,text/csv">
+            </label>
+            <div class="actions" style="margin-top:12px">
+              <button class="btn primary" id="import-assessment" type="button">Import Microsoft assessment</button>
+            </div>
+            <div class="source-status" id="assessment-source-status">No Microsoft automated assessment imported.</div>
           </article>
         </div>
 
@@ -1601,6 +1696,7 @@
     let localServiceAvailable = false;
     let activeWorkflowId = null;
     let readinessCatalog = null;
+    let upstreamEvidence = { readiness: null, assessment: null, cohort: null };
     let activeTenant = {
       name: "Contoso Aviation",
       source: "synthetic",
@@ -2944,6 +3040,7 @@
       document.getElementById("blast-radius-note").textContent = activeTenant.blastRadiusUsers == null
         ? "Effective reachability is not produced by this collector"
         : `${summary.guests.toLocaleString()} guest accounts detected`;
+      renderAppliedUpstreamSources(scan);
       renderEstateDomains(scan);
       document.getElementById("baseline-evidence").textContent = `${scan.generatedAt ? new Date(scan.generatedAt).toLocaleString() : "Imported scan"}, ${summary.sitesScanned} sites, read-only metadata.`;
       document.getElementById("verification-empty").hidden = false;
@@ -3380,11 +3477,227 @@
       return job;
     }
 
+    function dateInputToIso(value) {
+      return value ? `${value}T23:59:59.000Z` : null;
+    }
+
+    function metricElement(value, label) {
+      const item = document.createElement("div");
+      item.className = "source-metric";
+      const number = document.createElement("strong");
+      number.textContent = String(value);
+      const text = document.createElement("span");
+      text.textContent = label;
+      item.append(number, text);
+      return item;
+    }
+
+    function renderReadinessSource(readiness, cohort) {
+      const status = document.getElementById("readiness-source-status");
+      const builder = document.getElementById("cohort-builder");
+      const candidates = document.getElementById("candidate-list");
+      status.replaceChildren();
+      candidates.replaceChildren();
+      builder.hidden = true;
+      if (!readiness) {
+        status.textContent = "No Microsoft 365 Copilot Readiness report imported.";
+        return;
+      }
+      const title = document.createElement("strong");
+      title.textContent = `${readiness.summary.rows} activity-report users imported`;
+      const detail = document.createElement("div");
+      detail.textContent = `${readiness.privacy.mode} identities. Report date: ${
+        readiness.reportedAt ? new Date(readiness.reportedAt).toLocaleDateString() : "missing - evidence is non-gating"
+      }.`;
+      const metrics = document.createElement("div");
+      metrics.className = "source-metrics";
+      metrics.append(
+        metricElement(readiness.summary.copilotLicensedUsers, "Licensed"),
+        metricElement(readiness.summary.licensedUsersOnEligibleChannel, "Eligible channel"),
+        metricElement(readiness.summary.suggestedCandidates, "Suggested")
+      );
+      status.append(title, detail, metrics);
+      if (readiness.privacy.mode !== "Identified") {
+        const warning = document.createElement("div");
+        warning.style.marginTop = "10px";
+        warning.textContent = "A named cohort cannot be created because one or more identities are concealed.";
+        status.appendChild(warning);
+        return;
+      }
+      builder.hidden = false;
+      const sortedRows = [...readiness.rows].sort((left, right) =>
+        Number(right.suggestedCandidate) - Number(left.suggestedCandidate) ||
+        left.userName.localeCompare(right.userName));
+      for (const row of sortedRows) {
+        const label = document.createElement("label");
+        label.className = "candidate-row";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = row.userName;
+        checkbox.dataset.cohortMember = "true";
+        checkbox.checked = cohort?.userPrincipalNames
+          ?.map(userName => userName.toLowerCase())
+          .includes(row.userName.toLowerCase()) ||
+          (!cohort && row.suggestedCandidate === true);
+        const copy = document.createElement("span");
+        const name = document.createElement("strong");
+        name.textContent = row.userName;
+        const meta = document.createElement("small");
+        meta.textContent = [
+          row.suggestedCandidate ? "Microsoft suggested candidate" : "Not Microsoft-suggested",
+          row.hasCopilotLicense ? "Copilot licence assigned" : "No Copilot licence",
+          row.eligibleUpdateChannel ? "Eligible update channel" : "Update channel needs attention"
+        ].join(" · ");
+        copy.append(name, meta);
+        label.append(checkbox, copy);
+        candidates.appendChild(label);
+      }
+      if (cohort) {
+        document.getElementById("cohort-name").value = cohort.name;
+        document.getElementById("cohort-owner").value = cohort.owner;
+        const cohortStatus = document.getElementById("cohort-status");
+        cohortStatus.hidden = false;
+        cohortStatus.textContent = `${cohort.population} users approved for ${cohort.name}. Rerun the live scan to apply this cohort.`;
+      }
+    }
+
+    function renderAssessmentSource(assessment) {
+      const status = document.getElementById("assessment-source-status");
+      status.replaceChildren();
+      if (!assessment) {
+        status.textContent = "No Microsoft automated assessment imported.";
+        return;
+      }
+      const title = document.createElement("strong");
+      title.textContent = `${assessment.summary.rows} assessment rows imported`;
+      const detail = document.createElement("div");
+      detail.textContent = `${assessment.summary.mappedRows} exact-crosswalk rows mapped; ${assessment.summary.stagedRows} retained for review. Source ${assessment.upstreamVersion}.`;
+      status.append(title, detail);
+      if (assessment.stagedRows?.length) {
+        const list = document.createElement("ul");
+        list.className = "staged-list";
+        for (const row of assessment.stagedRows.slice(0, 8)) {
+          const item = document.createElement("li");
+          item.textContent = `${row.service}: ${row.feature} (${row.status || "No status"})`;
+          list.appendChild(item);
+        }
+        if (assessment.stagedRows.length > 8) {
+          const item = document.createElement("li");
+          item.textContent = `${assessment.stagedRows.length - 8} additional rows remain staged.`;
+          list.appendChild(item);
+        }
+        status.appendChild(list);
+      }
+    }
+
+    function renderAppliedUpstreamSources(scan) {
+      const sources = scan?.estateAssessment?.upstreamSources || [];
+      const conflicts = scan?.estateAssessment?.upstreamConflicts || [];
+      for (const id of ["assessment-upstream-summary", "decision-upstream-summary"]) {
+        const panel = document.getElementById(id);
+        panel.replaceChildren();
+        panel.hidden = sources.length === 0;
+        if (!sources.length) continue;
+        const heading = document.createElement("h3");
+        heading.textContent = "Evidence combined with this baseline";
+        const copy = document.createElement("p");
+        copy.className = "subtitle";
+        copy.textContent = sources.map(source => {
+          const date = source.reportedAt
+            ? new Date(source.reportedAt).toLocaleDateString()
+            : "source date missing";
+          return `${source.sourceType} (${source.rows || 0} rows, ${date})`;
+        }).join(" · ");
+        panel.append(heading, copy);
+        if (conflicts.length) {
+          const conflict = document.createElement("p");
+          conflict.className = "subtitle";
+          conflict.textContent = `${conflicts.length} imported result${
+            conflicts.length === 1 ? "" : "s"
+          } differed from fresh live evidence; the live result was retained.`;
+          panel.appendChild(conflict);
+        }
+      }
+    }
+
+    function renderUpstreamEvidence(payload) {
+      upstreamEvidence = {
+        readiness: payload?.readiness || null,
+        assessment: payload?.assessment || null,
+        cohort: payload?.cohort || null
+      };
+      renderReadinessSource(upstreamEvidence.readiness, upstreamEvidence.cohort);
+      renderAssessmentSource(upstreamEvidence.assessment);
+    }
+
+    async function loadUpstreamEvidence() {
+      renderUpstreamEvidence(await apiJson("/api/upstream-evidence"));
+    }
+
+    async function importUpstreamFile(sourceType) {
+      if (!localServiceAvailable) {
+        throw new Error("Launch AI Flight Deck with its local server before importing Microsoft evidence.");
+      }
+      const readiness = sourceType === "m365-copilot-readiness";
+      const fileInput = document.getElementById(readiness ? "readiness-file" : "assessment-file");
+      const [file] = fileInput.files;
+      if (!file) throw new Error("Select a CSV file first.");
+      if (file.size > 12 * 1024 * 1024) throw new Error("The CSV exceeds the 12 MB import limit.");
+      const reportedAt = dateInputToIso(document.getElementById(
+        readiness ? "readiness-reported-at" : "assessment-reported-at"
+      ).value);
+      if (!reportedAt) {
+        throw new Error("Enter the report as-of date so imported evidence can be evaluated for freshness.");
+      }
+      const payload = await apiJson("/api/upstream-evidence", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Flight-Deck": "local-ui"
+        },
+        body: JSON.stringify({
+          sourceType,
+          fileName: file.name,
+          content: await file.text(),
+          reportedAt,
+          upstreamVersion: readiness ? undefined :
+            document.getElementById("assessment-version").value.trim()
+        })
+      });
+      await loadUpstreamEvidence();
+      if (payload.artifactUpdated) await loadWorkflowArtifact("baseline");
+      showToast(readiness
+        ? `Imported ${payload.summary.rows} readiness users`
+        : `Mapped ${payload.summary.mappedRows}; staged ${payload.summary.stagedRows}`);
+    }
+
+    async function savePilotCohort() {
+      const userNames = [...document.querySelectorAll("[data-cohort-member]:checked")]
+        .map(input => input.value);
+      const cohort = await apiJson("/api/cohorts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Flight-Deck": "local-ui"
+        },
+        body: JSON.stringify({
+          name: document.getElementById("cohort-name").value.trim(),
+          owner: document.getElementById("cohort-owner").value.trim(),
+          approved: true,
+          userNames
+        })
+      });
+      upstreamEvidence.cohort = cohort;
+      renderReadinessSource(upstreamEvidence.readiness, cohort);
+      showToast(`Approved ${cohort.population}-user pilot cohort`);
+    }
+
     async function initializeLocalService() {
       try {
         const status = await apiJson("/api/status");
         localServiceAvailable = status.service === "ai-flight-deck-local" && status.ready === true;
         if (!localServiceAvailable) throw new Error("Unexpected local service response.");
+        await loadUpstreamEvidence();
         renderCapabilityPlans(await apiJson("/api/capabilities?authMode=local-delegated"));
         if (status.activeJobId) {
           renderServiceState("running", "A tenant workflow is already running.");
@@ -3483,6 +3796,16 @@
       } finally {
         event.target.value = "";
       }
+    });
+    document.getElementById("import-readiness").addEventListener("click", () => {
+      importUpstreamFile("m365-copilot-readiness").catch(error => showError(error.message));
+    });
+    document.getElementById("import-assessment").addEventListener("click", () => {
+      importUpstreamFile("microsoft-automated-readiness-assessment")
+        .catch(error => showError(error.message));
+    });
+    document.getElementById("save-cohort").addEventListener("click", () => {
+      savePilotCohort().catch(error => showError(error.message));
     });
     document.getElementById("verification-button").addEventListener("click", () => document.getElementById("verification-file").click());
     document.getElementById("verification-file").addEventListener("change", async event => {

@@ -204,6 +204,169 @@ test("reuses the workspace integrity key and verifies artifacts after restart", 
   }
 });
 
+test("imports Microsoft readiness evidence and saves an approved pilot cohort", async () => {
+  await withServer(async (job, action, signal, workspace) => {
+    fs.writeFileSync(path.join(workspace, "baseline-scan.json"), JSON.stringify({
+      documentType: "tenant-scan",
+      producer: "ai-flight-deck/scan-tenant.ps1",
+      generatedAt: "2026-09-04T09:00:00.000Z",
+      tenant: { tenantId: "11111111-1111-1111-1111-111111111111" },
+      auth: { actor: { id: "reader@example.test" } },
+      estateAssessment: {
+        cohorts: [{ id: "tenant-wide" }],
+        controlResults: [],
+        domains: [{
+          id: "devicesAndApps",
+          status: "Partial",
+          summary: "",
+          nextStep: ""
+        }]
+      }
+    }));
+    return "baseline";
+  }, async ({ port }) => {
+    const started = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Flight-Deck": "local-ui"
+      },
+      body: JSON.stringify({ action: "baseline" })
+    });
+    const { id } = await started.json();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    const completed = await fetch(`http://127.0.0.1:${port}/api/jobs/${id}`);
+    assert.equal((await completed.json()).status, "completed");
+
+    const csv = [
+      "User name,Has Copilot license been assigned,Uses eligible update channel,Uses Teams Meetings,Uses Teams chat,Uses Outlook Email,Uses Office docs,Suggested candidate for Copilot",
+      "pilot1@example.test,Yes,No,Yes,Yes,Yes,Yes,Yes"
+    ].join("\r\n");
+    const imported = await fetch(`http://127.0.0.1:${port}/api/upstream-evidence`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Flight-Deck": "local-ui"
+      },
+      body: JSON.stringify({
+        sourceType: "m365-copilot-readiness",
+        fileName: "copilot-readiness.csv",
+        reportedAt: "2026-09-03T12:00:00.000Z",
+        content: csv
+      })
+    });
+    assert.equal(imported.status, 200);
+    const importedBody = await imported.json();
+    assert.equal(importedBody.artifactUpdated, true);
+    assert.equal(importedBody.summary.rows, 1);
+
+    const artifact = await fetch(`http://127.0.0.1:${port}/api/artifacts/baseline`);
+    const artifactBody = await artifact.json();
+    assert.equal(artifact.status, 200);
+    assert.equal(artifactBody.estateAssessment.controlResults[0].status, "Fail");
+    assert.equal(artifactBody.estateAssessment.upstreamSources[0].sourceType,
+      "m365-copilot-readiness");
+
+    const cohort = await fetch(`http://127.0.0.1:${port}/api/cohorts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Flight-Deck": "local-ui"
+      },
+      body: JSON.stringify({
+        name: "Finance pilot",
+        owner: "Finance Copilot Lead",
+        approved: true,
+        userNames: ["pilot1@example.test"]
+      })
+    });
+    assert.equal(cohort.status, 200);
+    const cohortBody = await cohort.json();
+    assert.equal(cohortBody.approved, true);
+    assert.deepEqual(cohortBody.userPrincipalNames, ["pilot1@example.test"]);
+
+    const sources = await fetch(`http://127.0.0.1:${port}/api/upstream-evidence`);
+    const sourcesBody = await sources.json();
+    assert.equal(sourcesBody.readiness.summary.rows, 1);
+    assert.equal(sourcesBody.cohort.name, "Finance pilot");
+  });
+});
+
+test("imports the pinned Microsoft automated assessment and stages unmapped rows", async () => {
+  await withServer(async (job, action, signal, workspace) => {
+    fs.writeFileSync(path.join(workspace, "baseline-scan.json"), JSON.stringify({
+      documentType: "tenant-scan",
+      producer: "ai-flight-deck/scan-tenant.ps1",
+      generatedAt: "2026-09-04T09:00:00.000Z",
+      tenant: { tenantId: "11111111-1111-1111-1111-111111111111" },
+      auth: { actor: { id: "reader@example.test" } },
+      estateAssessment: {
+        cohorts: [{ id: "tenant-wide" }],
+        controlResults: [],
+        domains: [{
+          id: "powerPlatformAgents",
+          status: "Partial",
+          summary: "",
+          nextStep: ""
+        }]
+      },
+      evidenceSets: { broadAccessSiteIds: [], sharedItemIds: [] },
+      evidenceGraph: {
+        version: 1,
+        minimized: true,
+        tenantId: "11111111-1111-1111-1111-111111111111",
+        nodes: [],
+        edges: []
+      }
+    }));
+    return action;
+  }, async ({ port }) => {
+    const started = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Flight-Deck": "local-ui"
+      },
+      body: JSON.stringify({ action: "baseline" })
+    });
+    const { id } = await started.json();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    await fetch(`http://127.0.0.1:${port}/api/jobs/${id}`);
+
+    const csv = [
+      "Service,Feature,Status,Priority,Observation,Recommendation,LinkText,LinkUrl",
+      "Power Platform,DLP Governance - BLOCKER: HTTP Connector,Success,High,HTTP blocked,Update policy,DLP guide,https://example.test/dlp",
+      "M365,Unverified feature,Success,Low,Observed,Review,,"
+    ].join("\r\n");
+    const imported = await fetch(`http://127.0.0.1:${port}/api/upstream-evidence`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Flight-Deck": "local-ui"
+      },
+      body: JSON.stringify({
+        sourceType: "microsoft-automated-readiness-assessment",
+        fileName: "m365_recommendations.csv",
+        reportedAt: "2026-09-03T12:00:00.000Z",
+        upstreamVersion: "f542406ffba2066d943643de8d7a87b755b98cab",
+        content: csv
+      })
+    });
+    assert.equal(imported.status, 200);
+    const importedBody = await imported.json();
+    assert.equal(importedBody.summary.mappedRows, 1);
+    assert.equal(importedBody.summary.stagedRows, 1);
+    assert.equal(importedBody.mappedRows[0].proposedStatus, "Fail");
+
+    const sources = await fetch(`http://127.0.0.1:${port}/api/upstream-evidence`);
+    const sourcesBody = await sources.json();
+    assert.equal(sourcesBody.assessment.upstreamVersion,
+      "f542406ffba2066d943643de8d7a87b755b98cab");
+    assert.equal(sourcesBody.assessment.stagedRows[0].stagingReason,
+      "NO_VERIFIED_CONTROL_CROSSWALK");
+  });
+});
+
 test("rejects arbitrary workflow actions", async () => {
   await withServer(async () => "baseline", async ({ port }) => {
     const response = await fetch(`http://127.0.0.1:${port}/api/jobs`, {

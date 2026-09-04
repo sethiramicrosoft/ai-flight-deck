@@ -7,6 +7,14 @@ const { AUTH_MODES, ConsentBroker, buildServicePlans } = require("./consent-brok
 const { buildCollectorDefinitions } = require("./collector-definitions");
 const { collectEstate } = require("./estate-collector-suite");
 const {
+  assessmentControlResults,
+  createPilotCohort,
+  mergeImportedControlResults,
+  parseMicrosoftAutomatedAssessmentCsv,
+  parseM365CopilotReadinessCsv,
+  readinessControlResults
+} = require("./upstream-evidence");
+const {
   appendControlHistory,
   createActionPackageBinding,
   createEvidenceEnvelope,
@@ -83,6 +91,15 @@ function writeJsonAtomic(filePath, value) {
   const temporary = `${filePath}.${crypto.randomUUID()}.tmp`;
   fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { encoding: "utf8", mode: 0o600 });
   fs.renameSync(temporary, filePath);
+}
+
+async function readJsonBody(req, maximumBytes) {
+  let body = "";
+  for await (const chunk of req) {
+    body += chunk;
+    if (body.length > maximumBytes) throw new Error("Request body is too large.");
+  }
+  return JSON.parse(body || "{}");
 }
 
 function loadOrCreateIntegrityKey(workspace) {
@@ -352,7 +369,10 @@ function createApp({
   const artifactPaths = {
     baseline: path.join(workspace, "baseline-scan.json"),
     report: path.join(workspace, "verification-report.json"),
-    history: path.join(workspace, "control-history.json")
+    history: path.join(workspace, "control-history.json"),
+    readinessImport: path.join(workspace, "m365-copilot-readiness.json"),
+    assessmentImport: path.join(workspace, "microsoft-automated-assessment.json"),
+    cohort: path.join(workspace, "cohort-config.json")
   };
   const envelopePaths = {
     baseline: path.join(workspace, "baseline-scan.envelope.json"),
@@ -518,17 +538,105 @@ function createApp({
           });
           return;
         }
+        if (req.method === "GET" && pathname === "/api/upstream-evidence") {
+          const readiness = fs.existsSync(artifactPaths.readinessImport)
+            ? JSON.parse(fs.readFileSync(artifactPaths.readinessImport, "utf8"))
+            : null;
+          const assessment = fs.existsSync(artifactPaths.assessmentImport)
+            ? JSON.parse(fs.readFileSync(artifactPaths.assessmentImport, "utf8"))
+            : null;
+          const cohort = fs.existsSync(artifactPaths.cohort)
+            ? JSON.parse(fs.readFileSync(artifactPaths.cohort, "utf8"))
+            : null;
+          json(res, 200, { readiness, assessment, cohort });
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/upstream-evidence") {
+          if (req.headers["x-flight-deck"] !== "local-ui") {
+            json(res, 403, { error: "Missing local UI request header." });
+            return;
+          }
+          const input = await readJsonBody(req, 12 * 1024 * 1024);
+          if (!["m365-copilot-readiness", "microsoft-automated-readiness-assessment"]
+            .includes(input.sourceType)) {
+            throw new Error("Unsupported upstream evidence source.");
+          }
+          const importedAt = new Date().toISOString();
+          const imported = input.sourceType === "m365-copilot-readiness"
+            ? parseM365CopilotReadinessCsv(input.content, {
+              fileName: input.fileName,
+              importedAt,
+              reportedAt: input.reportedAt || null
+            })
+            : parseMicrosoftAutomatedAssessmentCsv(input.content, {
+              fileName: input.fileName,
+              importedAt,
+              reportedAt: input.reportedAt || null,
+              upstreamVersion: input.upstreamVersion
+            });
+          const importPath = imported.sourceType === "m365-copilot-readiness"
+            ? artifactPaths.readinessImport
+            : artifactPaths.assessmentImport;
+          writeJsonAtomic(importPath, imported);
+          let artifactUpdated = false;
+          if (fs.existsSync(artifactPaths.baseline) && fs.existsSync(envelopePaths.baseline)) {
+            const baseline = readVerifiedArtifact("baseline");
+            delete baseline.integrity;
+            mergeImportedControlResults(
+              baseline,
+              imported.sourceType === "m365-copilot-readiness"
+                ? readinessControlResults(baseline, imported)
+                : assessmentControlResults(baseline, imported),
+              {
+                sourceType: imported.sourceType,
+                importedAt: imported.importedAt,
+                reportedAt: imported.reportedAt,
+                fileName: imported.fileName,
+                rows: imported.summary.rows,
+                privacyMode: imported.privacy?.mode,
+                upstreamVersion: imported.upstreamVersion,
+                artifactSha256: imported.sourceArtifact.sha256,
+                mappedRows: imported.summary.mappedRows,
+                stagedRows: imported.summary.stagedRows
+              }
+            );
+            writeJsonAtomic(artifactPaths.baseline, baseline);
+            sealArtifact("baseline");
+            artifactUpdated = true;
+          }
+          json(res, 200, {
+            ...imported,
+            artifactUpdated
+          });
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/cohorts") {
+          if (req.headers["x-flight-deck"] !== "local-ui") {
+            json(res, 403, { error: "Missing local UI request header." });
+            return;
+          }
+          if (!fs.existsSync(artifactPaths.readinessImport)) {
+            throw new Error("Import the Microsoft Copilot Readiness CSV before creating a pilot cohort.");
+          }
+          const input = await readJsonBody(req, 1024 * 1024);
+          const readiness = JSON.parse(fs.readFileSync(artifactPaths.readinessImport, "utf8"));
+          const cohort = createPilotCohort(readiness, {
+            id: input.id,
+            name: input.name,
+            owner: input.owner,
+            approved: input.approved === true,
+            userNames: input.userNames
+          });
+          writeJsonAtomic(artifactPaths.cohort, cohort);
+          json(res, 200, cohort);
+          return;
+        }
         if (req.method === "POST" && pathname === "/api/action-bindings") {
           if (req.headers["x-flight-deck"] !== "local-ui") {
             json(res, 403, { error: "Missing local UI request header." });
             return;
           }
-          let body = "";
-          for await (const chunk of req) {
-            body += chunk;
-            if (body.length > 1048576) throw new Error("Request body is too large.");
-          }
-          const input = JSON.parse(body || "{}");
+          const input = await readJsonBody(req, 1048576);
           const baselineEnvelope = JSON.parse(fs.readFileSync(envelopePaths.baseline, "utf8"));
           verifyEvidenceEnvelope(baselineEnvelope, integrityKey);
           const binding = createActionPackageBinding({
@@ -545,12 +653,7 @@ function createApp({
             json(res, 403, { error: "Missing local UI request header." });
             return;
           }
-          let body = "";
-          for await (const chunk of req) {
-            body += chunk;
-            if (body.length > 4096) throw new Error("Request body is too large.");
-          }
-          const input = JSON.parse(body || "{}");
+          const input = await readJsonBody(req, 4096);
           const job = await startJob(input.action);
           json(res, 202, { id: job.id, status: job.status });
           return;

@@ -28,7 +28,7 @@ ai-flight-deck\Start-AI-Flight-Deck.cmd
 
 The launcher starts the localhost-only control plane and opens
 `http://127.0.0.1:8080/index.html`. From the Set up page, select
-**Run baseline scan**. The product prepares the Microsoft Graph
+**Connect and scan tenant**. The product prepares the Microsoft Graph
 authentication connector if needed, opens Microsoft sign-in, runs the
 read-only baseline, stores evidence in the protected user-local workspace, and
 loads Assessment automatically.
@@ -44,7 +44,7 @@ HTML application.
 
 ### 1. Connect and scan
 
-Select **Run baseline scan** inside AI Flight Deck. On first use, the
+Select **Connect and scan tenant** inside AI Flight Deck. On first use, the
 local control plane installs `Microsoft.Graph.Authentication` for the current
 Windows user if it is missing.
 
@@ -87,6 +87,38 @@ substitute total directory population for affected users or present the sharing
 signal as a rollout recommendation.
 
 Manual **Import existing scan** remains available for offline evidence review.
+
+### Combine Microsoft evidence
+
+The Set up page supports three complementary evidence paths:
+
+1. **Fast path - Microsoft 365 Copilot Readiness CSV.** Export the readiness
+   report from the Microsoft 365 admin center, enter its displayed as-of date,
+   and import it. Flight Deck records the source digest, 28-day activity scope,
+   reporting privacy mode, licence assignment, update-channel observations, and
+   suggested candidates. Activity-limited report rows never prove complete
+   tenant or device coverage.
+2. **Microsoft assessment path.** Run Microsoft's
+   `m365-copilot-automated-readiness-assessment`, then import its
+   `m365_recommendations_*.csv` file with the source commit or release and the
+   assessment date. Flight Deck maps only exact checks verified against that
+   source version. Unrecognized feature rows remain visible in a staged inbox;
+   title similarity is never treated as evidence.
+3. **Live path.** Run **Connect and scan tenant** to collect current Graph and
+   network evidence. Fresh conclusive live evidence takes precedence if an
+   imported result conflicts with it.
+
+For identified readiness reports, select users in the candidate list, enter a
+cohort name and accountable owner, and save the approved cohort. Run the live
+scan again so Flight Deck can resolve every selected user to a Microsoft Graph
+identity. The saved cohort is not approved for mission gating if any selected
+identity cannot be resolved. Microsoft Graph paging is followed beyond the
+first 999 directory users.
+
+If the Microsoft 365 reporting privacy setting conceals any identities, Flight
+Deck labels the import `Concealed` or `Mixed` and blocks named cohort creation.
+If an as-of date is missing, imported results remain `Unknown` with
+`MISSING_SOURCE_TIMESTAMP`.
 
 ### Current scanner scope
 
@@ -181,6 +213,14 @@ repository under the Microsoft GitHub organization. It is Microsoft-authored
 open-source software released under the MIT License, but it should not be
 represented as a supported Microsoft 365 product or service.
 
+The current import crosswalk is pinned to upstream commit
+`f542406ffba2066d943643de8d7a87b755b98cab`. That revision exports the columns
+`Service`, `Feature`, `Status`, `Priority`, `Observation`, `Recommendation`,
+`LinkText`, and `LinkUrl`. Flight Deck does not trust the upstream `Status`
+field alone because some recommendation modules use `Success` for a completed
+collector even when the observation identifies a governance gap. Exact feature
+semantics and source provenance determine the proposed Flight Deck result.
+
 AI Flight Deck can include equivalent assessment domains without losing its
 product differentiation:
 
@@ -213,7 +253,7 @@ retained in the copied or substantial portions as required by that license.
 The product is organized around four customer tasks:
 
 1. **Set up** - Review permissions and boundaries, run the read-only baseline,
-   and import it.
+   import Microsoft evidence, and approve a named pilot cohort.
 2. **Assessment** - Review domain coverage, evidence gaps, the sharing posture
    signal, and evidence-backed findings.
 3. **Corrections** - Create an approval-ready correction package. Forecasts are

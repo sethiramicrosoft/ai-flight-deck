@@ -1,5 +1,7 @@
 "use strict";
 
+const fs = require("fs");
+const path = require("path");
 const catalog = require("./schema/readiness-catalog.v1.json");
 const { runEstateCollectors } = require("./collector-orchestrator");
 const {
@@ -100,19 +102,18 @@ function updateEstateAssessment(scan, collection) {
 async function inferLicensedCohort(request, existingCohort, signal) {
   if (existingCohort?.principalIds?.length) return existingCohort;
   try {
-    const [skuResponse, userResponse] = await Promise.all([
+    const [skuResponse, users] = await Promise.all([
       request({
         url: "https://graph.microsoft.com/v1.0/subscribedSkus?" +
           "$select=id,skuId,skuPartNumber,servicePlans",
         method: "GET",
         signal
       }),
-      request({
-        url: "https://graph.microsoft.com/v1.0/users?" +
-          "$select=id,assignedLicenses&$top=999",
-        method: "GET",
+      listGraphCollection(
+        request,
+        "https://graph.microsoft.com/v1.0/users?$select=id,assignedLicenses&$top=999",
         signal
-      })
+      )
     ]);
     const copilotSkuIds = new Set((skuResponse.value || [])
       .filter(sku =>
@@ -122,7 +123,7 @@ async function inferLicensedCohort(request, existingCohort, signal) {
       .flatMap(sku => [sku.skuId, sku.id])
       .filter(Boolean)
       .map(value => String(value).toLowerCase()));
-    const principalIds = (userResponse.value || [])
+    const principalIds = users
       .filter(user => (user.assignedLicenses || []).some(license =>
         copilotSkuIds.has(String(license.skuId || "").toLowerCase())))
       .map(user => user.id)
@@ -145,6 +146,58 @@ async function inferLicensedCohort(request, existingCohort, signal) {
       discoveryError: String(error?.message || error)
     };
   }
+
+}
+
+async function listGraphCollection(request, initialUrl, signal, maxPages = 100) {
+  const values = [];
+  let url = initialUrl;
+  let pages = 0;
+  while (url) {
+    if (pages >= maxPages) {
+      throw new Error(`Microsoft Graph pagination exceeded the ${maxPages}-page safety limit.`);
+    }
+    const response = await request({ url, method: "GET", signal });
+    values.push(...(response.value || []));
+    url = response["@odata.nextLink"] || null;
+    pages++;
+  }
+  return values;
+}
+
+function loadConfiguredCohort(workspace) {
+  const filePath = path.join(workspace, "cohort-config.json");
+  if (!fs.existsSync(filePath)) return null;
+  const cohort = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  if (!Array.isArray(cohort.userPrincipalNames) || !cohort.userPrincipalNames.length) {
+    throw new Error("The saved cohort does not contain any user principal names.");
+  }
+  return cohort;
+}
+
+async function resolveConfiguredCohort(request, configuredCohort, signal) {
+  const directoryUsers = await listGraphCollection(
+    request,
+    "https://graph.microsoft.com/v1.0/users?$select=id,userPrincipalName,assignedLicenses&$top=999",
+    signal
+  );
+  const users = new Map(directoryUsers.map(user => [
+    String(user.userPrincipalName || "").toLowerCase(),
+    user
+  ]));
+  const requested = configuredCohort.userPrincipalNames
+    .map(value => String(value).toLowerCase());
+  const resolved = requested.map(userName => users.get(userName)).filter(Boolean);
+  const unresolvedUserPrincipalNames = requested.filter(userName => !users.has(userName));
+  return {
+    ...configuredCohort,
+    requestedApproved: configuredCohort.approved === true,
+    approved: configuredCohort.approved === true && unresolvedUserPrincipalNames.length === 0,
+    principalIds: resolved.map(user => user.id).sort(),
+    population: requested.length,
+    resolutionComplete: unresolvedUserPrincipalNames.length === 0,
+    unresolvedUserPrincipalNames
+  };
 }
 
 async function collectEstate({
@@ -163,12 +216,15 @@ async function collectEstate({
     verifyAttestation,
     adapters: { ...collectorAdapters, graphRequest: request }
   });
-  const configuredCohort = scan.estateAssessment?.cohorts?.[0] || {
+  const savedCohort = loadConfiguredCohort(workspace);
+  const defaultCohort = scan.estateAssessment?.cohorts?.[0] || {
     id: "tenant-wide",
     approved: false,
     principalIds: []
   };
-  const cohort = await inferLicensedCohort(request, configuredCohort, signal);
+  const cohort = savedCohort
+    ? await resolveConfiguredCohort(request, savedCohort, signal)
+    : await inferLicensedCohort(request, defaultCohort, signal);
   scan.estateAssessment.cohorts = [cohort];
   const context = {
     tenantId: scan.tenant.tenantId,
@@ -193,5 +249,7 @@ module.exports = {
   buildEstateCollectors,
   collectEstate,
   inferLicensedCohort,
+  loadConfiguredCohort,
+  resolveConfiguredCohort,
   updateEstateAssessment
 };
