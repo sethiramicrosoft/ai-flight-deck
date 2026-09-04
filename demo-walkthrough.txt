@@ -1,0 +1,58 @@
+AI Flight Deck - Team Walkthrough
+
+Let me show you what I built and how to use it.
+
+This is the AI Flight Deck dashboard. It has four main sections: Set up,
+Assessment, Corrections, and Decision.
+
+We start on Set up. Click Run baseline scan, then complete the Microsoft
+device sign-in using the code shown on the screen. The connection is read-only,
+so the tool does not change anything in the tenant.
+
+Once the scan finishes, go to Assessment. This shows all 13 readiness areas and
+77 individual checks.
+
+The results have four main statuses:
+
+- Pass means the check completed successfully.
+- Fail means the tool found a readiness issue.
+- Warning means something needs review.
+- Unknown means the tool could not get enough evidence. It does not
+  automatically mean there is a problem.
+
+Click any readiness area, and then expand a control. It shows exactly what was
+checked, the result, the evidence collected, what is missing, the required
+correction, and the related Microsoft documentation.
+
+The Missions turn the results into stages. Mission 1 covers the basic
+requirements. The later missions cover pilot readiness, scaling, and ongoing
+governance. A mission stays locked while any required control is failed or
+unresolved.
+
+Next, go to Corrections. Every failed, warning, or unresolved control appears
+here as an action. Select the actions you want to work on, then click Export
+administrator remediation plan.
+
+The downloaded file contains the selected controls, current findings, missing
+evidence, and recommended actions. It is an action plan for the relevant
+administrators - the tool does not automatically make tenant changes.
+
+The Decision page brings everything together. It tells us whether there is
+enough evidence to proceed and lists whatever is still blocking the next
+mission.
+
+We can also export the full assessment as a CSV if we want to review all 77
+controls in Excel or share them with the team.
+
+That is the complete workflow: run the scan, review the assessment, understand
+why missions are blocked, export the corrections, make the changes, and scan
+again to verify them.
+
+Click sequence while speaking
+
+1. Set up -> Run baseline scan
+2. Assessment -> open a domain -> expand a control
+3. Missions -> open Mission 1
+4. Corrections -> select an action -> Export administrator remediation plan
+5. Decision -> expand a blocker
+6. Export detailed CSV

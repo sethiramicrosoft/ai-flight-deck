@@ -1,0 +1,3585 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Flight Deck</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme = param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+    :root {
+      --cp-warning-text: var(--cp-text);
+      --cp-success-text: var(--cp-text);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--cp-bg);
+      color: var(--cp-text);
+      font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 24px 16px;
+      background: var(--cp-bg-elevated);
+      border-right: 1px solid var(--cp-border);
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+    .brand { display: flex; gap: 12px; align-items: center; padding: 0 8px; }
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 0.625rem;
+      background: var(--cp-accent);
+      color: var(--cp-accent-fg);
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .brand strong { display: block; font-size: 15px; }
+    .brand span { color: var(--cp-text-muted); font-size: 12px; }
+    nav { display: grid; gap: 6px; }
+    .nav-item {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: 0.625rem;
+      background: transparent;
+      color: var(--cp-text-muted);
+      text-align: left;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .nav-item:hover { background: var(--cp-surface-soft); color: var(--cp-text); }
+    .nav-item.active {
+      background: var(--cp-accent-soft);
+      border-color: var(--cp-accent);
+      color: var(--cp-accent);
+      font-weight: 700;
+    }
+    .nav-icon { width: 18px; text-align: center; }
+    .tenant {
+      margin-top: auto;
+      padding: 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+    }
+    .tenant-label {
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .tenant strong { display: block; margin: 5px 0 2px; font-size: 13px; }
+    .tenant small { color: var(--cp-success-text); }
+    main { min-width: 0; padding: 24px 32px 48px; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 26px;
+    }
+    .eyebrow {
+      margin: 0 0 5px;
+      color: var(--cp-accent);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 0; font-size: clamp(25px, 3vw, 36px); letter-spacing: -.03em; }
+    h1[tabindex="-1"]:focus { outline: none; }
+    h2 { font-size: 20px; letter-spacing: -.02em; }
+    h3 { font-size: 15px; }
+    .subtitle { margin: 6px 0 0; color: var(--cp-text-muted); max-width: 760px; }
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .btn {
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      padding: 9px 14px;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      font-weight: 650;
+    }
+    .btn:hover { border-color: var(--cp-border-strong); }
+    .btn.primary { background: var(--cp-accent); border-color: var(--cp-accent); color: var(--cp-accent-fg); }
+    .btn.primary:hover { background: var(--cp-accent-hover); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .icon-btn { width: 40px; padding-inline: 0; }
+    .service-panel {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface-soft);
+    }
+    .service-status { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+    .service-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cp-border-strong); }
+    .service-panel.ready .service-dot { background: var(--cp-success); }
+    .service-panel.running .service-dot { background: var(--cp-warning); }
+    .service-panel.failed .service-dot { background: var(--cp-danger); }
+    .service-log {
+      max-height: 180px;
+      overflow: auto;
+      margin: 12px 0 0;
+      padding: 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      color: var(--cp-text-muted);
+      font: 12px/1.5 Consolas, "Courier New", Courier, monospace;
+      white-space: pre-wrap;
+    }
+    .page { display: none; animation: enter .2s ease-out; }
+    .page.active { display: block; }
+    @keyframes enter { from { opacity: 0; transform: translateY(4px); } }
+    .grid { display: grid; gap: 16px; }
+    .grid.metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid.two { grid-template-columns: minmax(0, 1.5fr) minmax(300px, .8fr); }
+    .card {
+      background: var(--cp-surface);
+      border: 1px solid var(--cp-border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 0 2px var(--cp-border), 0 1px 2px var(--cp-border);
+    }
+    .metric-label { color: var(--cp-text-muted); font-size: 12px; font-weight: 650; }
+    .metric-value { margin-top: 8px; font-size: 30px; font-weight: 780; letter-spacing: -.04em; }
+    .metric-note { margin-top: 4px; color: var(--cp-text-muted); font-size: 12px; }
+    .metric-action { cursor: pointer; transition: border-color .15s ease, transform .15s ease; }
+    .metric-action:hover { border-color: var(--cp-border-strong); transform: translateY(-1px); }
+    .metric-action:focus-visible { outline: 3px solid var(--cp-highlight); outline-offset: 2px; }
+    .danger { color: var(--cp-danger); }
+    .warning { color: var(--cp-warning-text); }
+    .success { color: var(--cp-success-text); }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 28px 0 12px;
+    }
+    .section-head h2, .section-head p { margin-bottom: 0; }
+    .section-head p { color: var(--cp-text-muted); font-size: 13px; }
+    .progress-track {
+      height: 8px;
+      overflow: hidden;
+      background: var(--cp-surface-soft);
+      border-radius: 99px;
+    }
+    .progress-fill { height: 100%; width: 0; background: var(--cp-accent); border-radius: inherit; transition: width .5s ease; }
+    .readiness-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 24px; align-items: center; }
+    .score-ring {
+      --score: 64;
+      width: 160px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--cp-accent) calc(var(--score) * 1%), var(--cp-surface-soft) 0);
+      position: relative;
+    }
+    .score-ring::after {
+      content: "";
+      width: 126px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: var(--cp-surface);
+      position: absolute;
+    }
+    .score-ring-content { z-index: 1; text-align: center; }
+    .score-ring-content strong { display: block; font-size: 36px; letter-spacing: -.05em; }
+    .score-ring-content span { color: var(--cp-text-muted); font-size: 12px; }
+    .dimensions { display: grid; gap: 14px; }
+    .mission-control {
+      padding: 0;
+      overflow: hidden;
+      background: var(--cp-bg-elevated);
+    }
+    .mission-hud {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--cp-border);
+      background: var(--cp-surface);
+    }
+    .mission-hud h3 { margin: 3px 0 4px; font-size: 18px; }
+    .mission-hud p { margin: 0; color: var(--cp-text-muted); font-size: 12px; }
+    .mission-telemetry { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .telemetry-chip {
+      min-width: 84px;
+      padding: 9px 11px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      text-align: center;
+    }
+    .telemetry-chip strong { display: block; font-size: 17px; }
+    .telemetry-chip span { display: block; margin-top: 2px; color: var(--cp-text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+    .mission-lifecycle {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      border-bottom: 1px solid var(--cp-border);
+      background: var(--cp-border);
+    }
+    .mission-gate {
+      position: relative;
+      width: 100%;
+      border: 0;
+      padding: 13px 16px 13px 38px;
+      background: var(--cp-surface);
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      text-align: left;
+    }
+    .mission-gate::before {
+      content: "";
+      position: absolute;
+      left: 17px;
+      top: 17px;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--cp-border-strong);
+      box-shadow: 0 0 0 4px var(--cp-surface-soft);
+    }
+    .mission-gate.current { color: var(--cp-accent); font-weight: 800; }
+    .mission-gate.current::before { background: var(--cp-accent); box-shadow: 0 0 0 4px var(--cp-accent-soft); }
+    .mission-gate:hover,
+    .mission-gate:focus-visible,
+    .mission-gate.selected { z-index: 1; background: var(--cp-accent-soft); color: var(--cp-accent); outline: none; }
+    .mission-gate:focus-visible { box-shadow: inset 0 0 0 2px var(--cp-accent); }
+    .mission-gate strong { display: block; color: inherit; font-size: 12px; }
+    .mission-gate span { display: block; margin-top: 2px; font-size: 10px; }
+    .mission-workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.65fr) minmax(280px, .65fr);
+      min-height: 650px;
+    }
+    .mission-map-wrap {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      border-right: 1px solid var(--cp-border);
+      background:
+        radial-gradient(circle at center, var(--cp-accent-soft), transparent 32%),
+        linear-gradient(var(--cp-sheen) 1px, transparent 1px),
+        linear-gradient(90deg, var(--cp-sheen) 1px, transparent 1px),
+        var(--cp-bg-elevated);
+      background-size: auto, 32px 32px, 32px 32px, auto;
+    }
+    .mission-map {
+      position: absolute;
+      inset: 0;
+      min-height: 650px;
+      transform-style: preserve-3d;
+      transform: perspective(1100px) rotateX(var(--map-tilt-x, 0deg)) rotateY(var(--map-tilt-y, 0deg));
+      transition: transform .2s ease-out;
+    }
+    .orbit-ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      border: 1px solid var(--cp-border);
+      border-radius: 50%;
+      transform: translate(-50%, -50%) rotateX(66deg);
+      pointer-events: none;
+    }
+    .orbit-ring.outer { width: 78%; height: 78%; }
+    .orbit-ring.inner { width: 47%; height: 47%; border-color: var(--cp-border-strong); }
+    .mission-core {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      top: 50%;
+      width: 218px;
+      min-height: 166px;
+      padding: 22px;
+      transform: translate(-50%, -50%) translateZ(50px) rotateX(3deg);
+      border: 1px solid var(--cp-accent);
+      border-radius: 50%;
+      background: var(--cp-panel-strong);
+      box-shadow: var(--cp-shadow);
+      text-align: center;
+      display: grid;
+      place-content: center;
+    }
+    .mission-core::before,
+    .mission-core::after {
+      content: "";
+      position: absolute;
+      border: 1px solid var(--cp-accent);
+      border-radius: 50%;
+      inset: -12px;
+      opacity: .45;
+    }
+    .mission-core::after { inset: -25px; opacity: .18; }
+    .mission-core strong { display: block; font-size: 34px; letter-spacing: -.05em; }
+    .mission-core span { color: var(--cp-text-muted); font-size: 11px; }
+    .mission-core small { display: block; margin-top: 7px; color: var(--cp-accent); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .estate-domain {
+      position: absolute;
+      z-index: 4;
+      left: var(--domain-x);
+      top: var(--domain-y);
+      width: clamp(118px, 15vw, 164px);
+      min-height: 82px;
+      padding: 11px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-panel-strong);
+      color: var(--cp-text);
+      text-align: left;
+      box-shadow: 0 0 2px var(--cp-border), 0 8px 18px var(--cp-highlight);
+      transform: translate(-50%, -50%) translateZ(var(--domain-depth, 12px)) rotateX(7deg);
+      transform-style: preserve-3d;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .estate-domain:hover,
+    .estate-domain:focus-visible,
+    .estate-domain.selected {
+      z-index: 7;
+      border-color: var(--cp-accent);
+      transform: translate(-50%, -50%) translateZ(58px) rotateX(0deg) scale(1.06);
+      box-shadow: var(--cp-shadow);
+      outline: none;
+    }
+    .estate-domain.online { border-color: var(--cp-success); }
+    .estate-domain.degraded { border-color: var(--cp-warning); }
+    .domain-index { color: var(--cp-accent); font: 700 10px Consolas, "Courier New", Courier, monospace; }
+    .estate-domain strong { display: block; margin-top: 5px; font-size: 11px; line-height: 1.25; }
+    .domain-state {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+      color: var(--cp-text-muted);
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .domain-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cp-border-strong); }
+    .estate-domain.online .domain-state::before { background: var(--cp-success); }
+    .estate-domain.degraded .domain-state::before { background: var(--cp-warning); }
+    .mission-console {
+      padding: 22px;
+      background: var(--cp-surface);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .console-kicker { color: var(--cp-accent); font: 700 10px Consolas, "Courier New", Courier, monospace; text-transform: uppercase; letter-spacing: .08em; }
+    .mission-console h3 { margin: 6px 0 8px; font-size: 21px; }
+    .mission-console p { color: var(--cp-text-muted); font-size: 12px; line-height: 1.55; }
+    .console-status {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      gap: 7px;
+      padding: 6px 9px;
+      border: 1px solid var(--cp-border);
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .console-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cp-border-strong); }
+    .console-status.online::before { background: var(--cp-success); }
+    .console-status.degraded::before { background: var(--cp-warning); }
+    .console-controls {
+      display: grid;
+      gap: 8px;
+      max-height: 330px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .control-detail {
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+    }
+    .control-detail summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      cursor: pointer;
+    }
+    .control-detail summary::marker { color: var(--cp-accent); }
+    .control-heading { min-width: 0; }
+    .control-heading small { display: block; color: var(--cp-accent); font: 700 9px Consolas, "Courier New", Courier, monospace; }
+    .control-heading strong { display: block; margin-top: 3px; font-size: 11px; line-height: 1.35; }
+    .control-badge {
+      padding: 4px 7px;
+      border: 1px solid var(--cp-border);
+      border-radius: 99px;
+      color: var(--cp-text-muted);
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .control-detail.pass .control-badge { border-color: var(--cp-success); color: var(--cp-success); }
+    .control-detail.fail .control-badge, .control-detail.expired .control-badge { border-color: var(--cp-danger); color: var(--cp-danger); }
+    .control-detail.warning .control-badge { border-color: var(--cp-warning); color: var(--cp-warning); }
+    .control-body { padding: 0 10px 10px; border-top: 1px solid var(--cp-border); }
+    .control-body p { margin: 9px 0 0; }
+    .control-meta { color: var(--cp-text-muted); font-size: 10px; }
+    .control-observation {
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      padding: 10px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface-soft);
+      color: var(--cp-text-muted);
+      font-family: Consolas, "Courier New", Courier, monospace;
+      font-size: 10px;
+    }
+    .doc-link { color: var(--cp-link); font-weight: 700; }
+    .console-next {
+      margin-top: auto;
+      padding: 14px;
+      border-left: 3px solid var(--cp-accent);
+      border-radius: 0.625rem;
+      background: var(--cp-accent-soft);
+    }
+    .console-next strong { display: block; margin-bottom: 5px; font-size: 11px; }
+    .console-next p { margin: 0; color: var(--cp-text); }
+    .dimension-row { display: grid; grid-template-columns: 130px minmax(100px, 1fr) 44px; gap: 12px; align-items: center; font-size: 13px; }
+    .dimension-row strong { text-align: right; }
+    .scenario-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .scenario-card {
+      text-align: left;
+      transition: border-color .15s ease, transform .15s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .scenario-card:hover { border-color: var(--cp-accent); transform: translateY(-2px); }
+    .scenario-card.selected { border-color: var(--cp-accent); box-shadow: 0 0 0 2px var(--cp-highlight); }
+    .scenario-number {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--cp-accent-soft);
+      color: var(--cp-accent);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 22px;
+    }
+    .scenario-card p { min-height: 58px; color: var(--cp-text-muted); font-size: 13px; line-height: 1.45; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 99px;
+      background: var(--cp-surface-soft);
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge.high { color: var(--cp-danger); background: var(--cp-accent-soft); }
+    .badge.medium { color: var(--cp-warning); }
+    .simulator-shell { min-height: 520px; }
+    .prompt-box {
+      padding: 16px;
+      background: var(--cp-bg-elevated);
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      font-family: Consolas, "Courier New", Courier, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .simulation-state { margin-top: 16px; }
+    .steps { display: grid; gap: 10px; margin-top: 16px; }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--cp-text-muted);
+      font-size: 13px;
+    }
+    .step-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--cp-border-strong); }
+    .step.complete { color: var(--cp-text); }
+    .step.complete .step-dot { background: var(--cp-success); }
+    .step.running { color: var(--cp-accent); font-weight: 700; }
+    .step.running .step-dot { background: var(--cp-accent); animation: pulse 1s infinite; }
+    @keyframes pulse { 50% { opacity: .35; } }
+    .result-panel { display: none; margin-top: 18px; }
+    .result-panel.visible { display: block; }
+    .exposure-summary {
+      padding: 16px;
+      border-left: 4px solid var(--cp-danger);
+      background: var(--cp-accent-soft);
+      border-radius: 0.625rem;
+    }
+    .exposure-summary strong { display: block; margin-bottom: 5px; }
+    .exposure-summary p { margin-bottom: 0; color: var(--cp-text-muted); font-size: 13px; line-height: 1.5; }
+    .path {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 6px 0 12px;
+    }
+    .path-node {
+      min-width: 132px;
+      padding: 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+    }
+    .path-node small { color: var(--cp-text-muted); }
+    .path-arrow { align-self: center; color: var(--cp-accent); font-weight: 900; }
+    .finding-list { display: grid; gap: 10px; }
+    .finding {
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+    }
+    .severity-bar { height: 100%; min-height: 54px; border-radius: 99px; background: var(--cp-warning); }
+    .severity-bar.critical { background: var(--cp-danger); }
+    .finding h3 { margin-bottom: 5px; }
+    .finding p { margin-bottom: 0; color: var(--cp-text-muted); font-size: 12px; }
+    .evidence-detail-list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+    .evidence-detail {
+      padding: 10px 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface-soft);
+    }
+    .evidence-detail strong { display: block; margin-bottom: 3px; }
+    .evidence-detail span { display: block; color: var(--cp-text-muted); font-size: 12px; }
+    .finding-meta { text-align: right; color: var(--cp-text-muted); font-size: 11px; }
+    .toolbar { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    select {
+      padding: 8px 32px 8px 10px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+    }
+    .remediation {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--cp-border);
+      align-items: start;
+    }
+    .remediation:last-child { border-bottom: 0; }
+    .check {
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--cp-border-strong);
+      border-radius: 6px;
+      background: var(--cp-surface);
+      display: grid;
+      place-items: center;
+      color: var(--cp-accent-fg);
+      margin-top: 1px;
+    }
+    .remediation.applied .check { background: var(--cp-success); border-color: var(--cp-success); }
+    .remediation.applied .check::after { content: "✓"; font-weight: 900; }
+    .remediation h3 { margin-bottom: 5px; }
+    .remediation p { margin-bottom: 7px; color: var(--cp-text-muted); font-size: 12px; line-height: 1.45; }
+    .impact { text-align: right; }
+    .impact strong { display: block; color: var(--cp-success-text); }
+    .impact small { color: var(--cp-text-muted); }
+    .clearance {
+      max-width: 880px;
+      margin: 20px auto;
+      text-align: center;
+      padding: 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    .clearance::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 6px;
+      background: var(--cp-warning);
+    }
+    .clearance.cleared::before { background: var(--cp-success); }
+    .clearance-icon {
+      width: 76px;
+      height: 76px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      background: var(--cp-accent-soft);
+      color: var(--cp-accent);
+      font-size: 32px;
+    }
+    .clearance-status { font-size: 28px; margin-bottom: 8px; }
+    .clearance-copy { max-width: 620px; margin: 0 auto 24px; color: var(--cp-text-muted); line-height: 1.55; }
+    .clearance-facts { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--cp-border); border-radius: 0.625rem; overflow: hidden; }
+    .clearance-fact { padding: 16px; background: var(--cp-bg-elevated); border-right: 1px solid var(--cp-border); }
+    .clearance-fact:last-child { border-right: 0; }
+    .clearance-fact strong { display: block; font-size: 22px; }
+    .clearance-fact span { color: var(--cp-text-muted); font-size: 11px; }
+    .timeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
+    .phase { padding: 12px; border-top: 3px solid var(--cp-border); color: var(--cp-text-muted); font-size: 12px; }
+    .phase.complete { border-color: var(--cp-success); color: var(--cp-text); }
+    .phase.current { border-color: var(--cp-accent); color: var(--cp-accent); font-weight: 800; }
+    .assurance-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .assurance-metric { padding: 14px; background: var(--cp-bg-elevated); border: 1px solid var(--cp-border); border-radius: 0.625rem; }
+    .assurance-metric span { display: block; color: var(--cp-text-muted); font-size: 11px; }
+    .assurance-metric strong { display: block; margin-top: 6px; font-size: 20px; }
+    .delta-positive { color: var(--cp-success); }
+    .delta-negative { color: var(--cp-danger); }
+    .evidence-log { display: grid; gap: 10px; }
+    .evidence-entry { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; }
+    .evidence-dot { width: 10px; height: 10px; margin: 5px auto 0; border-radius: 50%; background: var(--cp-border-strong); }
+    .evidence-entry.complete .evidence-dot { background: var(--cp-success); }
+    .evidence-entry.current .evidence-dot { background: var(--cp-accent); }
+    .evidence-entry strong { display: block; font-size: 13px; }
+    .evidence-entry small { color: var(--cp-text-muted); }
+    .error-banner {
+      margin: -10px 0 18px;
+      padding: 12px 14px;
+      border: 1px solid var(--cp-danger);
+      border-radius: 0.625rem;
+      background: var(--cp-accent-soft);
+      color: var(--cp-text);
+      font-size: 13px;
+    }
+    .source-ribbon {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 6px 10px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .empty-state {
+      padding: 28px;
+      border: 1px dashed var(--cp-border-strong);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      color: var(--cp-text-muted);
+      text-align: center;
+    }
+    .guide-intro {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+    .guide-steps { display: grid; gap: 12px; }
+    .guide-step {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .guide-step-number {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--cp-accent-soft);
+      color: var(--cp-accent);
+      font-weight: 800;
+    }
+    .guide-step h3 { margin: 0 0 6px; }
+    .guide-step p { margin: 0; color: var(--cp-text-muted); line-height: 1.55; }
+    .command-block {
+      margin-top: 12px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      color: var(--cp-text);
+      font: 12px/1.6 Consolas, "Courier New", Courier, monospace;
+      white-space: pre-wrap;
+    }
+    .guide-table-wrap { overflow-x: auto; }
+    .guide-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .guide-table th, .guide-table td {
+      padding: 12px;
+      border-bottom: 1px solid var(--cp-border);
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .guide-table th { color: var(--cp-text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    .guide-table tr:last-child td { border-bottom: 0; }
+    .guide-callout {
+      padding: 16px;
+      border-left: 4px solid var(--cp-accent);
+      border-radius: 0.625rem;
+      background: var(--cp-accent-soft);
+    }
+    .guide-callout strong { display: block; margin-bottom: 5px; }
+    .guide-checklist { display: grid; gap: 9px; margin: 14px 0 0; padding: 0; list-style: none; }
+    .guide-checklist li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; color: var(--cp-text-muted); line-height: 1.45; }
+    .guide-checklist li::before { content: "✓"; color: var(--cp-success); font-weight: 800; }
+    .decision-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 16px;
+      border-left: 5px solid var(--cp-accent);
+    }
+    .decision-panel.hold { border-left-color: var(--cp-danger); }
+    .decision-panel.clear { border-left-color: var(--cp-success); }
+    .decision-panel h2 { margin: 4px 0 6px; font-size: 24px; }
+    .decision-panel p { margin: 0; max-width: 760px; color: var(--cp-text-muted); line-height: 1.5; }
+    .decision-label { color: var(--cp-accent); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .decision-panel.hold .decision-label { color: var(--cp-danger); }
+    .decision-panel.clear .decision-label { color: var(--cp-success); }
+    .decision-flow {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      padding-top: 14px;
+      border-top: 1px solid var(--cp-border);
+    }
+    .decision-flow-step {
+      padding: 10px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      text-align: center;
+    }
+    .decision-flow-step.complete { border-color: var(--cp-success); color: var(--cp-text); }
+    .decision-flow-step.current { border-color: var(--cp-accent); background: var(--cp-accent-soft); color: var(--cp-accent); font-weight: 800; }
+    .getting-started {
+      margin-bottom: 16px;
+      padding: 0;
+      overflow: hidden;
+    }
+    .getting-started-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--cp-border);
+      background: var(--cp-bg-elevated);
+    }
+    .getting-started-head h2 { margin: 0 0 4px; font-size: 20px; }
+    .getting-started-head p { margin: 0; color: var(--cp-text-muted); font-size: 13px; }
+    .getting-started-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .getting-started-step {
+      padding: 20px;
+      border-right: 1px solid var(--cp-border);
+    }
+    .getting-started-step:last-child { border-right: 0; }
+    .getting-started-step h3 { margin: 10px 0 6px; }
+    .getting-started-step p { margin: 0; color: var(--cp-text-muted); font-size: 12px; line-height: 1.5; }
+    .setup-number { color: var(--cp-accent); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .access-list { display: grid; gap: 6px; margin-top: 12px; }
+    .access-item {
+      padding: 7px 9px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      font: 11px Consolas, "Courier New", Courier, monospace;
+    }
+    .setup-command {
+      margin-top: 12px;
+      padding: 10px;
+      overflow-x: auto;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+      font: 11px/1.5 Consolas, "Courier New", Courier, monospace;
+      white-space: nowrap;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .page, .step.running .step-dot { animation: none; }
+      .mission-map, .estate-domain { transition: none; transform: none; }
+    }
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      max-width: 340px;
+      padding: 12px 16px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-panel-strong);
+      box-shadow: var(--cp-shadow);
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: .2s ease;
+      font-size: 13px;
+    }
+    .toast.visible { transform: translateY(0); opacity: 1; }
+    .mobile-nav { display: none; }
+    @media (max-width: 1040px) {
+      .grid.metrics { grid-template-columns: repeat(2, 1fr); }
+      .scenario-grid { grid-template-columns: 1fr; }
+      .grid.two { grid-template-columns: 1fr; }
+      .guide-intro { grid-template-columns: 1fr; }
+      .decision-panel { grid-template-columns: 1fr; }
+      .decision-flow { grid-template-columns: 1fr 1fr; }
+      .getting-started-grid { grid-template-columns: 1fr; }
+      .getting-started-step { border-right: 0; border-bottom: 1px solid var(--cp-border); }
+      .getting-started-step:last-child { border-bottom: 0; }
+      .assurance-grid { grid-template-columns: 1fr 1fr; }
+      .mission-workspace { grid-template-columns: 1fr; }
+      .mission-map-wrap { min-height: 620px; border-right: 0; border-bottom: 1px solid var(--cp-border); }
+      .mission-map { min-height: 620px; }
+    }
+    @media (max-width: 760px) {
+      .app { display: block; }
+      .sidebar { display: none; }
+      main { padding: 18px 16px 84px; }
+      .topbar { align-items: flex-start; }
+      .topbar .actions .btn:not(.icon-btn) { display: none; }
+      .readiness-layout { grid-template-columns: 1fr; justify-items: center; }
+      .dimensions { width: 100%; }
+      .dimension-row { grid-template-columns: 105px 1fr 36px; }
+      .clearance-facts { grid-template-columns: 1fr; }
+      .clearance-fact { border-right: 0; border-bottom: 1px solid var(--cp-border); }
+      .clearance-fact:last-child { border-bottom: 0; }
+      .timeline { grid-template-columns: 1fr 1fr; }
+      .mission-hud { grid-template-columns: 1fr; }
+      .mission-telemetry { justify-content: flex-start; }
+      .mission-lifecycle { grid-template-columns: 1fr 1fr; }
+      .mission-map-wrap { min-height: auto; padding: 18px; }
+      .mission-map {
+        position: static;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        transform: none;
+      }
+      .orbit-ring, .mission-core { display: none; }
+      .estate-domain {
+        position: static;
+        width: auto;
+        min-height: 92px;
+        transform: none;
+      }
+      .estate-domain:hover,
+      .estate-domain:focus-visible,
+      .estate-domain.selected { transform: translateY(-2px); }
+      .mobile-nav {
+        position: fixed;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        background: var(--cp-panel-strong);
+        border-top: 1px solid var(--cp-border);
+      }
+      .mobile-nav .nav-item { display: grid; justify-items: center; gap: 2px; padding: 9px 2px; font-size: 10px; border-radius: 0; }
+      .mobile-nav .nav-icon { font-size: 15px; }
+    }
+    @media (max-width: 520px) {
+      .grid.metrics { grid-template-columns: 1fr 1fr; }
+      .card { padding: 16px; }
+      .metric-value { font-size: 24px; }
+      .finding { grid-template-columns: 7px 1fr; }
+      .finding-meta { grid-column: 2; text-align: left; }
+      .remediation { grid-template-columns: auto 1fr; }
+      .impact { grid-column: 2; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AF</div>
+        <div><strong>AI Flight Deck</strong><span>Copilot estate mission control</span></div>
+      </div>
+      <nav aria-label="Primary navigation">
+        <button class="nav-item active" data-page="guide" aria-current="page"><span class="nav-icon" aria-hidden="true">1</span>Set up</button>
+        <button class="nav-item" data-page="overview"><span class="nav-icon" aria-hidden="true">2</span>Assessment</button>
+        <button class="nav-item" data-page="remediation"><span class="nav-icon" aria-hidden="true">3</span>Corrections</button>
+        <button class="nav-item" data-page="clearance"><span class="nav-icon" aria-hidden="true">4</span>Decision</button>
+      </nav>
+      <div class="tenant">
+        <div class="tenant-label">Tenant data source</div>
+        <strong>Contoso Aviation</strong>
+        <small id="tenant-status">Synthetic demonstration data</small>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Copilot estate mission control</p>
+          <h1 id="page-title">Set up your estate assessment</h1>
+          <p class="subtitle" id="page-subtitle">Understand the required access, run a read-only scan, and import the result.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" id="import-button">Import existing scan</button>
+          <input type="file" id="scan-file" accept=".json,application/json" hidden>
+          <button class="btn" id="export-button">Export report</button>
+          <button class="btn icon-btn" id="theme-button" aria-label="Toggle color theme">◐</button>
+        </div>
+      </header>
+      <div class="source-ribbon" id="source-ribbon">Demonstration mode. No tenant scan has been imported.</div>
+      <div class="error-banner" id="import-error" role="alert" hidden></div>
+
+      <section class="page" id="overview">
+        <article class="card decision-panel" id="decision-panel" role="status" aria-live="polite" aria-atomic="true">
+          <div>
+            <div class="decision-label" id="decision-label">Demonstration</div>
+            <h2 id="decision-title">Explore the workflow before scanning a tenant</h2>
+            <p id="decision-reason">This page contains synthetic data. It cannot support a Copilot deployment decision until a live baseline scan is imported.</p>
+          </div>
+          <button class="btn primary" id="decision-action" data-go="guide">See how to start</button>
+          <div class="decision-flow" aria-label="Copilot decision workflow">
+            <div class="decision-flow-step current" data-decision-phase="1">1. Set up</div>
+            <div class="decision-flow-step" data-decision-phase="2">2. Assessment</div>
+            <div class="decision-flow-step" data-decision-phase="3">3. Corrections</div>
+            <div class="decision-flow-step" data-decision-phase="4">4. Decision</div>
+          </div>
+        </article>
+        <div class="grid metrics">
+          <article class="card metric-action" data-go="findings" role="button" tabindex="0" aria-label="Explain the sharing readiness score">
+            <div class="metric-label">Sharing posture signal</div>
+            <div class="metric-value" id="overview-score">64</div>
+            <div class="metric-note warning" id="score-note">Select to see how this score was calculated</div>
+          </article>
+          <article class="card metric-action" data-go="findings" role="button" tabindex="0" aria-label="Review critical exposure details">
+            <div class="metric-label" id="critical-label">Critical sharing evidence</div>
+            <div class="metric-value danger" id="critical-count">3</div>
+            <div class="metric-note" id="critical-note">Select to review the evidence</div>
+          </article>
+          <article class="card">
+            <div class="metric-label" id="exposure-label">Sensitive files exposed</div>
+            <div class="metric-value" id="exposed-files">1,284</div>
+            <div class="metric-note" id="exposure-note">Across 17 collaboration sites</div>
+          </article>
+          <article class="card">
+            <div class="metric-label">Affected users</div>
+            <div class="metric-value" id="blast-radius-users">4,218</div>
+            <div class="metric-note" id="blast-radius-note">31% of tenant population</div>
+          </article>
+        </div>
+
+        <div class="section-head">
+          <div><h2>Microsoft 365 Copilot estate readiness coverage</h2><p>Move the pointer across the 3D control plane and select a system to inspect its evidence mission.</p></div>
+          <div class="actions">
+            <span class="badge" id="scan-timestamp">No live scan imported</span>
+            <button class="btn" id="export-controls-csv" disabled>Export controls CSV</button>
+          </div>
+        </div>
+        <article class="card mission-control" id="dimension-card">
+          <div class="empty-state">Loading the readiness control catalogue...</div>
+        </article>
+
+        <div class="section-head">
+          <div><h2>Priority simulation scenarios</h2><p>Test realistic questions against effective permissions and policy controls.</p></div>
+          <button class="btn primary" data-go="simulator">Open simulator</button>
+        </div>
+        <div class="grid scenario-grid" id="overview-scenarios"></div>
+      </section>
+
+      <section class="page" id="simulator">
+        <div class="grid two simulator-shell">
+          <div>
+            <div class="section-head" style="margin-top:0">
+              <div><h2>Choose an adversarial scenario</h2><p>Simulations are read-only and use effective access metadata.</p></div>
+            </div>
+            <div class="grid scenario-grid" id="simulator-scenarios"></div>
+            <article class="card simulation-state">
+              <h3>Simulated Copilot request</h3>
+              <div class="prompt-box" id="simulation-prompt"></div>
+              <div class="steps" id="simulation-steps">
+                <div class="step"><span class="step-dot" aria-hidden="true"></span>Resolve requesting user's effective identity<span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span>Traverse groups, sites and inherited permissions<span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span>Match discoverable content to sensitivity signals<span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span>Evaluate policy controls and calculate affected audience<span class="step-status sr-only"></span></div>
+              </div>
+              <div id="simulation-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+              <button class="btn primary" id="run-simulation" style="margin-top:18px">Run risk simulation</button>
+            </article>
+          </div>
+          <aside>
+            <article class="card">
+              <div class="tenant-label">Simulation mode</div>
+              <h2 style="margin:7px 0">Pre-deployment</h2>
+              <p class="subtitle">No prompts are submitted to a production AI system. AI Flight Deck models discoverability from metadata and policy state.</p>
+              <div class="timeline">
+                <div class="phase complete" data-phase="1">1. Assess</div>
+                <div class="phase current" data-phase="2">2. Simulate</div>
+                <div class="phase" data-phase="3">3. Act</div>
+                <div class="phase" data-phase="4">4. Prove</div>
+              </div>
+            </article>
+            <article class="card result-panel" id="simulation-result">
+              <div class="exposure-summary">
+                <strong id="result-title">Critical exposure confirmed</strong>
+                <p id="result-copy"></p>
+              </div>
+              <h3 style="margin-top:20px">Permission attack path</h3>
+              <div class="path" id="result-path"></div>
+              <button class="btn" data-go="remediation">Review remediation</button>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" id="findings">
+        <div class="toolbar">
+          <div>
+            <h2 style="margin-bottom:4px">Evidence-backed findings</h2>
+            <p class="subtitle">Every finding maps technical evidence to an AI exposure outcome.</p>
+          </div>
+          <select id="severity-filter" aria-label="Filter findings by severity">
+            <option value="all">All severities</option>
+            <option value="critical">Critical only</option>
+            <option value="high">High only</option>
+            <option value="medium">Medium only</option>
+          </select>
+        </div>
+        <div class="finding-list" id="finding-list"></div>
+      </section>
+
+      <section class="page" id="remediation">
+        <div class="grid two">
+          <article class="card">
+            <div class="section-head" style="margin-top:0">
+              <div><h2>Recommended corrections</h2><p>Select evidence-linked controls for administrator review. These selections do not change the tenant.</p></div>
+              <span class="badge" id="applied-count">0 of 4 modelled</span>
+            </div>
+            <div id="remediation-list"></div>
+          </article>
+          <aside>
+            <article class="card">
+              <div class="metric-label">Forecast sharing readiness</div>
+              <div class="metric-value" id="forecast-score">64</div>
+              <div class="progress-track"><div class="progress-fill" id="forecast-progress"></div></div>
+              <p class="subtitle" style="margin-top:12px" id="forecast-copy">Model controls to see the expected reduction in AI exposure.</p>
+              <div id="remediation-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+            </article>
+            <article class="card" style="margin-top:16px">
+              <div class="tenant-label">Act</div>
+              <h3 style="margin-top:7px">Administrator remediation plan</h3>
+              <p class="subtitle" id="package-copy">Select corrections to download a JSON review file. An administrator must validate and implement each action outside AI Flight Deck, then return here and run verification.</p>
+              <button class="btn primary" id="generate-package" style="margin-top:14px">Export administrator remediation plan</button>
+            </article>
+            <article class="card" style="margin-top:16px">
+              <h3>Change-control boundary</h3>
+              <p class="subtitle">AI Flight Deck generates evidence and approved actions but does not silently change tenant configuration. Production execution must use supported APIs, least privilege, explicit approval, verification, and rollback.</p>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" id="clearance">
+        <article class="card clearance" id="clearance-card" role="status" aria-live="polite" aria-atomic="true">
+          <div class="clearance-icon" id="clearance-icon" aria-hidden="true">!</div>
+          <p class="eyebrow">Estate readiness decision</p>
+          <h2 class="clearance-status" id="clearance-status">Estate readiness evidence is incomplete</h2>
+          <p class="clearance-copy" id="clearance-copy">The current collector measures a bounded SharePoint sharing signal. It cannot determine Microsoft 365 Copilot readiness until all required estate domains are assessed.</p>
+          <div class="clearance-facts">
+            <div class="clearance-fact"><strong id="clearance-score">64</strong><span>Sharing signal</span></div>
+            <div class="clearance-fact"><strong id="clearance-open">3</strong><span>Sharing findings</span></div>
+            <div class="clearance-fact"><strong id="clearance-users">0/13</strong><span>Estate systems online</span></div>
+          </div>
+          <div class="actions" style="justify-content:center;margin-top:24px">
+            <button class="btn" data-go="remediation">Review proposed corrections</button>
+            <button class="btn" id="decision-export-csv" disabled>Export decision evidence CSV</button>
+            <button class="btn primary" id="download-clearance" disabled>Download decision record</button>
+          </div>
+        </article>
+        <article class="card" style="margin-top:16px">
+          <div class="section-head" style="margin-top:0">
+            <div><h2>Decision blockers</h2><p>Every unresolved gate links to the required action and authoritative Microsoft guidance.</p></div>
+          </div>
+          <div class="decision-blocker-list" id="decision-blockers"></div>
+        </article>
+        <div class="grid two">
+          <article class="card">
+            <div class="section-head" style="margin-top:0">
+              <div><h2>Verify sharing corrections</h2><p>After administrators complete approved sharing changes, run verification. This verifies the sharing collector only; it does not complete the estate-wide readiness decision.</p></div>
+              <div class="actions">
+                <button class="btn primary" id="verify-workflow" disabled>Verify corrections and refresh decision</button>
+                <button class="btn" id="verification-button">Import existing comparison</button>
+              </div>
+              <input type="file" id="verification-file" accept=".json,application/json" hidden>
+            </div>
+            <div id="verification-empty" class="prompt-box">No sharing comparison report has been imported. Verification can prove sharing improvement, but an estate-wide decision also requires licensing, identity, devices, network, compliance, security, Copilot configuration, agents, and adoption evidence.</div>
+            <div id="verification-result" hidden>
+              <div class="assurance-grid">
+                <div class="assurance-metric"><span>Readiness change</span><strong id="verified-score-delta">Not available</strong></div>
+                <div class="assurance-metric"><span>Critical paths</span><strong id="verified-critical-delta">Not available</strong></div>
+                <div class="assurance-metric"><span>Exposed items</span><strong id="verified-exposure-delta">Not available</strong></div>
+                <div class="assurance-metric"><span>Verification status</span><strong id="verified-status">Not available</strong></div>
+              </div>
+              <p class="subtitle" id="verified-copy" style="margin-top:14px"></p>
+              <div class="prompt-box" id="verification-change-details" hidden></div>
+            </div>
+          </article>
+          <article class="card">
+            <h2>Decision evidence trail</h2>
+            <div class="evidence-log">
+              <div class="evidence-entry complete"><span class="evidence-dot"></span><div><strong>Baseline evidence collected</strong><small id="baseline-evidence">Synthetic demonstration baseline loaded.</small></div></div>
+              <div class="evidence-entry current" id="package-evidence"><span class="evidence-dot"></span><div><strong>Remediation package</strong><small>Awaiting approved action package.</small></div></div>
+              <div class="evidence-entry" id="verification-evidence"><span class="evidence-dot"></span><div><strong>Post-change verification</strong><small>Awaiting an authoritative comparison report.</small></div></div>
+              <div class="evidence-entry" id="clearance-evidence"><span class="evidence-dot"></span><div><strong>Estate-wide readiness decision</strong><small>Unavailable until all required readiness domains have sufficient evidence.</small></div></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page active" id="guide">
+        <div class="guide-intro">
+          <article class="card">
+            <p class="eyebrow">Step 1 of 4</p>
+            <h2>Set up an estate-wide Copilot readiness assessment</h2>
+            <p class="subtitle">The assessment orchestrates thirteen bounded collectors covering all 77 readiness controls. Microsoft Graph and local network evidence are collected directly; workload-specific administration evidence and accountable attestations remain explicit blockers until their connectors are authenticated or evidence is supplied.</p>
+            <div class="actions" style="margin-top:18px">
+              <button class="btn primary" id="connect-scan">Connect and scan tenant</button>
+              <button class="btn" id="cancel-workflow" hidden>Cancel active scan</button>
+              <button class="btn" id="guide-import-scan">Import existing scan</button>
+              <button class="btn" data-go="overview">Open 3D Mission Control</button>
+            </div>
+            <div class="service-panel" id="service-panel" role="status" aria-live="polite" aria-atomic="true">
+              <div class="service-status"><span class="service-dot" aria-hidden="true"></span><span id="service-status">Checking the local scanner...</span></div>
+              <p class="subtitle" id="service-help">The first run installs the Microsoft Graph authentication connector for the current Windows user if it is missing. The tool opens Microsoft's device sign-in page and displays the one-time code here.</p>
+              <div class="guide-callout" id="auth-instructions" style="margin-top:12px" hidden>
+                <strong>Microsoft sign-in code</strong>
+                <span id="auth-code"></span>
+                <button class="btn" id="copy-auth-code" type="button">Copy code</button>
+              </div>
+              <pre class="service-log" id="service-log" hidden></pre>
+              <div class="console-controls" id="capability-panel" aria-label="Collector connection requirements" hidden></div>
+            </div>
+          </article>
+          <article class="card">
+            <div class="tenant-label">Who uses it</div>
+            <ul class="guide-checklist">
+              <li><span><strong>Microsoft 365 administrator</strong><br>Runs scans and implements approved tenant changes.</span></li>
+              <li><span><strong>Security or compliance reviewer</strong><br>Reviews evidence, risk, and control requirements.</span></li>
+              <li><span><strong>Copilot program owner</strong><br>Makes the pilot or rollout decision.</span></li>
+              <li><span><strong>Site and data owners</strong><br>Confirm whether broad access is intentional.</span></li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="section-head">
+          <div><h2>Before you begin</h2><p>Use a test tenant or an approved production assessment window.</p></div>
+        </div>
+        <div class="grid two">
+          <article class="card">
+            <h3>Prerequisites</h3>
+            <ul class="guide-checklist">
+              <li><span>Windows PowerShell 7 or Windows PowerShell 5.1.</span></li>
+              <li><span>The Microsoft Graph Authentication module.</span></li>
+              <li><span>An account permitted to consent to read-only Graph scopes.</span></li>
+              <li><span>Approval to review identity, device, service health, collaboration, security, usage, and SharePoint metadata.</span></li>
+              <li><span>Dummy documents only when deliberately creating a test exposure.</span></li>
+            </ul>
+            <div class="command-block">Install-Module Microsoft.Graph.Authentication -Scope CurrentUser</div>
+          </article>
+          <article class="card">
+            <h3>Read-only collection</h3>
+            <ul class="guide-checklist">
+              <li><span>Microsoft Graph consent is requested only for the read scopes used by enabled collectors.</span></li>
+              <li><span>Exchange, SharePoint administration, Purview, Defender, and Power Platform require their own authenticated workload adapters.</span></li>
+              <li><span>Human governance controls require current, attributable, signed attestations.</span></li>
+            </ul>
+            <div class="guide-callout" style="margin-top:16px">
+              <strong>Collection boundary</strong>
+              The scanner reads metadata and permissions. It does not retrieve document contents, enable Copilot, remove sharing links, or change tenant configuration.
+            </div>
+          </article>
+        </div>
+
+        <div class="section-head">
+          <div><h2>Complete workflow</h2><p>Follow these steps in order. A forecast is never treated as proof.</p></div>
+        </div>
+        <div class="guide-steps">
+          <article class="card guide-step">
+            <div class="guide-step-number">1</div>
+            <div>
+              <h3>Connect and sign in</h3>
+              <p>Select <strong>Connect and scan tenant</strong>. AI Flight Deck prepares the local connector and opens Microsoft sign-in. Sign in with an account approved for the displayed read-only Graph permissions.</p>
+            </div>
+          </article>
+          <article class="card guide-step">
+            <div class="guide-step-number">2</div>
+            <div>
+              <h3>Let the tool capture the baseline</h3>
+              <p>The product runs the bounded read-only scan, stores the evidence in the protected user-local workspace, and opens Assessment automatically. You do not need to find or import a JSON file.</p>
+            </div>
+          </article>
+          <article class="card guide-step">
+            <div class="guide-step-number">3</div>
+            <div>
+              <h3>Import and assess</h3>
+              <p>Start with the thirteen-domain estate mission map. Every collector is attempted, and each unavailable permission, licence, workload connection, network test, or attestation is shown against the exact blocked control. Manual import remains available for existing artifacts or offline review.</p>
+              <div class="actions" style="margin-top:12px">
+                <button class="btn" data-go="overview">Open overview</button>
+                <button class="btn" data-go="findings">Review findings</button>
+              </div>
+            </div>
+          </article>
+          <article class="card guide-step">
+            <div class="guide-step-number">4</div>
+            <div>
+              <h3>Understand the risk</h3>
+              <p>Open each finding to understand the rule, source, evidence identifier, severity, and affected resource. Demonstration scenarios show how inherited Microsoft 365 access can become Copilot exposure. Live simulation remains unavailable until the collector has effective permission paths.</p>
+              <div class="actions" style="margin-top:12px">
+                <button class="btn" data-go="simulator">Open simulator</button>
+              </div>
+            </div>
+          </article>
+          <article class="card guide-step">
+            <div class="guide-step-number">5</div>
+            <div>
+              <h3>Prepare approved corrections</h3>
+              <p>On the Remediation plan page, select evidence-linked actions and generate the action package. This is a proposal for administrator review. Selecting an action does not mean the control has been applied.</p>
+              <div class="actions" style="margin-top:12px">
+                <button class="btn" data-go="remediation">Open remediation plan</button>
+              </div>
+            </div>
+          </article>
+          <article class="card guide-step">
+            <div class="guide-step-number">6</div>
+            <div>
+              <h3>Implement changes through normal administration</h3>
+              <p>After approval, tenant administrators use supported Microsoft 365 administration experiences to remove unnecessary anonymous links, narrow broad site access, or review guest access. Record approval, rollback, and ownership outside AI Flight Deck.</p>
+            </div>
+          </article>
+          <article class="card guide-step">
+            <div class="guide-step-number">7</div>
+            <div>
+              <h3>Capture verification and compare</h3>
+              <p>Select <strong>Verify corrections and refresh decision</strong>. The tool rescans the sharing scope and proves whether those corrections worked. A successful comparison verifies sharing controls only and never substitutes for the remaining estate domains.</p>
+              <div class="actions" style="margin-top:12px">
+                <button class="btn" data-go="clearance">Open rollout decision</button>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="section-head">
+          <div><h2>How the estate-wide decision works</h2><p>No single collector or score can approve Microsoft 365 Copilot rollout.</p></div>
+        </div>
+        <article class="card guide-table-wrap">
+          <table class="guide-table">
+            <caption class="sr-only">Copilot rollout decision rules and recommended actions</caption>
+            <thead><tr><th scope="col">Assessment result</th><th scope="col">What it means</th><th scope="col">Recommended action</th></tr></thead>
+            <tbody>
+              <tr><td>Domain not collected</td><td>A required estate domain has no evidence.</td><td><strong>No estate decision.</strong> Connect the required collector or complete the organizational assessment.</td></tr>
+              <tr><td>Domain partial</td><td>Some evidence exists, but important controls or populations remain outside scope.</td><td>Review the stated gaps and collect the missing evidence.</td></tr>
+              <tr><td>Sharing finding</td><td>The SharePoint collector found anonymous sharing, organization-wide sharing, or a public workspace requiring validation.</td><td>Confirm intent with the owner, correct unjustified access, and verify again.</td></tr>
+              <tr><td>Sharing drift</td><td>The newer sharing scan has worse counts or newly opened evidence.</td><td>Investigate the changed evidence while continuing the estate assessment.</td></tr>
+              <tr><td>Sharing controls verified</td><td>The approved sharing changes were proven by comparable scans.</td><td>Mark only the sharing workstream as verified. Continue licensing, identity, devices, network, compliance, security, Copilot configuration, agents, and adoption assessment.</td></tr>
+              <tr><td>Estate decision available</td><td>Every required domain has sufficient, current evidence and the approved pilot cohort meets all mandatory gates.</td><td>Present the evidence-backed pilot recommendation to the accountable decision owner.</td></tr>
+            </tbody>
+          </table>
+        </article>
+
+        <div class="section-head">
+          <div><h2>What each stage is for</h2><p>Use the four stages as one connected decision process.</p></div>
+        </div>
+        <div class="grid two">
+          <article class="card"><h3>1. Set up</h3><p class="subtitle">Explains permissions, boundaries, commands, roles, and the evidence workflow.</p></article>
+          <article class="card"><h3>2. Assessment</h3><p class="subtitle">Maps thirteen estate-readiness systems as online, degraded, or unscanned, then presents evidence from connected collectors.</p></article>
+          <article class="card"><h3>3. Corrections</h3><p class="subtitle">Packages proposed actions for approval. Forecast values are planning aids, not tenant changes or proof.</p></article>
+          <article class="card"><h3>4. Decision</h3><p class="subtitle">Separates verified sharing changes from the estate-wide readiness decision, which remains unavailable until every mandatory domain has sufficient evidence.</p></article>
+        </div>
+
+        <div class="section-head">
+          <div><h2>Required estate domains before enabling Copilot</h2><p>Sharing is one workstream inside the complete deployment decision.</p></div>
+        </div>
+        <article class="card">
+          <ul class="guide-checklist">
+            <li><span>Confirm Microsoft 365 Copilot licensing and supported user prerequisites.</span></li>
+            <li><span>Review Entra identity protection, MFA, Conditional Access, and privileged roles.</span></li>
+            <li><span>Confirm Purview sensitivity labels, DLP, retention, and information-protection requirements.</span></li>
+            <li><span>Review Defender posture, managed devices, and incident-response processes.</span></li>
+            <li><span>Approve the pilot population, support model, adoption plan, communications, and success measures.</span></li>
+            <li><span>Continue rescanning after rollout so newly opened sharing evidence stops expansion until it is reviewed.</span></li>
+          </ul>
+          <div class="guide-callout" style="margin-top:18px">
+            <strong>Decision boundary</strong>
+            AI Flight Deck provides decision support, not compliance certification. The current live connector supplies partial identity and SharePoint sharing evidence. The estate decision remains unavailable until licensing, identity controls, devices, network, compliance, security, Copilot configuration, agents, and adoption evidence are connected.
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <button class="nav-item active" data-page="guide" aria-current="page"><span class="nav-icon" aria-hidden="true">1</span>Set up</button>
+    <button class="nav-item" data-page="overview"><span class="nav-icon" aria-hidden="true">2</span>Assessment</button>
+    <button class="nav-item" data-page="remediation"><span class="nav-icon" aria-hidden="true">3</span>Corrections</button>
+    <button class="nav-item" data-page="clearance"><span class="nav-icon" aria-hidden="true">4</span>Decision</button>
+  </nav>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="mission-engine.js"></script>
+  <script src="evidence-graph.js"></script>
+  <script>
+    const demoScenarios = [
+      {
+        id: "ma",
+        title: "Confidential acquisition",
+        description: "Can a Sales user discover restricted acquisition plans through broad SharePoint permissions?",
+        prompt: "Summarize any planned acquisitions, including target companies, expected dates, and executive sponsors.",
+        severity: "Critical",
+        exposure: "The request could surface Project Northstar acquisition materials from the Strategy workspace. 38 confidential files are discoverable by 4,218 users.",
+        path: [["User", "Adele Vance"], ["Group", "All Employees"], ["Site", "Strategy Hub"], ["Library", "Project Northstar"], ["Files", "38 confidential"]]
+      },
+      {
+        id: "hr",
+        title: "Employee compensation",
+        description: "Could Copilot summarize salary-planning documents exposed through inherited membership?",
+        prompt: "Summarize proposed salary adjustments for the next review cycle and identify employees receiving the largest increases.",
+        severity: "Critical",
+        exposure: "Compensation planning files inherit access from a legacy HR collaboration group containing 327 non-HR members.",
+        path: [["User", "Diego Siciliani"], ["Group", "HR Project Alumni"], ["Site", "People Planning"], ["Folder", "FY27 Rewards"], ["Files", "114 sensitive"]]
+      },
+      {
+        id: "agent",
+        title: "Finance agent expansion",
+        description: "What sensitive information becomes reachable if a procurement agent receives Finance site access?",
+        prompt: "Grant the Procurement Assistant access to Finance and summarize supplier negotiations and payment exceptions.",
+        severity: "High",
+        exposure: "The proposed permission expands the agent's reach by 1,132 files, including 246 labelled Highly Confidential.",
+        path: [["Agent", "Procurement Assistant"], ["Role", "Finance visitor"], ["Site", "Finance Operations"], ["Libraries", "7 connected"], ["Files", "1,132 reachable"]]
+      }
+    ];
+
+    const demoFindings = [
+      { severity: "critical", title: "Acquisition workspace discoverable tenant-wide", detail: "The Strategy Hub inherits access from All Employees; 38 confidential Project Northstar files are AI-discoverable.", source: "SharePoint", impact: "4,218 users" },
+      { severity: "critical", title: "Legacy HR group exposes compensation planning", detail: "327 non-HR members remain in HR Project Alumni and can discover 114 sensitive rewards files.", source: "Entra + SharePoint", impact: "327 users" },
+      { severity: "critical", title: "Restricted discovery is not enabled", detail: "Nine high-risk sites remain eligible for organization-wide Copilot discovery despite limited business need.", source: "SharePoint", impact: "9 sites" },
+      { severity: "high", title: "Agent access expansion lacks impact simulation", detail: "The Procurement Assistant can be granted broad site roles without a pre-deployment affected-user review.", source: "Agent governance", impact: "1,132 files" },
+      { severity: "high", title: "Sensitive-label coverage below launch threshold", detail: "Only 42% of sampled sensitive content has a published sensitivity label available to policy controls.", source: "Purview", impact: "748 files" },
+      { severity: "medium", title: "External collaboration review is overdue", detail: "Guest membership in 14 Copilot-relevant sites has not been reviewed in the previous 180 days.", source: "Entra", impact: "63 guests" }
+    ];
+
+    const demoRemediations = [
+      { id: "rcd", title: "Enable Restricted Content Discovery on nine sites", copy: "Prevent broad Copilot discovery while preserving direct user access and site collaboration.", gain: 12, critical: 1, users: 1320, effort: "Low effort" },
+      { id: "groups", title: "Remove stale users from privileged collaboration groups", copy: "Review HR Project Alumni and All Employees inheritance before the Copilot pilot.", gain: 9, critical: 1, users: 327, effort: "Medium effort" },
+      { id: "rac", title: "Apply Restricted Access Control to Strategy Hub", copy: "Require membership in the approved Strategy security group for site and AI-grounded access.", gain: 10, critical: 1, users: 2571, effort: "Medium effort" },
+      { id: "labels", title: "Publish labels and DLP controls for high-risk content", copy: "Extend sensitivity classification and policy coverage to acquisition, compensation, and finance content.", gain: 5, critical: 0, users: 0, effort: "High effort" }
+    ];
+
+    const pageMeta = {
+      overview: ["Estate readiness assessment", "Review collected evidence, missing readiness domains, and sharing findings."],
+      simulator: ["Copilot risk simulator", "Model realistic exposure paths before enabling AI."],
+      findings: ["Sharing evidence details", "Review the sharing signals collected from Microsoft Graph."],
+      remediation: ["Corrections for administrator review", "Queue evidence-linked changes, obtain approval, and verify them with a new scan."],
+      clearance: ["Estate readiness decision", "Separate verified sharing improvement from the remaining estate-wide readiness evidence."],
+      guide: ["Set up your estate assessment", "Connect evidence sources required for a Microsoft 365 Copilot readiness decision."]
+    };
+
+    const MAX_SCAN_FILE_BYTES = 50 * 1024 * 1024;
+    const MAX_FINDINGS = 100;
+    const MAX_FINDING_FIELD_LENGTH = 4096;
+    const SUPPORTED_PRODUCER_VERSION = "1.5.0";
+    const SUPPORTED_SCORING_VERSION = "1.3.0";
+    const ALLOWED_SEVERITIES = new Set(["critical", "high", "medium", "low"]);
+    const REQUIRED_EVIDENCE_SETS = [
+      "anonymousPermissionIds",
+      "organizationPermissionIds",
+      "broadAccessSiteIds",
+      "sharedItemIds",
+      "guestUserIds",
+      "criticalEvidenceIds"
+    ];
+    const remediationCatalog = {
+      "AFD-SP-ANONYMOUS-001": {
+        id: "review-anonymous-links",
+        title: "Review and remove anonymous sharing links",
+        copy: "Confirm business ownership for each anonymous link, remove links that are no longer required, then run a new scan.",
+        effort: "Administrator review",
+        critical: 1,
+        users: 0
+      },
+      "AFD-SP-ORGANIZATION-001": {
+        id: "review-organization-links",
+        title: "Review organization-wide sharing links",
+        copy: "Reduce organization-wide sharing to named groups where the audience is broader than the business requirement.",
+        effort: "Site owner review",
+        critical: 0,
+        users: 0
+      },
+      "AFD-SP-BROAD-001": {
+        id: "restrict-broad-sites",
+        title: "Review public Microsoft 365 workspaces",
+        copy: "Ask each workspace owner whether Public visibility is intentional. Change unjustified groups to Private through the normal Microsoft 365 administration process, then run verification again.",
+        effort: "Group owner and administrator review",
+        critical: 1,
+        users: 0
+      },
+      "AFD-DIR-GUESTS-001": {
+        id: "review-guests",
+        title: "Review guest access to scanned sites",
+        copy: "Confirm guest sponsorship and remove access that is no longer required before a broad Copilot rollout.",
+        effort: "Identity review",
+        critical: 0,
+        users: 0
+      }
+    };
+    const domainDocumentation = {
+      licensingAndTenantEntitlement: {
+        title: "Microsoft 365 Copilot licensing",
+        url: "https://learn.microsoft.com/en-us/copilot/microsoft-365/microsoft-365-copilot-licensing"
+      },
+      identityAndAccess: {
+        title: "Microsoft Entra Conditional Access overview",
+        url: "https://learn.microsoft.com/en-us/entra/identity/conditional-access/overview"
+      },
+      devicesAndApps: {
+        title: "Microsoft 365 Copilot app and network requirements",
+        url: "https://learn.microsoft.com/en-us/microsoft-365/copilot/microsoft-365-copilot-requirements"
+      },
+      networkConnectivity: {
+        title: "Microsoft 365 network connectivity principles",
+        url: "https://learn.microsoft.com/en-us/microsoft-365/enterprise/microsoft-365-network-connectivity-principles"
+      },
+      serviceHealthOperations: {
+        title: "How to check Microsoft 365 service health",
+        url: "https://learn.microsoft.com/en-us/microsoft-365/enterprise/view-service-health"
+      },
+      exchangeOnline: {
+        title: "Microsoft 365 Copilot minimum requirements",
+        url: "https://learn.microsoft.com/en-us/microsoft-365/copilot/microsoft-365-copilot-minimum-requirements"
+      },
+      teamsReadiness: {
+        title: "Microsoft 365 Copilot app and network requirements",
+        url: "https://learn.microsoft.com/en-us/microsoft-365/copilot/microsoft-365-copilot-requirements"
+      },
+      sharePointOneDrive: {
+        title: "Sharing and permissions in the SharePoint modern experience",
+        url: "https://learn.microsoft.com/en-us/sharepoint/modern-experience-sharing-permissions"
+      },
+      purviewCompliance: {
+        title: "Microsoft Purview capabilities for generative AI",
+        url: "https://learn.microsoft.com/en-us/purview/ai-microsoft-purview"
+      },
+      securityPosture: {
+        title: "Copilot Control System security and governance",
+        url: "https://learn.microsoft.com/en-us/microsoft-365/copilot/copilot-control-system/security-governance"
+      },
+      copilotConfiguration: {
+        title: "Microsoft 365 Copilot page in the admin center",
+        url: "https://learn.microsoft.com/en-us/copilot/microsoft-365/microsoft-365-copilot-page"
+      },
+      powerPlatformAgents: {
+        title: "Security and governance in Microsoft Copilot Studio",
+        url: "https://learn.microsoft.com/en-us/microsoft-copilot-studio/security-and-governance"
+      },
+      adoptionMeasurementGovernance: {
+        title: "Microsoft 365 Copilot enablement resources",
+        url: "https://learn.microsoft.com/en-us/microsoft-365/copilot/microsoft-365-copilot-enablement-resources"
+      }
+    };
+
+    let scenarios = [...demoScenarios];
+    let findings = [...demoFindings];
+    let remediations = [...demoRemediations];
+    let selectedScenario = scenarios[0];
+    const applied = new Set();
+    let baselineScan = null;
+    let verificationReport = null;
+    let verificationOutcome = null;
+    let currentJourneyPhase = 2;
+    let localServiceAvailable = false;
+    let activeWorkflowId = null;
+    let readinessCatalog = null;
+    let activeTenant = {
+      name: "Contoso Aviation",
+      source: "synthetic",
+      baselineScore: 64,
+      criticalExposures: 3,
+      exposedFiles: 1284,
+      blastRadiusUsers: 4218
+    };
+
+    function scenarioCard(scenario, selected = false) {
+      return `<article class="card scenario-card ${selected ? "selected" : ""}" data-scenario="${scenario.id}" tabindex="0" role="button" aria-pressed="${selected}" aria-label="Select scenario: ${scenario.title}">
+        <div class="scenario-number">${scenario.id === "ma" ? "01" : scenario.id === "hr" ? "02" : "03"}</div>
+        <h3>${scenario.title}</h3>
+        <p>${scenario.description}</p>
+        <span class="badge ${scenario.severity === "Critical" ? "high" : "medium"}">${scenario.severity} scenario</span>
+      </article>`;
+    }
+
+    function renderScenarios() {
+      const overview = document.getElementById("overview-scenarios");
+      const simulator = document.getElementById("simulator-scenarios");
+      const runButton = document.getElementById("run-simulation");
+      if (!scenarios.length) {
+        const message = "Simulator unavailable: this scan did not collect an effective-access graph. Connect principal membership, resource permission, content-sensitivity, AI-surface, and policy evidence before simulation can produce a result.";
+        overview.innerHTML = `<div class="empty-state">${message}</div>`;
+        simulator.innerHTML = `<div class="empty-state">${message}</div>`;
+        document.getElementById("simulation-prompt").textContent = "No scenario is available for this scan.";
+        runButton.disabled = true;
+        return;
+      }
+      overview.innerHTML = scenarios.map(s => scenarioCard(s)).join("");
+      simulator.innerHTML = scenarios.map(s => scenarioCard(s, s.id === selectedScenario.id)).join("");
+      document.getElementById("simulation-prompt").textContent = selectedScenario.prompt;
+      runButton.disabled = false;
+    }
+
+    function buildLiveScenarios(scan) {
+      if (scan.integrity?.verifiedByLocalService !== true || !scan.evidenceGraphEnvelope) return [];
+      const simulation = window.FlightDeckEvidenceGraph.simulateEvidenceGraph(scan.evidenceGraphEnvelope, {
+        tenantId: scanTenantId(scan),
+        cohortId: scan.estateAssessment?.cohorts?.[0]?.id || "tenant-wide",
+        sensitiveLevels: ["internal", "confidential", "highly-confidential"]
+      });
+      return simulation.sensitiveMatches.slice(0, 6).map((match, index) => {
+        const reachability = simulation.reachableResources.find(item => item.resourceId === match.resourceId);
+        const audience = match.principalIds.includes("principal:tenant-users")
+          ? `${scan.summary.users} inventoried tenant users`
+          : match.principalIds.includes("principal:broad-sharing-audience")
+            ? "a broad sharing audience"
+            : `${match.principalIds.length} observed principals`;
+        const missing = simulation.missingEvidence.length
+          ? ` ${simulation.missingEvidence.length} evidence link(s) are missing, so the result is incomplete.`
+          : "";
+        return {
+          id: `live-${index + 1}`,
+          title: `Evidence path ${index + 1}`,
+          description: `Trace the observed access path to ${match.resourceId}.`,
+          prompt: `Evaluate whether the selected cohort can reach ${match.resourceId} through the collected membership and policy evidence.`,
+          severity: match.blockedByPolicyIds.length ? "Medium" : "High",
+          exposure: `${audience} can reach ${match.resourceId} through the collected graph. Confidence is ${simulation.confidenceLevel.toLowerCase()} (${Math.round(simulation.confidence * 100)}%).${missing}`,
+          path: [
+            ["Principal", match.principalIds.join(", ") || "Missing"],
+            ["Membership", reachability?.membershipIds.join(", ") || "Missing"],
+            ["Resource", match.resourceId],
+            ["Content signal", `${match.signalId} / ${match.sensitivity}`],
+            ["AI surface", match.aiSurfaceIds.join(", ") || "Missing"],
+            ["Policy", match.blockedByPolicyIds.join(", ") || "No blocking policy observed"]
+          ]
+        };
+      });
+    }
+
+    function renderFindings(filter = "all") {
+      const visible = findings.filter(f => filter === "all" || f.severity === filter);
+      const list = document.getElementById("finding-list");
+      list.replaceChildren();
+      if (!visible.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = `No ${filter === "all" ? "" : `${filter} `}findings are present in this scan.`;
+        list.appendChild(empty);
+        return;
+      }
+      for (const finding of visible) {
+        const article = document.createElement("article");
+        article.className = "finding";
+        const bar = document.createElement("div");
+        bar.classList.add("severity-bar", finding.severity);
+        bar.setAttribute("aria-hidden", "true");
+        const content = document.createElement("div");
+        const title = document.createElement("h3");
+        title.textContent = finding.title;
+        const detail = document.createElement("p");
+        detail.textContent = finding.detail;
+        const details = document.createElement("ul");
+        details.className = "evidence-detail-list";
+        for (const evidence of finding.evidenceDetails || []) {
+          const row = document.createElement("li");
+          row.className = "evidence-detail";
+          const name = document.createElement("strong");
+          name.textContent = evidence.displayName;
+          const reason = document.createElement("span");
+          reason.textContent = evidence.reason;
+          const recommendation = document.createElement("span");
+          recommendation.textContent = `Action: ${evidence.recommendedAction}`;
+          row.append(name, reason, recommendation);
+          details.appendChild(row);
+        }
+        const action = document.createElement("button");
+        action.className = "btn";
+        action.dataset.go = "remediation";
+        action.textContent = "Plan correction";
+        action.style.marginTop = "10px";
+        content.append(title, detail);
+        if (details.childElementCount) content.appendChild(details);
+        content.appendChild(action);
+        const meta = document.createElement("div");
+        meta.className = "finding-meta";
+        const badge = document.createElement("span");
+        badge.className = `badge ${finding.severity === "critical" ? "high" : "medium"}`;
+        badge.textContent = finding.severity.toUpperCase();
+        meta.append(badge, document.createElement("br"), document.createElement("br"));
+        meta.append(document.createTextNode(finding.source), document.createElement("br"), document.createTextNode(finding.impact));
+        article.append(bar, content, meta);
+        list.appendChild(article);
+      }
+    }
+
+    function renderEstateDomains(scan) {
+      const assessment = scan?.estateAssessment;
+      const card = document.getElementById("dimension-card");
+      if (!readinessCatalog) {
+        card.innerHTML = '<div class="empty-state">The readiness control catalogue is unavailable.</div>';
+        return;
+      }
+      if (!assessment || !Array.isArray(assessment.domains)) {
+        card.innerHTML = '<div class="empty-state" style="grid-column:1/-1">Estate-wide readiness coverage is unavailable for this artifact.</div>';
+        return;
+      }
+      const statusLabels = {
+        Collected: "Online",
+        Partial: "Degraded",
+        NotCollected: "Unscanned"
+      };
+      const positions = [
+        [50, 7], [67, 12], [80, 22], [86, 39], [85, 59], [76, 76], [61, 88],
+        [43, 90], [27, 84], [16, 70], [14, 49], [18, 29], [32, 15]
+      ];
+      const stateClass = status => status === "Collected" ? "online" : status === "Partial" ? "degraded" : "unscanned";
+      const shell = document.createElement("div");
+
+      const hud = document.createElement("div");
+      hud.className = "mission-hud";
+      const hudCopy = document.createElement("div");
+      const kicker = document.createElement("div");
+      kicker.className = "console-kicker";
+      kicker.textContent = "Estate mission telemetry";
+      const hudTitle = document.createElement("h3");
+      hudTitle.textContent = "Microsoft 365 Copilot control plane";
+      const hudText = document.createElement("p");
+      hudText.textContent = assessment.collectedDomains === 0 && assessment.partialDomains === 2
+        ? "Current connector coverage: partial Identity and SharePoint evidence only. The other estate collectors have not been built or connected."
+        : "Select a system to inspect its evidence state and next mission.";
+      hudCopy.append(kicker, hudTitle, hudText);
+      const telemetry = document.createElement("div");
+      telemetry.className = "mission-telemetry";
+      [
+        [assessment.collectedDomains, "Online"],
+        [assessment.partialDomains, "Degraded"],
+        [assessment.requiredDomains - assessment.collectedDomains - assessment.partialDomains, "Unscanned"]
+      ].forEach(([value, label]) => {
+        const chip = document.createElement("div");
+        chip.className = "telemetry-chip";
+        const strong = document.createElement("strong");
+        strong.textContent = String(value);
+        const span = document.createElement("span");
+        span.textContent = label;
+        chip.append(strong, span);
+        telemetry.appendChild(chip);
+      });
+      hud.append(hudCopy, telemetry);
+
+      const controlDomains = new Map();
+      for (const domain of readinessCatalog.domains) {
+        for (const control of domain.controls) {
+          controlDomains.set(control.id, domain.id);
+        }
+      }
+      const missionDefinitions = readinessCatalog.missions.map(mission => ({
+        id: mission.id,
+        code: `Mission ${String(mission.order).padStart(2, "0")}`,
+        title: mission.name,
+        detail: mission.purpose,
+        requiredControlIds: mission.requiredControlIds,
+        systems: [...new Set(mission.requiredControlIds.map(controlId => controlDomains.get(controlId)).filter(Boolean))],
+        briefing: mission.purpose,
+        unlock: mission.progressionRule
+      }));
+      const cohort = Array.isArray(assessment.cohorts) && assessment.cohorts.length
+        ? assessment.cohorts[0]
+        : { id: "tenant-wide", name: "Tenant-wide baseline" };
+      const cohortControlResults = (Array.isArray(assessment.controlResults) ? assessment.controlResults : [])
+        .filter(result => result.cohortId === cohort.id);
+      const controlResults = new Map(cohortControlResults.map(result => [result.controlId, result]));
+      const controlSatisfied = controlId => {
+        const result = controlResults.get(controlId);
+        if (!result) return false;
+        return window.FlightDeckMissionEngine.evaluateControl(result, new Date()).satisfied;
+      };
+      const missionEvaluation = window.FlightDeckMissionEngine.evaluateMissions({
+        catalog: readinessCatalog,
+        controlResults: cohortControlResults,
+        cohorts: [cohort],
+        now: new Date()
+      })[0];
+      const missionResults = new Map(missionEvaluation.missions.map(result => [result.missionId, result]));
+      const missionSatisfied = mission => missionResults.get(mission.id)?.satisfied === true;
+      const firstUnsatisfiedMission = missionDefinitions.findIndex((mission, index) =>
+        !missionSatisfied(mission) ||
+        missionDefinitions.slice(0, index).some(previous => !missionSatisfied(previous))
+      );
+      const currentMissionIndex = firstUnsatisfiedMission < 0 ? missionDefinitions.length - 1 : firstUnsatisfiedMission;
+      const lifecycle = document.createElement("div");
+      lifecycle.className = "mission-lifecycle";
+      const gateElements = [];
+      missionDefinitions.forEach((mission, index) => {
+        const gate = document.createElement("button");
+        gate.type = "button";
+        gate.className = `mission-gate${index === currentMissionIndex ? " current" : ""}`;
+        gate.setAttribute("aria-pressed", "false");
+        gate.innerHTML = `<strong>${mission.code}: ${mission.title}</strong><span>${mission.detail}</span>`;
+        gateElements.push(gate);
+        lifecycle.appendChild(gate);
+      });
+
+      const workspace = document.createElement("div");
+      workspace.className = "mission-workspace";
+      const mapWrap = document.createElement("div");
+      mapWrap.className = "mission-map-wrap";
+      const map = document.createElement("div");
+      map.className = "mission-map";
+      map.setAttribute("aria-label", "Interactive three-dimensional Microsoft 365 estate map");
+      const outerRing = document.createElement("div");
+      outerRing.className = "orbit-ring outer";
+      const innerRing = document.createElement("div");
+      innerRing.className = "orbit-ring inner";
+      const core = document.createElement("div");
+      core.className = "mission-core";
+      const coreCount = document.createElement("strong");
+      coreCount.textContent = `${assessment.collectedDomains}/${assessment.requiredDomains}`;
+      const coreLabel = document.createElement("span");
+      coreLabel.textContent = "systems fully evidenced";
+      const coreState = document.createElement("small");
+      coreState.textContent = `${assessment.partialDomains} partial / ${assessment.requiredDomains - assessment.collectedDomains - assessment.partialDomains} collectors missing`;
+      core.append(coreCount, coreLabel, coreState);
+      map.append(outerRing, innerRing, core);
+
+      const console = document.createElement("aside");
+      console.className = "mission-console";
+      const consoleKicker = document.createElement("div");
+      consoleKicker.className = "console-kicker";
+      const consoleTitle = document.createElement("h3");
+      const consoleStatus = document.createElement("div");
+      const consoleSummary = document.createElement("p");
+      const consoleNext = document.createElement("div");
+      consoleNext.className = "console-next";
+      const consoleNextLabel = document.createElement("strong");
+      consoleNextLabel.textContent = "Next mission";
+      const consoleNextText = document.createElement("p");
+      const consoleDocumentation = document.createElement("a");
+      consoleDocumentation.className = "doc-link";
+      consoleDocumentation.target = "_blank";
+      consoleDocumentation.rel = "noopener noreferrer";
+      consoleDocumentation.style.display = "inline-block";
+      consoleDocumentation.style.marginTop = "8px";
+      consoleNext.append(consoleNextLabel, consoleNextText, consoleDocumentation);
+      const consoleControls = document.createElement("div");
+      consoleControls.className = "console-controls";
+      consoleControls.setAttribute("aria-label", "Readiness control evidence");
+      console.append(consoleKicker, consoleTitle, consoleStatus, consoleSummary, consoleControls, consoleNext);
+
+      const renderControlList = controlIds => {
+        consoleControls.replaceChildren();
+        for (const controlId of controlIds) {
+          const catalogDomain = readinessCatalog.domains.find(domain =>
+            domain.controls.some(control => control.id === controlId));
+          const catalogControl = catalogDomain?.controls.find(control => control.id === controlId);
+          if (!catalogControl) continue;
+          const result = controlResults.get(controlId);
+          const evaluation = window.FlightDeckMissionEngine.evaluateControl(result, new Date());
+          const effectiveStatus = evaluation.reason === "Expired"
+            ? "Expired"
+            : (result?.status || "Unknown");
+          const detail = document.createElement("details");
+          detail.className = `control-detail ${effectiveStatus.toLowerCase()}`;
+          const summary = document.createElement("summary");
+          const heading = document.createElement("span");
+          heading.className = "control-heading";
+          const id = document.createElement("small");
+          id.textContent = `${controlId} / ${catalogControl.requirement}`;
+          const title = document.createElement("strong");
+          title.textContent = catalogControl.title;
+          heading.append(id, title);
+          const badge = document.createElement("span");
+          badge.className = "control-badge";
+          badge.textContent = effectiveStatus;
+          summary.append(heading, badge);
+          const body = document.createElement("div");
+          body.className = "control-body";
+          const description = document.createElement("p");
+          description.textContent = catalogControl.description;
+          const requirement = document.createElement("p");
+          requirement.textContent = `Why this matters: ${catalogControl.applicability}`;
+          const passCondition = document.createElement("p");
+          passCondition.textContent = `Ready when: ${catalogControl.passCondition}`;
+          const evidence = document.createElement("p");
+          evidence.textContent = result
+            ? `Evidence: ${result.provenance?.source || "Source not recorded"}. Coverage ${result.coverage?.evaluated ?? 0}/${result.coverage?.population ?? 0}.`
+            : `Evidence required: ${catalogControl.evidenceSources.join(", ")}.`;
+          const evidenceSources = document.createElement("p");
+          evidenceSources.textContent =
+            `Collection method: ${catalogControl.automation}. Expected sources: ${catalogControl.evidenceSources.join(", ")}.`;
+          const freshness = document.createElement("p");
+          freshness.className = "control-meta";
+          freshness.textContent = result
+            ? `Observed ${new Date(result.observedAt).toLocaleString()}; fresh until ${new Date(result.freshUntil).toLocaleString()}.`
+            : `No collector result is available. Freshness window: ${catalogControl.freshnessHours} hours.`;
+          const next = document.createElement("p");
+          next.textContent = `Next: ${result?.remediation?.action || catalogControl.remediation}`;
+          const limitations = document.createElement("p");
+          limitations.textContent = result?.limitations?.length
+            ? `Current blockers: ${result.limitations.map(item => `${item.code}: ${item.description}`).join(" ")}`
+            : "Current blockers: none recorded.";
+          const observation = document.createElement("pre");
+          observation.className = "control-observation";
+          observation.textContent = result?.observedValue == null
+            ? "No observation was returned."
+            : JSON.stringify(result.observedValue, null, 2).slice(0, 4000);
+          const documentation = domainDocumentation[catalogDomain.id];
+          const documentationLink = document.createElement("a");
+          documentationLink.className = "doc-link";
+          documentationLink.href = documentation.url;
+          documentationLink.target = "_blank";
+          documentationLink.rel = "noopener noreferrer";
+          documentationLink.textContent = `Microsoft documentation: ${documentation.title}`;
+          body.append(
+            description,
+            requirement,
+            passCondition,
+            evidenceSources,
+            evidence,
+            freshness,
+            limitations,
+            observation,
+            next,
+            documentationLink
+          );
+          detail.append(summary, body);
+          consoleControls.appendChild(detail);
+        }
+      };
+
+      const nodes = [];
+      const selectDomain = (domain, node, index) => {
+        gateElements.forEach(gate => {
+          gate.classList.remove("selected");
+          gate.setAttribute("aria-pressed", "false");
+        });
+        nodes.forEach(item => {
+          const selected = item === node;
+          item.classList.toggle("selected", selected);
+          item.setAttribute("aria-pressed", String(selected));
+        });
+        const systemState = stateClass(domain.status);
+        consoleKicker.textContent = `System ${String(index + 1).padStart(2, "0")} of ${assessment.requiredDomains}`;
+        consoleTitle.textContent = domain.name;
+        consoleStatus.className = `console-status ${systemState}`;
+        consoleStatus.textContent = statusLabels[domain.status] || domain.status;
+        consoleSummary.textContent = domain.summary;
+        consoleNextLabel.textContent = "Recommended next action";
+        const catalogDomain = readinessCatalog.domains.find(item => item.id === domain.id);
+        renderControlList(catalogDomain?.controls.map(control => control.id) || []);
+        consoleNextText.textContent = domain.nextStep;
+        const documentation = domainDocumentation[domain.id];
+        consoleDocumentation.hidden = !documentation;
+        if (documentation) {
+          consoleDocumentation.href = documentation.url;
+          consoleDocumentation.textContent = `Open Microsoft guidance: ${documentation.title}`;
+        }
+      };
+
+      const selectMission = (mission, gate, index) => {
+        nodes.forEach(item => {
+          item.classList.remove("selected");
+          item.setAttribute("aria-pressed", "false");
+        });
+        gateElements.forEach(item => {
+          const selected = item === gate;
+          item.classList.toggle("selected", selected);
+          item.setAttribute("aria-pressed", String(selected));
+        });
+        const results = mission.requiredControlIds.map(controlId => controlResults.get(controlId)).filter(Boolean);
+        const passed = mission.requiredControlIds.filter(controlSatisfied).length;
+        const failed = results.filter(result => result.status === "Fail").length;
+        const warnings = results.filter(result => result.status === "Warning").length;
+        const missionResult = missionResults.get(mission.id);
+        const locked = missionResult?.satisfied !== true;
+        const unknown = missionResult?.blockers.filter(blocker =>
+          ["Missing", "Unknown", "InvalidFreshness"].includes(blocker.reason)
+        ).length || 0;
+        const expired = missionResult?.blockers.filter(blocker => blocker.reason === "Expired").length || 0;
+        consoleKicker.textContent = `${mission.code} / ${passed} of ${mission.requiredControlIds.length} gate controls satisfied`;
+        consoleTitle.textContent = mission.title;
+        consoleStatus.className = `console-status ${locked ? "unscanned" : "online"}`;
+        consoleStatus.textContent = locked
+          ? `Locked / ${failed} failed / ${warnings} warning / ${unknown} unknown / ${expired} expired`
+          : "Gate satisfied";
+        consoleSummary.textContent = `${mission.briefing} ${mission.unlock}`;
+        consoleNextLabel.textContent = "Mission gate";
+        renderControlList(mission.requiredControlIds);
+        const blockingTitles = (missionResult?.blockers || []).slice(0, 5).map(blocker => {
+          const control = readinessCatalog.domains
+            .flatMap(domain => domain.controls)
+            .find(item => item.id === blocker.controlId);
+          return control ? `${control.id} ${control.title}` : blocker.controlId;
+        });
+        consoleNextText.textContent = locked
+          ? `Cannot advance this cohort. Resolve: ${blockingTitles.join("; ")}${(missionResult?.blockers.length || 0) > 5 ? "; and additional blockers" : ""}.`
+          : mission.unlock;
+        consoleDocumentation.hidden = true;
+      };
+
+      assessment.domains.forEach((domain, index) => {
+        const node = document.createElement("button");
+        const systemState = stateClass(domain.status);
+        node.type = "button";
+        node.className = `estate-domain ${systemState}`;
+        node.style.setProperty("--domain-x", `${positions[index][0]}%`);
+        node.style.setProperty("--domain-y", `${positions[index][1]}%`);
+        node.style.setProperty("--domain-depth", `${12 + (index % 4) * 5}px`);
+        node.setAttribute("aria-pressed", "false");
+        node.setAttribute("aria-label", `${domain.name}: ${statusLabels[domain.status] || domain.status}`);
+        const number = document.createElement("span");
+        number.className = "domain-index";
+        const catalogDomain = readinessCatalog.domains.find(item => item.id === domain.id);
+        const catalogControls = domain.catalogControls ?? catalogDomain?.controls.length ?? 0;
+        number.textContent = `SYS-${String(index + 1).padStart(2, "0")} / ${catalogControls} controls`;
+        const name = document.createElement("strong");
+        name.textContent = domain.name;
+        const status = document.createElement("span");
+        status.className = "domain-state";
+        status.textContent = statusLabels[domain.status] || domain.status;
+        node.append(number, name, status);
+        node.addEventListener("click", () => selectDomain(domain, node, index));
+        nodes.push(node);
+        map.appendChild(node);
+      });
+      missionDefinitions.forEach((mission, index) => {
+        gateElements[index].addEventListener("click", () => selectMission(mission, gateElements[index], index));
+      });
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduceMotion) {
+        mapWrap.addEventListener("pointermove", event => {
+          const bounds = mapWrap.getBoundingClientRect();
+          const x = (event.clientX - bounds.left) / bounds.width - .5;
+          const y = (event.clientY - bounds.top) / bounds.height - .5;
+          map.style.setProperty("--map-tilt-x", `${y * -3}deg`);
+          map.style.setProperty("--map-tilt-y", `${x * 4}deg`);
+        });
+        mapWrap.addEventListener("pointerleave", () => {
+          map.style.setProperty("--map-tilt-x", "0deg");
+          map.style.setProperty("--map-tilt-y", "0deg");
+        });
+      }
+
+      mapWrap.appendChild(map);
+      workspace.append(mapWrap, console);
+      shell.append(hud, lifecycle, workspace);
+      card.className = "card mission-control";
+      card.replaceChildren(shell);
+      const initialIndex = Math.max(0, assessment.domains.findIndex(domain => domain.status === "Partial"));
+      selectDomain(assessment.domains[initialIndex], nodes[initialIndex], initialIndex);
+    }
+
+    function renderRemediations() {
+      if (!remediations.length) {
+        document.getElementById("remediation-list").innerHTML = '<div class="empty-state">No failed, warning, or evidence-blocked controls require action.</div>';
+        document.getElementById("generate-package").disabled = true;
+        applied.clear();
+        updateForecast();
+        return;
+      }
+      document.getElementById("remediation-list").innerHTML = remediations.map(r => `
+        <article class="remediation ${applied.has(r.id) ? "applied" : ""}" data-remediation="${r.id}">
+          <button class="check" aria-pressed="${applied.has(r.id)}" aria-label="${applied.has(r.id) ? "Remove from" : "Include in"} forecast: ${r.title}"></button>
+          <div>
+            <h3>${r.title}</h3>
+            <p>${r.copy}</p>
+            ${domainDocumentation[r.domainId]
+              ? `<p><a class="doc-link" href="${domainDocumentation[r.domainId].url}" target="_blank" rel="noopener noreferrer">Microsoft documentation: ${domainDocumentation[r.domainId].title}</a></p>`
+              : ""}
+            <span class="badge">${r.currentStatus ? `${r.currentStatus} / ` : ""}${r.effort}</span>
+          </div>
+          <div class="impact"><strong>${Number.isFinite(r.gain) ? `+${r.gain} pts` : "Re-scan"}</strong><small>${Number.isFinite(r.gain) ? "demonstration forecast" : "required for impact"}</small></div>
+        </article>`).join("");
+      document.getElementById("generate-package").disabled = false;
+      updateForecast();
+    }
+
+    function updateForecast() {
+      const selected = remediations.filter(r => applied.has(r.id));
+      const hasNumericForecast = activeTenant.baselineScore != null && selected.every(r => Number.isFinite(r.gain));
+      const gain = hasNumericForecast ? selected.reduce((sum, r) => sum + r.gain, 0) : 0;
+      const score = hasNumericForecast ? Math.min(100, activeTenant.baselineScore + gain) : null;
+      const criticalClosed = selected.reduce((sum, r) => sum + r.critical, 0);
+      const usersReduced = selected.reduce((sum, r) => sum + r.users, 0);
+      document.getElementById("forecast-score").textContent = hasNumericForecast ? score : "Re-scan";
+      document.getElementById("forecast-progress").style.width = hasNumericForecast ? `${score}%` : "0";
+      document.getElementById("applied-count").textContent = `${selected.length} of ${remediations.length} selected for the administrator plan`;
+      document.getElementById("forecast-copy").textContent = selected.length
+        ? hasNumericForecast
+          ? `${criticalClosed} critical path${criticalClosed === 1 ? "" : "s"} could close. This is a demonstration forecast and does not change the tenant.`
+          : `${selected.length} control${selected.length === 1 ? "" : "s"} selected. Run a new scan after administrator action to measure the result.`
+        : "Select controls to prepare a remediation package. A new scan is required to prove the result.";
+      document.getElementById("package-copy").textContent = selected.length
+        ? hasNumericForecast
+          ? `${selected.length} correction${selected.length === 1 ? "" : "s"} selected for a demonstration forecast of ${gain} points.`
+          : `${selected.length} evidence-linked correction${selected.length === 1 ? "" : "s"} selected. Impact will be measured by a new scan.`
+        : "Select one or more corrections to create a traceable remediation package for tenant administrators.";
+      document.getElementById("remediation-live").textContent = selected.length
+        ? `${selected.length} correction${selected.length === 1 ? "" : "s"} selected. ${document.getElementById("forecast-copy").textContent}`
+        : "No corrections selected.";
+      renderClearance();
+    }
+
+    function navigate(page) {
+      document.querySelectorAll(".page").forEach(el => el.classList.toggle("active", el.id === page));
+      document.querySelectorAll("[data-page]").forEach(el => {
+        const active = el.dataset.page === page;
+        el.classList.toggle("active", active);
+        if (active) {
+          el.setAttribute("aria-current", "page");
+        } else {
+          el.removeAttribute("aria-current");
+        }
+      });
+      const title = document.getElementById("page-title");
+      title.textContent = pageMeta[page][0];
+      document.getElementById("page-subtitle").textContent = pageMeta[page][1];
+      title.setAttribute("tabindex", "-1");
+      title.focus();
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+      renderJourneyPhase();
+    }
+
+    function renderJourneyPhase() {
+      document.querySelectorAll("[data-phase]").forEach(element => {
+        const phase = Number(element.dataset.phase);
+        element.classList.toggle("complete", phase < currentJourneyPhase);
+        element.classList.toggle("current", phase === currentJourneyPhase);
+      });
+    }
+
+    async function runSimulation() {
+      if (!selectedScenario) {
+        showError("No evidence-backed scenario is available for this scan.");
+        return;
+      }
+      const button = document.getElementById("run-simulation");
+      const steps = [...document.querySelectorAll("#simulation-steps .step")];
+      const result = document.getElementById("simulation-result");
+      const live = document.getElementById("simulation-live");
+      button.setAttribute("aria-busy", "true");
+      button.disabled = true;
+      button.textContent = "Simulation running";
+      live.textContent = "Running risk simulation.";
+      result.classList.remove("visible");
+      steps.forEach(step => {
+        step.className = "step";
+        step.querySelector(".step-status").textContent = "";
+      });
+      for (const step of steps) {
+        step.classList.add("running");
+        step.querySelector(".step-status").textContent = " in progress";
+        live.textContent = `${step.childNodes[1].textContent.trim()} in progress.`;
+        await new Promise(resolve => setTimeout(resolve, 520));
+        step.classList.remove("running");
+        step.classList.add("complete");
+        step.querySelector(".step-status").textContent = " complete";
+      }
+      document.getElementById("result-copy").textContent = selectedScenario.exposure;
+      document.getElementById("result-title").textContent = `${selectedScenario.severity} exposure confirmed`;
+      const path = document.getElementById("result-path");
+      path.replaceChildren();
+      selectedScenario.path.forEach((node, index) => {
+        if (index) {
+          const arrow = document.createElement("span");
+          arrow.className = "path-arrow";
+          arrow.setAttribute("aria-hidden", "true");
+          arrow.textContent = "→";
+          path.appendChild(arrow);
+        }
+        const pathNode = document.createElement("div");
+        pathNode.className = "path-node";
+        const kind = document.createElement("small");
+        kind.textContent = node[0];
+        const value = document.createElement("strong");
+        value.textContent = node[1];
+        pathNode.append(kind, document.createElement("br"), value);
+        path.appendChild(pathNode);
+      });
+      result.classList.add("visible");
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+      button.textContent = "Run again";
+      button.focus();
+      live.textContent = `${selectedScenario.severity} exposure confirmed. Review the permission path.`;
+    }
+
+    function download(name, payload) {
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast(`${name} downloaded`);
+    }
+
+    function csvCell(value) {
+      let text = value == null
+        ? ""
+        : typeof value === "string"
+          ? value
+          : JSON.stringify(value);
+      if (/^[=+\-@]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+
+    function controlsCsv() {
+      if (!baselineScan?.estateAssessment?.controlResults) {
+        throw new Error("Run or import a tenant assessment before exporting controls.");
+      }
+      const columns = [
+        "Tenant", "Generated At", "Domain", "Domain Name", "Control", "Control Name",
+        "Requirement", "Status", "Description", "Applicability", "Pass Condition",
+        "Automation", "Expected Evidence Sources", "Collected Evidence Source",
+        "Observed At", "Fresh Until", "Population", "Evaluated", "Coverage Complete",
+        "Confidence", "Observed Value", "Affected Principals", "Affected Resources",
+        "Evidence References", "Limitation Codes", "Limitation Details",
+        "Recommended Correction", "Microsoft Documentation"
+      ];
+      const rows = baselineScan.estateAssessment.controlResults.map(result => {
+        const domain = readinessCatalog.domains.find(item => item.id === result.domainId);
+        const control = domain?.controls.find(item => item.id === result.controlId);
+        const documentation = domainDocumentation[result.domainId];
+        return [
+          activeTenant.name,
+          baselineScan.generatedAt,
+          result.domainId,
+          domain?.name,
+          result.controlId,
+          control?.title,
+          result.requirement,
+          result.status,
+          control?.description,
+          result.applicability,
+          control?.passCondition,
+          control?.automation,
+          control?.evidenceSources,
+          result.provenance?.source,
+          result.observedAt,
+          result.freshUntil,
+          result.coverage?.population,
+          result.coverage?.evaluated,
+          result.coverage?.complete,
+          result.confidence,
+          result.observedValue,
+          result.affectedPrincipals,
+          result.affectedResources,
+          result.evidenceRefs,
+          result.limitations?.map(item => item.code),
+          result.limitations?.map(item => item.description),
+          result.remediation?.action || control?.remediation,
+          documentation?.url
+        ].map(csvCell).join(",");
+      });
+      return `\uFEFF${columns.map(csvCell).join(",")}\r\n${rows.join("\r\n")}`;
+    }
+
+    function exportControlsCsv() {
+      const safeTenant = activeTenant.name.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "tenant";
+      const blob = new Blob([controlsCsv()], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ai-flight-deck-${safeTenant}-controls.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast("Detailed controls CSV downloaded");
+    }
+
+    function reportPayload() {
+      const selected = remediations.filter(r => applied.has(r.id));
+      const numericGain = selected.filter(r => Number.isFinite(r.gain)).reduce((sum, r) => sum + r.gain, 0);
+      return JSON.stringify({
+        schemaVersion: "1.0",
+        reportType: "ai-flight-deck-assessment",
+        product: "AI Flight Deck",
+        tenant: activeTenant.name,
+        source: activeTenant.source,
+        generatedAt: new Date().toISOString(),
+        baselineScore: activeTenant.baselineScore,
+        forecastScore: activeTenant.source === "synthetic" ? Math.min(100, activeTenant.baselineScore + numericGain) : null,
+        verification: verificationOutcome,
+        findings,
+        selectedRemediations: selected,
+        limitation: verificationReport
+          ? "This report references an authoritative comparison report."
+          : "No comparison report has been imported. Forecast selections are not proof of remediation."
+      }, null, 2);
+    }
+
+    function clearancePayload() {
+      if (!verificationReport) {
+        throw new Error("Import the authoritative comparison report before downloading a decision record.");
+      }
+      return JSON.stringify(verificationReport, null, 2);
+    }
+
+    function actionPackagePayload() {
+      const selected = remediations.filter(r => applied.has(r.id));
+      return JSON.stringify({
+        schemaVersion: "1.0",
+        packageType: "ai-flight-deck-remediation",
+        packageId: `AFD-${Date.now()}`,
+        tenant: activeTenant.name,
+        tenantId: baselineScan?.tenant?.tenantId || null,
+        createdAt: new Date().toISOString(),
+        status: "Awaiting administrator approval",
+        tenantChangesApplied: false,
+        baseline: {
+          readinessScore: activeTenant.baselineScore,
+          criticalExposures: activeTenant.criticalExposures,
+          exposedItems: activeTenant.exposedFiles
+        },
+        requestedActions: selected.map(action => ({
+          id: action.id,
+          title: action.title,
+          rationale: action.copy,
+          forecastReadinessGain: Number.isFinite(action.gain) ? action.gain : null,
+          forecastCriticalPathsClosed: action.critical,
+          forecastAffectedUsersReduced: action.users,
+          ruleKey: action.ruleKey || null,
+          controlId: action.controlId || null,
+          domainId: action.domainId || null,
+          currentStatus: action.currentStatus || null,
+          limitationCodes: action.limitationCodes || [],
+          evidenceIds: action.evidenceIds || [],
+          executionMode: "Administrator approval and execution required"
+        })),
+        controls: {
+          approvalRequired: true,
+          leastPrivilegeRequired: true,
+          postChangeScanRequired: true,
+          rollbackPlanRequired: true
+        }
+      }, null, 2);
+    }
+
+    function normalizeSeverity(value) {
+      const normalized = String(value ?? "").trim().toLowerCase();
+      return ALLOWED_SEVERITIES.has(normalized) ? normalized : "medium";
+    }
+
+    function normalizeText(value, fallback) {
+      if (typeof value !== "string") return fallback;
+      const trimmed = value.trim();
+      return trimmed ? trimmed.slice(0, MAX_FINDING_FIELD_LENGTH) : fallback;
+    }
+
+    function parseBoundedInteger(value, field, min, max) {
+      if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+        throw new Error(`The scan field '${field}' must be between ${min} and ${max}.`);
+      }
+      return value;
+    }
+
+    function enforceImportGuards(file, label) {
+      if (file.size > MAX_SCAN_FILE_BYTES) {
+        throw new Error(`${label} exceeds the 50 MB import limit.`);
+      }
+    }
+
+    function scanTenantId(scan) {
+      return scan.tenant.tenantId || scan.tenant.id || null;
+    }
+
+    function scanScopeFingerprint(scan) {
+      if (scan.scopeFingerprint) return scan.scopeFingerprint;
+      if (scan.scope?.fingerprint) return scan.scope.fingerprint;
+      if (!scan.scope) return null;
+      const scopes = Array.isArray(scan.scope.grantedScopes) ? [...scan.scope.grantedScopes].sort() : [];
+      return JSON.stringify({
+        mode: scan.scope.mode || null,
+        maximumSites: scan.scope.maximumSites ?? null,
+        maximumDrivesPerSite: scan.scope.maximumDrivesPerSite ?? null,
+        maximumItems: scan.scope.maximumItems ?? null,
+        grantedScopes: scopes
+      });
+    }
+
+    function scanIsComplete(scan) {
+      if (!scan.completeness) return false;
+      if (typeof scan.completeness.isComplete === "boolean") return scan.completeness.isComplete;
+      if (typeof scan.completeness.requiredEvidenceComplete === "boolean") {
+        return scan.completeness.requiredEvidenceComplete && scan.completeness.status === "Complete";
+      }
+      return scan.completeness.partial === false;
+    }
+
+    function validateScan(scan) {
+      if (!scan || typeof scan.schemaVersion !== "string" || scan.schemaVersion.split(".")[0] !== "1" || !scan.tenant || !scan.summary || !Array.isArray(scan.findings)) {
+        throw new Error("This file is not an AI Flight Deck tenant scan.");
+      }
+      if (scan.documentType !== "tenant-scan" || scan.producer !== "ai-flight-deck/scan-tenant.ps1") {
+        throw new Error("The file was not produced by the supported tenant scanner.");
+      }
+      for (const field of ["producerVersion", "scoringVersion", "policyHash", "configHash"]) {
+        if (typeof scan[field] !== "string" || !scan[field].trim()) {
+          throw new Error(`The scan field '${field}' is required.`);
+        }
+      }
+      if (scan.producerVersion !== SUPPORTED_PRODUCER_VERSION || scan.scoringVersion !== SUPPORTED_SCORING_VERSION) {
+        throw new Error("The scan uses an unsupported producer or scoring version.");
+      }
+      if (!/^[a-f0-9]{64}$/i.test(scan.policyHash) || !/^[a-f0-9]{64}$/i.test(scan.configHash)) {
+        throw new Error("The scan policy or configuration hash is invalid.");
+      }
+      if (!scanTenantId(scan)) {
+        throw new Error("The scan does not contain a tenant identifier.");
+      }
+      if (!/^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/i.test(scan.generatedAt || "") || Number.isNaN(Date.parse(scan.generatedAt))) {
+        throw new Error("The scan generatedAt timestamp is invalid.");
+      }
+      if (!scan.auth || typeof scan.auth.mode !== "string" || typeof scan.auth.actor?.id !== "string" || !scan.auth.actor.id.trim()) {
+        throw new Error("The scan does not contain complete authentication provenance.");
+      }
+      if (!scan.scope || typeof scan.scope.fingerprint !== "string" || !/^[a-f0-9]{64}$/i.test(scan.scope.fingerprint)) {
+        throw new Error("The scan does not contain a scope fingerprint.");
+      }
+      if (!scan.completeness || typeof scan.completeness.requiredEvidenceComplete !== "boolean") {
+        throw new Error("The scan does not contain completeness metadata.");
+      }
+      if (!scan.coverage || !scan.collectionMetadata || !scan.evidenceSets) {
+        throw new Error("The scan does not contain coverage, collection, and evidence metadata.");
+      }
+      const estate = scan.estateAssessment;
+      if (!estate || estate.assessmentType !== "microsoft-365-copilot-estate-readiness" ||
+          estate.overallStatus !== "InsufficientEvidence" ||
+          estate.decision !== "EvidenceCollectionRequired" ||
+          !Array.isArray(estate.domains) || estate.domains.length !== 13) {
+        throw new Error("The scan does not contain the required estate-readiness domain assessment.");
+      }
+      if (!readinessCatalog || estate.catalogVersion !== readinessCatalog.catalogVersion) {
+        throw new Error("The scan readiness catalogue is missing or incompatible.");
+      }
+      const catalogControlCount = readinessCatalog.domains.reduce((sum, domain) => sum + domain.controls.length, 0);
+      if (estate.totalControls !== catalogControlCount ||
+          !Number.isInteger(estate.evaluatedControls) ||
+          !Number.isInteger(estate.unknownControls) ||
+          estate.evaluatedControls < 0 ||
+          estate.unknownControls < 0 ||
+          estate.evaluatedControls + estate.unknownControls > estate.totalControls) {
+        throw new Error("The scan control coverage is inconsistent with the readiness catalogue.");
+      }
+      if (!Array.isArray(estate.cohorts) || !estate.cohorts.length ||
+          !Array.isArray(estate.controlResults) || estate.controlResults.length !== catalogControlCount) {
+        throw new Error("The scan does not contain cohort-aware control results.");
+      }
+      const catalogControls = new Map();
+      for (const domain of readinessCatalog.domains) {
+        for (const control of domain.controls) {
+          catalogControls.set(control.id, { ...control, domainId: domain.id });
+        }
+      }
+      const cohortIds = new Set(estate.cohorts.map(cohort => cohort?.id).filter(Boolean));
+      const resultIds = new Set();
+      let evaluatedControls = 0;
+      let unknownControls = 0;
+      for (const result of estate.controlResults) {
+        const catalogControl = catalogControls.get(result?.controlId);
+        if (!catalogControl || resultIds.has(result.controlId) ||
+            result.domainId !== catalogControl.domainId ||
+            !cohortIds.has(result.cohortId) ||
+            !["Pass", "Fail", "Warning", "Unknown", "NotApplicable"].includes(result.status) ||
+            result.requirement !== catalogControl.requirement ||
+            typeof result.applicability?.applies !== "boolean" ||
+            typeof result.applicability?.reason !== "string" ||
+            !result.coverage || !Number.isInteger(result.coverage.population) ||
+            !Number.isInteger(result.coverage.evaluated) ||
+            typeof result.coverage.complete !== "boolean" ||
+            !result.provenance || result.provenance.tenantId !== scanTenantId(scan) ||
+            typeof result.provenance.collectorId !== "string" ||
+            typeof result.provenance.collectorRunId !== "string" ||
+            !Array.isArray(result.evidenceRefs) ||
+            !Array.isArray(result.affectedPrincipals) ||
+            !Array.isArray(result.affectedResources) ||
+            !Array.isArray(result.limitations) ||
+            Number.isNaN(Date.parse(result.observedAt)) ||
+            Number.isNaN(Date.parse(result.freshUntil))) {
+          throw new Error("The scan contains an invalid control result.");
+        }
+        resultIds.add(result.controlId);
+        if (result.status === "Unknown") unknownControls++;
+        else evaluatedControls++;
+      }
+      if (evaluatedControls !== estate.evaluatedControls || unknownControls !== estate.unknownControls) {
+        throw new Error("The scan control-result counts are inconsistent.");
+      }
+      const domainIds = new Set();
+      let collectedDomains = 0;
+      let partialDomains = 0;
+      for (const domain of estate.domains) {
+        if (!domain || typeof domain.id !== "string" || domainIds.has(domain.id) ||
+            typeof domain.name !== "string" || !["Collected", "Partial", "NotCollected"].includes(domain.status)) {
+          throw new Error("The estate-readiness domain metadata is invalid.");
+        }
+        for (const key of ["summary", "nextStep"]) {
+          if (typeof domain[key] !== "string" || !domain[key].trim() || domain[key].length > MAX_FINDING_FIELD_LENGTH) {
+            throw new Error(`The estate-readiness domain field '${key}' is invalid.`);
+          }
+        }
+        domainIds.add(domain.id);
+        if (domain.status === "Collected") collectedDomains++;
+        if (domain.status === "Partial") partialDomains++;
+      }
+      if (estate.requiredDomains !== estate.domains.length ||
+          estate.collectedDomains !== collectedDomains ||
+          estate.partialDomains !== partialDomains) {
+        throw new Error("The estate-readiness domain counts are inconsistent.");
+      }
+      for (const field of ["sitesDiscovered", "sitesSelected", "sitesScanned"]) {
+        scan.coverage[field] = parseBoundedInteger(scan.coverage[field], `coverage.${field}`, 0, 10000);
+      }
+      for (const field of ["discoveryComplete", "selectionComplete", "limitReached", "complete"]) {
+        if (typeof scan.coverage[field] !== "boolean") {
+          throw new Error(`The scan coverage field '${field}' must be true or false.`);
+        }
+      }
+      const expectedCoverageComplete = scan.coverage.discoveryComplete &&
+        scan.coverage.selectionComplete &&
+        !scan.coverage.limitReached &&
+        scan.coverage.sitesDiscovered === scan.coverage.sitesSelected &&
+        scan.coverage.sitesSelected === scan.coverage.sitesScanned;
+      if (scan.coverage.complete !== expectedCoverageComplete) {
+        throw new Error("The scan coverage metadata is internally inconsistent.");
+      }
+      for (const setName of REQUIRED_EVIDENCE_SETS) {
+        const values = scan.evidenceSets[setName];
+        if (!Array.isArray(values)) {
+          throw new Error(`The scan evidence set '${setName}' is invalid.`);
+        }
+        if (values.some(value => typeof value !== "string" || !value.trim() || value.length > MAX_FINDING_FIELD_LENGTH)) {
+          throw new Error(`The scan evidence set '${setName}' contains an invalid identifier.`);
+        }
+        const normalized = values.map(value => value.trim());
+        if (new Set(normalized).size !== normalized.length) {
+          throw new Error(`The scan evidence set '${setName}' contains duplicate identifiers.`);
+        }
+        scan.evidenceSets[setName] = normalized;
+      }
+      if (scan.findings.length > MAX_FINDINGS) {
+        throw new Error(`The scan contains more than ${MAX_FINDINGS} findings.`);
+      }
+      for (const item of scan.findings) {
+        if (!ALLOWED_SEVERITIES.has(String(item.severity || "").toLowerCase())) {
+          throw new Error("The scan contains an unsupported finding severity.");
+        }
+        for (const key of ["title", "detail", "source", "impact"]) {
+          if (typeof item[key] !== "string" || !item[key].trim() || item[key].length > MAX_FINDING_FIELD_LENGTH) {
+            throw new Error(`The scan finding field '${key}' must be non-empty text within the supported length.`);
+          }
+        }
+      }
+      const complete = scanIsComplete(scan);
+      if (complete) {
+        scan.summary.readinessScore = parseBoundedInteger(scan.summary.readinessScore, "summary.readinessScore", 0, 100);
+        if (scan.summary.readinessScoreVerified !== true) {
+          throw new Error("The scan readiness score is not marked as verified.");
+        }
+      } else if (scan.summary.readinessScore !== null) {
+        throw new Error("An incomplete scan must not contain a readiness score.");
+      }
+      scan.summary.criticalExposures = parseBoundedInteger(scan.summary.criticalExposures, "summary.criticalExposures", 0, 1000000);
+      scan.summary.exposedItems = parseBoundedInteger(scan.summary.exposedItems, "summary.exposedItems", 0, 100000000);
+      scan.summary.users = parseBoundedInteger(scan.summary.users, "summary.users", 0, 100000000);
+      scan.summary.guests = parseBoundedInteger(scan.summary.guests ?? 0, "summary.guests", 0, 100000000);
+      scan.summary.sitesScanned = parseBoundedInteger(scan.summary.sitesScanned ?? 0, "summary.sitesScanned", 0, 1000000);
+      scan.summary.sitesDiscovered = parseBoundedInteger(scan.summary.sitesDiscovered ?? 0, "summary.sitesDiscovered", 0, 1000000);
+      scan.summary.anonymousLinks = parseBoundedInteger(scan.summary.anonymousLinks, "summary.anonymousLinks", 0, 100000000);
+      scan.summary.organizationLinks = parseBoundedInteger(scan.summary.organizationLinks, "summary.organizationLinks", 0, 100000000);
+      scan.summary.broadAccessSites = parseBoundedInteger(scan.summary.broadAccessSites, "summary.broadAccessSites", 0, 1000000);
+      if (scan.summary.criticalExposures !== scan.evidenceSets.criticalEvidenceIds.length ||
+          scan.summary.exposedItems !== scan.evidenceSets.sharedItemIds.length ||
+          scan.summary.guests !== scan.evidenceSets.guestUserIds.length ||
+          scan.summary.anonymousLinks !== scan.evidenceSets.anonymousPermissionIds.length ||
+          scan.summary.organizationLinks !== scan.evidenceSets.organizationPermissionIds.length ||
+          scan.summary.broadAccessSites !== scan.evidenceSets.broadAccessSiteIds.length) {
+        throw new Error("The scan summary does not match its evidence identifiers.");
+      }
+      if (scan.summary.sitesDiscovered !== scan.coverage.sitesDiscovered ||
+          scan.summary.sitesScanned !== scan.coverage.sitesScanned) {
+        throw new Error("The scan summary does not match its coverage metadata.");
+      }
+      const expectedCritical = [...new Set([
+        ...scan.evidenceSets.anonymousPermissionIds
+      ])].sort();
+      if (expectedCritical.join("|") !== [...scan.evidenceSets.criticalEvidenceIds].sort().join("|")) {
+        throw new Error("The critical evidence set is inconsistent with the raw evidence sets.");
+      }
+      if (complete && !scan.coverage.complete) {
+        throw new Error("A complete scan must also have complete site coverage.");
+      }
+      return scan;
+    }
+
+    function buildLiveRemediations(scan) {
+      const seen = new Set();
+      const result = [];
+      for (const controlResult of scan.estateAssessment?.controlResults || []) {
+        if (controlResult.status === "Pass" ||
+            (controlResult.status === "NotApplicable" &&
+             controlResult.applicability?.approvedBy &&
+             Date.parse(controlResult.applicability?.expiresAt) > Date.now())) {
+          continue;
+        }
+        const catalogDomain = readinessCatalog.domains.find(domain =>
+          domain.id === controlResult.domainId);
+        const catalogControl = catalogDomain?.controls.find(control =>
+          control.id === controlResult.controlId);
+        if (!catalogControl) continue;
+        const id = `control-${catalogControl.id}`;
+        seen.add(id);
+        result.push({
+          id,
+          controlId: catalogControl.id,
+          domainId: catalogDomain.id,
+          currentStatus: controlResult.status,
+          title: `${catalogControl.id}: ${catalogControl.title}`,
+          copy: controlResult.status === "Unknown"
+            ? `Evidence required. ${catalogControl.remediation}`
+            : catalogControl.remediation,
+          effort: controlResult.status === "Unknown"
+            ? "Connect evidence"
+            : controlResult.status === "Fail"
+              ? "Administrator action"
+              : "Owner review",
+          gain: null,
+          critical: catalogControl.requirement === "Gate" && controlResult.status === "Fail" ? 1 : 0,
+          users: Array.isArray(controlResult.affectedPrincipals)
+            ? controlResult.affectedPrincipals.length
+            : 0,
+          evidenceIds: Array.isArray(controlResult.evidenceRefs)
+            ? controlResult.evidenceRefs.map(reference => reference.id).filter(Boolean).slice(0, 100)
+            : [],
+          limitationCodes: Array.isArray(controlResult.limitations)
+            ? controlResult.limitations.map(item => item.code).filter(Boolean)
+            : []
+        });
+      }
+      for (const finding of scan.findings) {
+        const template = remediationCatalog[finding.ruleKey];
+        if (!template || seen.has(template.id)) continue;
+        seen.add(template.id);
+        result.push({
+          ...template,
+          ruleKey: finding.ruleKey,
+          evidenceIds: Array.isArray(finding.evidenceIds) ? finding.evidenceIds.slice(0, 100) : [],
+          critical: finding.ruleKey === "AFD-SP-BROAD-001"
+            ? Math.min(100, finding.evidenceIds?.length || 0)
+            : template.critical
+        });
+      }
+      return result;
+    }
+
+    function renderDecisionCenter() {
+      const panel = document.getElementById("decision-panel");
+      const label = document.getElementById("decision-label");
+      const title = document.getElementById("decision-title");
+      const reason = document.getElementById("decision-reason");
+      const action = document.getElementById("decision-action");
+      let phase = 1;
+      let state = "default";
+      let nextPage = "guide";
+      let actionText = "See how to start";
+
+      if (activeTenant.source === "synthetic") {
+        label.textContent = "Demonstration only";
+        title.textContent = "Explore the workflow before scanning a tenant";
+        reason.textContent = "This page contains synthetic data. It cannot support a Copilot deployment decision until a live baseline scan is imported.";
+      } else if (!scanIsComplete(baselineScan)) {
+        label.textContent = "Estate decision: Insufficient evidence";
+        title.textContent = "The sharing collector is incomplete";
+        reason.textContent = "Required sharing evidence is missing or truncated. The estate-wide assessment also requires the remaining readiness domains.";
+        actionText = "Review scan instructions";
+        state = "hold";
+      } else if (verificationOutcome?.cleared) {
+        label.textContent = "Sharing verification complete";
+        title.textContent = "Sharing controls improved; estate readiness is still undetermined";
+        reason.textContent = "A newer comparable scan verified the sharing changes. This is not a Copilot rollout approval: all remaining estate-readiness domains still require sufficient evidence.";
+        actionText = "Review estate evidence gaps";
+        nextPage = "clearance";
+        phase = 4;
+      } else if (verificationOutcome?.status === "DriftDetected") {
+        label.textContent = "Sharing verification: Regression";
+        title.textContent = "New or worse sharing exposure was detected";
+        reason.textContent = "The verification scan found regression or newly opened sharing evidence. Investigate it while completing the other estate-readiness domains.";
+        actionText = "Investigate drift";
+        nextPage = "clearance";
+        phase = 4;
+        state = "hold";
+      } else if (verificationOutcome?.status === "IncompleteEvidence") {
+        label.textContent = "Sharing verification incomplete";
+        title.textContent = "The sharing changes have not been proven";
+        reason.textContent = "Repeat the sharing verification with the locked baseline configuration. The estate-wide assessment remains incomplete regardless.";
+        actionText = "Review verification";
+        nextPage = "clearance";
+        phase = 4;
+        state = "hold";
+      } else if (verificationOutcome) {
+        label.textContent = "Sharing verification";
+        title.textContent = "The expected sharing improvement has not been proven";
+        reason.textContent = "Review the remaining sharing findings and evidence changes. This comparison does not produce an estate-wide Copilot decision.";
+        actionText = "Review verification";
+        nextPage = "clearance";
+        phase = 4;
+      } else {
+        label.textContent = "Estate decision: Insufficient evidence";
+        if (applied.size) {
+          title.textContent = "Sharing corrections are selected; estate assessment remains incomplete";
+          reason.textContent = `${applied.size} sharing correction${applied.size === 1 ? " is" : "s are"} selected. Complete and verify them, but do not treat this as an estate-wide Copilot decision.`;
+          actionText = "Review sharing action package";
+          nextPage = "remediation";
+          phase = 3;
+        } else {
+          const estate = baselineScan?.estateAssessment;
+          title.textContent = "Microsoft 365 Copilot estate readiness cannot be determined yet";
+          reason.textContent = `The current connector collected partial evidence for ${estate?.partialDomains ?? 0} of ${estate?.requiredDomains ?? 13} required systems. Its sharing signal is ${activeTenant.baselineScore}; ${baselineScan?.summary?.broadAccessSites ?? 0} public workspaces require owner validation. Complete the missing missions before making a rollout decision.`;
+          actionText = "Review readiness coverage";
+          nextPage = "overview";
+          phase = 2;
+        }
+        state = "hold";
+      }
+
+      panel.classList.toggle("hold", state === "hold");
+      panel.classList.toggle("clear", state === "clear");
+      action.textContent = actionText;
+      action.dataset.go = nextPage;
+      document.querySelectorAll("[data-decision-phase]").forEach(element => {
+        const step = Number(element.dataset.decisionPhase);
+        element.classList.toggle("complete", step < phase);
+        element.classList.toggle("current", step === phase);
+        element.textContent = element.textContent.replace(/ \(current\)$/, "");
+        if (step === phase) {
+          element.textContent += " (current)";
+          element.setAttribute("aria-current", "step");
+        } else {
+          element.removeAttribute("aria-current");
+        }
+      });
+    }
+
+    function renderClearance() {
+      const card = document.getElementById("clearance-card");
+      const status = document.getElementById("clearance-status");
+      const copy = document.getElementById("clearance-copy");
+      const score = document.getElementById("clearance-score");
+      const open = document.getElementById("clearance-open");
+      const users = document.getElementById("clearance-users");
+      const icon = document.getElementById("clearance-icon");
+
+      if (!verificationOutcome) {
+        card.classList.remove("cleared");
+        icon.textContent = "!";
+        status.textContent = "Estate readiness evidence is incomplete";
+        const evaluated = baselineScan?.estateAssessment?.evaluatedControls ?? 0;
+        const unknown = baselineScan?.estateAssessment?.unknownControls ?? 77;
+        copy.textContent = `${evaluated} of 77 controls have conclusive evidence; ${unknown} remain blocked. Resolve every mandatory gate before making a Microsoft 365 Copilot rollout decision.`;
+        score.textContent = activeTenant.baselineScore == null ? "Not calculated" : activeTenant.baselineScore;
+        open.textContent = baselineScan?.summary?.broadAccessSites ?? activeTenant.criticalExposures;
+        users.textContent = `${baselineScan?.estateAssessment?.collectedDomains ?? 0}/${baselineScan?.estateAssessment?.requiredDomains ?? 13}`;
+        renderDecisionBlockers();
+        renderDecisionCenter();
+        return;
+      }
+
+      card.classList.toggle("cleared", verificationOutcome.cleared);
+      icon.textContent = verificationOutcome.cleared ? "✓" : "!";
+      status.textContent = verificationOutcome.cleared
+        ? "Sharing controls verified; estate decision still pending"
+        : verificationOutcome.status === "DriftDetected"
+          ? "Sharing regression detected"
+          : "Sharing verification requires more work";
+      copy.textContent = verificationOutcome.cleared
+        ? `${verificationOutcome.reason} This verifies the sharing collector only; the remaining estate-readiness domains are still required.`
+        : verificationOutcome.reason;
+      score.textContent = verificationReport.verification.readinessScore;
+      open.textContent = verificationReport.verification.criticalExposures;
+      users.textContent = `${baselineScan?.estateAssessment?.collectedDomains ?? 0}/${baselineScan?.estateAssessment?.requiredDomains ?? 13}`;
+      renderDecisionBlockers();
+      renderDecisionCenter();
+    }
+
+    function renderDecisionBlockers() {
+      const container = document.getElementById("decision-blockers");
+      container.replaceChildren();
+      if (!baselineScan?.estateAssessment?.controlResults) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "Run or import a tenant assessment to calculate decision blockers.";
+        container.appendChild(empty);
+        return;
+      }
+      const blocked = baselineScan.estateAssessment.controlResults
+        .filter(result => result.status !== "Pass" &&
+          !(result.status === "NotApplicable" &&
+            result.applicability?.approvedBy &&
+            Date.parse(result.applicability?.expiresAt) > Date.now()))
+        .sort((left, right) => {
+          const rank = { Fail: 0, Warning: 1, Unknown: 2, NotApplicable: 3 };
+          return (rank[left.status] ?? 4) - (rank[right.status] ?? 4) ||
+            left.controlId.localeCompare(right.controlId);
+        });
+      for (const result of blocked) {
+        const domain = readinessCatalog.domains.find(item => item.id === result.domainId);
+        const control = domain?.controls.find(item => item.id === result.controlId);
+        if (!control) continue;
+        const detail = document.createElement("details");
+        detail.className = `control-detail ${result.status.toLowerCase()}`;
+        const summary = document.createElement("summary");
+        const heading = document.createElement("span");
+        heading.className = "control-heading";
+        const id = document.createElement("small");
+        id.textContent = `${domain.name} / ${control.requirement}`;
+        const title = document.createElement("strong");
+        title.textContent = `${control.id}: ${control.title}`;
+        heading.append(id, title);
+        const badge = document.createElement("span");
+        badge.className = "control-badge";
+        badge.textContent = result.status;
+        summary.append(heading, badge);
+        const body = document.createElement("div");
+        body.className = "control-body";
+        const impact = document.createElement("p");
+        impact.textContent = control.description;
+        const blocker = document.createElement("p");
+        blocker.textContent = result.limitations?.length
+          ? `Blocking evidence: ${result.limitations.map(item => item.description).join(" ")}`
+          : "This control did not meet its required condition.";
+        const action = document.createElement("p");
+        action.textContent = `Required action: ${result.remediation?.action || control.remediation}`;
+        const link = document.createElement("a");
+        link.className = "doc-link";
+        link.href = domainDocumentation[result.domainId].url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = `Microsoft documentation: ${domainDocumentation[result.domainId].title}`;
+        body.append(impact, blocker, action, link);
+        detail.append(summary, body);
+        container.appendChild(detail);
+      }
+    }
+
+    function applyTenantScan(scan) {
+      validateScan(scan);
+      const summary = scan.summary;
+      activeTenant = {
+        name: normalizeText(scan.tenant.displayName, "Microsoft 365 tenant"),
+        source: scan.producer,
+        baselineScore: summary.readinessScore,
+        criticalExposures: Number(summary.criticalExposures),
+        exposedFiles: Number(summary.exposedItems),
+        blastRadiusUsers: summary.blastRadiusUsers == null ? null : Number(summary.blastRadiusUsers)
+      };
+      baselineScan = scan;
+      verificationReport = null;
+      verificationOutcome = null;
+      currentJourneyPhase = 2;
+      document.getElementById("export-controls-csv").disabled = false;
+      document.getElementById("decision-export-csv").disabled = false;
+      findings = scan.findings.map(item => ({
+        ruleKey: normalizeText(item.ruleKey, "UNSPECIFIED"),
+        evidenceIds: Array.isArray(item.evidenceIds) ? item.evidenceIds.slice(0, 100) : [],
+        severity: normalizeSeverity(item.severity),
+        title: normalizeText(item.title, "Untitled finding"),
+        detail: normalizeText(item.detail, "No detail supplied."),
+        source: normalizeText(item.source, "Tenant scan"),
+        impact: normalizeText(item.impact, "Review required"),
+        evidenceDetails: item.ruleKey === "AFD-SP-BROAD-001"
+          ? (scan.evidenceDetails?.broadAccessSites || []).map(detail => ({
+              displayName: normalizeText(detail.displayName, "Unnamed workspace"),
+              reason: normalizeText(detail.reason, "Public visibility detected."),
+              recommendedAction: normalizeText(detail.recommendedAction, "Confirm whether public access is required.")
+            }))
+          : []
+      }));
+      scenarios = buildLiveScenarios(scan);
+      remediations = buildLiveRemediations(scan);
+      applied.clear();
+      selectedScenario = scenarios[0] || null;
+      document.querySelector(".tenant strong").textContent = activeTenant.name;
+      document.getElementById("tenant-status").textContent = "Imported point-in-time scan";
+      const estate = scan.estateAssessment;
+      const missingDomains = estate.requiredDomains - estate.collectedDomains - estate.partialDomains;
+      document.getElementById("source-ribbon").textContent = scanIsComplete(scan)
+        ? `Partial evidence is available for ${estate.partialDomains} of ${estate.requiredDomains} readiness domains for ${activeTenant.name}; ${missingDomains} domain collectors remain unavailable.`
+        : `The connected collectors were incomplete for ${activeTenant.name}. Findings are diagnostic only and no readiness score or rollout recommendation can be produced.`;
+      document.getElementById("scan-timestamp").textContent = scan.generatedAt
+        ? `Scan generated ${new Date(scan.generatedAt).toLocaleString()}`
+        : "Scan timestamp unavailable";
+      document.getElementById("overview-score").textContent = activeTenant.baselineScore == null ? "Not calculated" : activeTenant.baselineScore;
+      const penalties = scan.scoringInputs?.penalties || {};
+      const totalPenalty = ["anonymousPermissions", "organizationPermissions", "broadAccessSites", "sharedItems"]
+        .reduce((sum, key) => sum + (Number.isInteger(penalties[key]) ? penalties[key] : 0), 0);
+      document.getElementById("score-note").textContent = activeTenant.baselineScore == null
+        ? "Score unavailable because required evidence is incomplete"
+        : `100 minus ${totalPenalty} sharing-risk penalty points; this is not an estate-readiness score`;
+      document.getElementById("critical-count").textContent = activeTenant.criticalExposures;
+      document.getElementById("critical-label").textContent = "Critical sharing evidence";
+      document.getElementById("critical-note").textContent = `${summary.broadAccessSites} public workspaces require owner validation`;
+      document.getElementById("exposure-label").textContent = "Sampled exposed items";
+      document.getElementById("exposed-files").textContent = activeTenant.exposedFiles.toLocaleString();
+      document.getElementById("exposure-note").textContent = `Across ${summary.sitesScanned} scanned sites`;
+      document.getElementById("blast-radius-users").textContent = activeTenant.blastRadiusUsers == null ? "Not computed" : activeTenant.blastRadiusUsers.toLocaleString();
+      document.getElementById("blast-radius-note").textContent = activeTenant.blastRadiusUsers == null
+        ? "Effective reachability is not produced by this collector"
+        : `${summary.guests.toLocaleString()} guest accounts detected`;
+      renderEstateDomains(scan);
+      document.getElementById("baseline-evidence").textContent = `${scan.generatedAt ? new Date(scan.generatedAt).toLocaleString() : "Imported scan"}, ${summary.sitesScanned} sites, read-only metadata.`;
+      document.getElementById("verification-empty").hidden = false;
+      document.getElementById("verification-result").hidden = true;
+      document.getElementById("verification-change-details").hidden = true;
+      document.getElementById("download-clearance").disabled = true;
+      document.getElementById("verification-evidence").className = "evidence-entry";
+      document.getElementById("verification-evidence").querySelector("small").textContent = "Awaiting an authoritative comparison report.";
+      document.getElementById("clearance-evidence").className = "evidence-entry";
+      document.getElementById("clearance-evidence").querySelector("small").textContent = "Available after a post-change scan proves the required improvement.";
+      document.getElementById("simulation-result").classList.remove("visible");
+      renderScenarios();
+      renderFindings(document.getElementById("severity-filter").value);
+      applied.clear();
+      renderRemediations();
+      renderClearance();
+      clearError();
+      navigate("overview");
+      showToast(`Imported read-only scan for ${activeTenant.name}`);
+    }
+
+    function signedDelta(value) {
+      return `${value > 0 ? "+" : ""}${value}`;
+    }
+
+    function validateReadinessCatalog(catalog) {
+      if (!catalog || catalog.schemaVersion !== "1.0" || typeof catalog.catalogVersion !== "string" ||
+          !Array.isArray(catalog.domains) || catalog.domains.length !== 13 ||
+          !Array.isArray(catalog.missions) || catalog.missions.length !== 4) {
+        throw new Error("The readiness control catalogue is invalid.");
+      }
+      const domainIds = new Set();
+      const controlIds = new Set();
+      for (const domain of catalog.domains) {
+        if (!domain || typeof domain.id !== "string" || domainIds.has(domain.id) ||
+            typeof domain.name !== "string" || !Array.isArray(domain.controls) || domain.controls.length < 5) {
+          throw new Error("The readiness catalogue domain metadata is invalid.");
+        }
+        domainIds.add(domain.id);
+        for (const control of domain.controls) {
+          if (!control || typeof control.id !== "string" || controlIds.has(control.id) ||
+              !["Gate", "Advisory"].includes(control.requirement) ||
+              !["Automated", "Partial", "Attested"].includes(control.automation)) {
+            throw new Error("The readiness catalogue control metadata is invalid.");
+          }
+          controlIds.add(control.id);
+        }
+      }
+      if (controlIds.size < 65 || controlIds.size > 90) {
+        throw new Error("The readiness catalogue control count is outside the supported range.");
+      }
+      for (const mission of catalog.missions) {
+        if (!mission || !Array.isArray(mission.requiredControlIds) || !mission.requiredControlIds.length ||
+            mission.requiredControlIds.some(controlId => !controlIds.has(controlId))) {
+          throw new Error("The readiness catalogue mission metadata is invalid.");
+        }
+      }
+      return catalog;
+    }
+
+    function buildDemoEstateAssessment(catalog) {
+      const partialDomains = new Set(["licensingAndTenantEntitlement", "identityAndAccess", "sharePointOneDrive"]);
+      const totalControls = catalog.domains.reduce((sum, domain) => sum + domain.controls.length, 0);
+      return {
+        assessmentType: "microsoft-365-copilot-estate-readiness",
+        overallStatus: "InsufficientEvidence",
+        decision: "EvidenceCollectionRequired",
+        catalogVersion: catalog.catalogVersion,
+        collectedDomains: 0,
+        partialDomains: partialDomains.size,
+        requiredDomains: catalog.domains.length,
+        totalControls,
+        evaluatedControls: 0,
+        unknownControls: totalControls,
+        domains: catalog.domains.map(domain => {
+          const partial = partialDomains.has(domain.id);
+          return {
+            id: domain.id,
+            name: domain.name,
+            status: partial ? "Partial" : "NotCollected",
+            summary: partial
+              ? `Demonstration evidence represents only part of the ${domain.name} control set.`
+              : `No evidence has been collected for the ${domain.name} domain.`,
+            nextStep: `Connect the required evidence sources and evaluate the ${domain.controls.length} catalog controls in this domain.`,
+            catalogControls: domain.controls.length
+          };
+        })
+      };
+    }
+
+    async function initializeReadinessCatalog() {
+      const response = await fetch("schema/readiness-catalog.v1.json", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`Unable to load the readiness control catalogue (${response.status}).`);
+      }
+      readinessCatalog = validateReadinessCatalog(await response.json());
+      renderEstateDomains({ estateAssessment: buildDemoEstateAssessment(readinessCatalog) });
+    }
+
+    function validateVerificationReport(report) {
+      if (!report || report.schemaVersion !== "1.0" || report.documentType !== "verification-report" ||
+          report.producer !== "ai-flight-deck/compare-scans.ps1" || !report.tenant ||
+          !report.baseline || !report.verification || !report.change || !report.controls) {
+        throw new Error("This file is not an AI Flight Deck comparison report.");
+      }
+      if (!baselineScan) {
+        throw new Error("Import the baseline tenant scan before the comparison report.");
+      }
+      const baselineTenantId = scanTenantId(baselineScan);
+      const reportTenantId = report.tenant.tenantId || report.tenant.id;
+      if (!reportTenantId || reportTenantId !== baselineTenantId) {
+        throw new Error("The comparison report belongs to a different tenant.");
+      }
+      if (report.scoringVersion !== baselineScan.scoringVersion ||
+          report.policyHash !== baselineScan.policyHash ||
+          report.configHash !== baselineScan.configHash) {
+        throw new Error("The comparison report does not match the imported baseline contract.");
+      }
+      if (Date.parse(report.baseline.generatedAt) !== Date.parse(baselineScan.generatedAt)) {
+        throw new Error("The comparison report was not created from the imported baseline scan.");
+      }
+      if (Number.isNaN(Date.parse(report.verification.generatedAt)) ||
+          Date.parse(report.verification.generatedAt) <= Date.parse(report.baseline.generatedAt) ||
+          Number.isNaN(Date.parse(report.generatedAt)) ||
+          Date.parse(report.generatedAt) < Date.parse(report.verification.generatedAt)) {
+        throw new Error("The comparison report timestamps are invalid.");
+      }
+      for (const field of ["readinessScore", "criticalExposures", "exposedItems", "sitesDiscovered", "sitesScanned"]) {
+        if (report.baseline[field] !== baselineScan.summary[field]) {
+          throw new Error(`The comparison report baseline does not match '${field}'.`);
+        }
+      }
+      const requiredControls = [
+        "sameTenantVerified",
+        "newerVerificationVerified",
+        "sameScopeVerified",
+        "samePolicyVerified",
+        "sameConfigVerified",
+        "sameAuthActorVerified",
+        "completeEvidenceVerified",
+        "completeCoverageVerified"
+      ];
+      if (requiredControls.some(name => report.controls[name] !== true) ||
+          report.controls.scopeFingerprint !== baselineScan.scope.fingerprint ||
+          report.controls.writeActionsTaken !== false ||
+          report.controls.evidenceOnly !== true) {
+        throw new Error("The comparison report did not pass all required evidence controls.");
+      }
+      for (const container of [report.baseline, report.verification]) {
+        container.readinessScore = parseBoundedInteger(container.readinessScore, "report readinessScore", 0, 100);
+        container.criticalExposures = parseBoundedInteger(container.criticalExposures, "report criticalExposures", 0, 1000000);
+        container.exposedItems = parseBoundedInteger(container.exposedItems, "report exposedItems", 0, 100000000);
+        container.sitesDiscovered = parseBoundedInteger(container.sitesDiscovered, "report sitesDiscovered", 0, 1000000);
+        container.sitesScanned = parseBoundedInteger(container.sitesScanned, "report sitesScanned", 0, 1000000);
+        if (container.coverageComplete !== true) {
+          throw new Error("The comparison report does not contain complete site coverage.");
+        }
+      }
+      for (const field of ["readinessScore", "criticalExposures", "exposedItems"]) {
+        if (typeof report.change[field] !== "number" || !Number.isInteger(report.change[field])) {
+          throw new Error(`The comparison report change '${field}' is invalid.`);
+        }
+        if (report.change[field] !== report.verification[field] - report.baseline[field]) {
+          throw new Error(`The comparison report change '${field}' is internally inconsistent.`);
+        }
+      }
+      const evidenceChanges = report.change.evidenceSets;
+      if (!evidenceChanges || !evidenceChanges.criticalEvidenceIds || !evidenceChanges.sharedItemIds) {
+        throw new Error("The comparison report does not contain evidence changes.");
+      }
+      for (const setName of ["criticalEvidenceIds", "sharedItemIds"]) {
+        for (const direction of ["opened", "closed"]) {
+          const values = evidenceChanges[setName][direction];
+          if (!Array.isArray(values) || values.some(value => typeof value !== "string" || !value.trim() || value.length > MAX_FINDING_FIELD_LENGTH)) {
+            throw new Error(`The comparison report evidence set '${setName}.${direction}' is invalid.`);
+          }
+        }
+      }
+      const decision = report.decision || report.clearance;
+      const allowedDecisions = new Set(["Hold", "Remediate", "VerifyAgain", "SharingControlsVerified"]);
+      if (!allowedDecisions.has(decision)) {
+        throw new Error("The comparison report contains an unsupported rollout decision.");
+      }
+      if (decision === "SharingControlsVerified" &&
+          (report.status !== "ImprovementVerified" ||
+           report.verification.criticalExposures !== 0 ||
+           report.verification.readinessScore < 90 ||
+           evidenceChanges.criticalEvidenceIds.opened.length > 0)) {
+        throw new Error("The positive rollout decision is inconsistent with its evidence.");
+      }
+      return decision;
+    }
+
+    function applyVerificationReport(report, { trusted = false } = {}) {
+      const decision = validateVerificationReport(report);
+      if (!trusted || report.integrity?.verifiedByLocalService !== true) {
+        throw new Error("Unsigned comparison reports are not accepted. Run verification through the local AI Flight Deck service.");
+      }
+      verificationReport = report;
+      const evidenceChanges = report.change.evidenceSets;
+      const statusLabels = {
+        ImprovementVerified: "Improvement verified",
+        DriftDetected: "Drift detected",
+        NoMaterialChange: "No material change"
+      };
+      const cleared = decision === "SharingControlsVerified";
+      const regressed = report.status === "DriftDetected";
+      const status = statusLabels[report.status] || decision;
+      verificationOutcome = {
+        status: report.status,
+        decision,
+        cleared,
+        complete: true,
+        scoreDelta: report.change.readinessScore,
+        criticalDelta: report.change.criticalExposures,
+        exposureDelta: report.change.exposedItems,
+        evidenceChanges,
+        reason: cleared
+          ? "The authoritative comparison proved the required sharing-control improvement. This does not complete the estate-wide Copilot readiness assessment."
+          : regressed
+            ? "The authoritative comparison found sharing regression or newly opened evidence."
+            : decision === "Remediate"
+              ? "Sharing findings remain. Complete the required corrections and compare again."
+              : "The comparison does not yet prove enough sharing improvement. Run another post-change scan after confirming the approved corrections were completed."
+      };
+      activeTenant.baselineScore = report.verification.readinessScore;
+      activeTenant.criticalExposures = report.verification.criticalExposures;
+      activeTenant.exposedFiles = report.verification.exposedItems;
+      activeTenant.blastRadiusUsers = null;
+      currentJourneyPhase = 4;
+
+      document.getElementById("overview-score").textContent = activeTenant.baselineScore;
+      const ringScore = document.getElementById("ring-score");
+      const scoreRing = document.getElementById("score-ring");
+      if (ringScore && scoreRing) {
+        ringScore.textContent = activeTenant.baselineScore;
+        scoreRing.style.setProperty("--score", activeTenant.baselineScore);
+      }
+      document.getElementById("critical-count").textContent = activeTenant.criticalExposures;
+      document.getElementById("exposed-files").textContent = activeTenant.exposedFiles.toLocaleString();
+      document.getElementById("exposure-note").textContent = `Across ${report.verification.sitesScanned} verified sites`;
+
+      const scoreElement = document.getElementById("verified-score-delta");
+      const criticalElement = document.getElementById("verified-critical-delta");
+      const exposureElement = document.getElementById("verified-exposure-delta");
+      scoreElement.textContent = signedDelta(report.change.readinessScore);
+      criticalElement.textContent = signedDelta(report.change.criticalExposures);
+      exposureElement.textContent = signedDelta(report.change.exposedItems);
+      scoreElement.className = report.change.readinessScore >= 0 ? "delta-positive" : "delta-negative";
+      criticalElement.className = report.change.criticalExposures <= 0 ? "delta-positive" : "delta-negative";
+      exposureElement.className = report.change.exposedItems <= 0 ? "delta-positive" : "delta-negative";
+      document.getElementById("verified-status").textContent = status;
+      document.getElementById("verified-status").className = regressed ? "delta-negative" : cleared ? "delta-positive" : "";
+      document.getElementById("verified-copy").textContent = `${report.verification.sitesScanned} sites were compared. The sharing posture signal is ${report.verification.readinessScore}; ${report.verification.criticalExposures} critical sharing items and ${report.verification.exposedItems} exposed sampled items remain. Estate-wide readiness is not determined by this comparison.`;
+      const identifierPreview = ids => ids.length
+        ? ids.slice(0, 3).join(", ") + (ids.length > 3 ? ` and ${ids.length - 3} more` : "")
+        : "none";
+      const changeDetails = document.getElementById("verification-change-details");
+      changeDetails.textContent = `Critical evidence opened: ${identifierPreview(evidenceChanges.criticalEvidenceIds.opened)}. Critical evidence closed: ${identifierPreview(evidenceChanges.criticalEvidenceIds.closed)}. Exposed items opened: ${identifierPreview(evidenceChanges.sharedItemIds.opened)}. Exposed items closed: ${identifierPreview(evidenceChanges.sharedItemIds.closed)}.`;
+      changeDetails.hidden = false;
+      document.getElementById("verification-empty").hidden = true;
+      document.getElementById("verification-result").hidden = false;
+      document.getElementById("verification-evidence").className = `evidence-entry ${regressed ? "current" : "complete"}`;
+      document.getElementById("verification-evidence").querySelector("small").textContent = `${status}, ${new Date(report.generatedAt).toLocaleString()}.`;
+      document.getElementById("clearance-evidence").className = `evidence-entry ${cleared ? "complete" : "current"}`;
+      document.getElementById("clearance-evidence").querySelector("small").textContent = verificationOutcome.reason;
+      document.getElementById("download-clearance").disabled = false;
+      renderClearance();
+      clearError();
+      navigate("clearance");
+      showToast(status);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.classList.add("visible");
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove("visible"), 2600);
+    }
+
+    function showError(message) {
+      const banner = document.getElementById("import-error");
+      banner.textContent = message;
+      banner.hidden = false;
+      showToast(`Error: ${message}`);
+    }
+
+    function clearError() {
+      const banner = document.getElementById("import-error");
+      banner.textContent = "";
+      banner.hidden = true;
+    }
+
+    function renderServiceState(state, message, log = "", auth = null) {
+      const panel = document.getElementById("service-panel");
+      panel.classList.toggle("ready", state === "ready");
+      panel.classList.toggle("running", state === "running");
+      panel.classList.toggle("failed", state === "failed");
+      document.getElementById("service-status").textContent = message;
+      const logElement = document.getElementById("service-log");
+      logElement.textContent = log;
+      logElement.hidden = !log;
+      if (log) logElement.scrollTop = logElement.scrollHeight;
+      const codeMatch = log.match(/(?:enter|use)\s+(?:the\s+)?code\s+([A-Z0-9-]{6,16})/i) ||
+        log.match(/code[:\s]+([A-Z0-9-]{6,16})/i);
+      const authInstructions = document.getElementById("auth-instructions");
+      const authCode = auth?.userCode || codeMatch?.[1];
+      if (authCode) {
+        document.getElementById("auth-code").textContent = authCode.toUpperCase();
+        authInstructions.hidden = false;
+      } else if (state !== "running") {
+        authInstructions.hidden = true;
+      }
+      const running = state === "running";
+      document.getElementById("connect-scan").disabled = running;
+      document.getElementById("verify-workflow").disabled = running || !baselineScan;
+      document.getElementById("cancel-workflow").hidden = !running;
+    }
+
+    async function apiJson(url, options) {
+      const response = await fetch(url, { cache: "no-store", ...options });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || `Local service request failed with status ${response.status}.`);
+      }
+      return body;
+    }
+
+    async function loadWorkflowArtifact(result) {
+      const artifact = await apiJson(`/api/artifacts/${result}`);
+      if (result === "baseline") {
+        applyTenantScan(artifact);
+      } else {
+        applyVerificationReport(artifact, { trusted: true });
+      }
+    }
+
+    function renderCapabilityPlans(payload) {
+      const panel = document.getElementById("capability-panel");
+      panel.replaceChildren();
+      const heading = document.createElement("strong");
+      heading.textContent = "Collector connection requirements";
+      panel.appendChild(heading);
+      for (const plan of payload.plans || []) {
+        const detail = document.createElement("details");
+        detail.className = `control-detail ${plan.available ? "pass" : "unknown"}`;
+        const summary = document.createElement("summary");
+        const title = document.createElement("span");
+        title.className = "control-heading";
+        const service = document.createElement("strong");
+        service.textContent = plan.serviceId;
+        const count = document.createElement("small");
+        count.textContent = `${plan.controlIds.length} controls / ${plan.authMode}`;
+        title.append(count, service);
+        const badge = document.createElement("span");
+        badge.className = "control-badge";
+        badge.textContent = plan.available ? "Available" : "Requirements";
+        summary.append(title, badge);
+        const body = document.createElement("div");
+        body.className = "control-body";
+        const lines = [
+          ["Permissions", plan.permissions],
+          ["Admin roles", plan.adminRoles],
+          ["Licences", plan.licenses],
+          ["Endpoints", plan.endpoints]
+        ];
+        for (const [label, values] of lines) {
+          const row = document.createElement("p");
+          row.textContent = `${label}: ${values.length ? values.join(", ") : "None"}`;
+          body.appendChild(row);
+        }
+        detail.append(summary, body);
+        panel.appendChild(detail);
+      }
+      panel.hidden = false;
+    }
+
+    async function monitorWorkflow(id) {
+      activeWorkflowId = id;
+      while (activeWorkflowId === id) {
+        const job = await apiJson(`/api/jobs/${id}`);
+        const actionLabel = job.action === "baseline" ? "Scanning the tenant" : "Verifying corrections";
+        if (job.status === "running" || job.status === "cancelling") {
+          renderServiceState("running", `${actionLabel}. Complete Microsoft sign-in if prompted.`, job.log, job.auth);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+        activeWorkflowId = null;
+        if (job.status === "cancelled") {
+          renderServiceState("ready", "The tenant workflow was cancelled.", job.log);
+          return;
+        }
+        if (job.status === "failed") {
+          renderServiceState("failed", "The tenant workflow needs attention.", job.log);
+          throw new Error(job.error || "The tenant workflow failed.");
+        }
+        await loadWorkflowArtifact(job.result);
+        renderServiceState("ready", job.action === "baseline"
+          ? "Baseline complete. The Assessment page is ready."
+          : "Verification complete. The Decision page is ready.", job.log);
+      }
+    }
+
+    async function startLocalWorkflow(action) {
+      if (!localServiceAvailable) {
+        throw new Error("The integrated scanner is unavailable. Launch AI Flight Deck with its local server, not a generic static web server.");
+      }
+      clearError();
+      const signInWindow = window.open("https://microsoft.com/devicelogin", "_blank", "noopener");
+      if (!signInWindow) {
+        document.getElementById("service-help").textContent = "Pop-ups are blocked. Open https://microsoft.com/devicelogin in another tab, then enter the code shown below.";
+      }
+      const label = action === "baseline" ? "Preparing tenant sign-in..." : "Preparing verification sign-in...";
+      renderServiceState("running", label);
+      const job = await apiJson("/api/jobs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Flight-Deck": "local-ui"
+        },
+        body: JSON.stringify({ action })
+      });
+      await monitorWorkflow(job.id);
+    }
+
+    async function cancelLocalWorkflow() {
+      if (!activeWorkflowId) return;
+      const job = await apiJson(`/api/jobs/${activeWorkflowId}`, {
+        method: "DELETE",
+        headers: { "X-Flight-Deck": "local-ui" }
+      });
+      renderServiceState("running", "Cancelling the active tenant workflow...");
+      return job;
+    }
+
+    async function initializeLocalService() {
+      try {
+        const status = await apiJson("/api/status");
+        localServiceAvailable = status.service === "ai-flight-deck-local" && status.ready === true;
+        if (!localServiceAvailable) throw new Error("Unexpected local service response.");
+        renderCapabilityPlans(await apiJson("/api/capabilities?authMode=local-delegated"));
+        if (status.activeJobId) {
+          renderServiceState("running", "A tenant workflow is already running.");
+          monitorWorkflow(status.activeJobId).catch(error => showError(error.message));
+          return;
+        }
+        if (status.artifacts.baseline) {
+          try {
+            await loadWorkflowArtifact("baseline");
+            if (status.artifacts.report) {
+              await loadWorkflowArtifact("report");
+            }
+          } catch (error) {
+            renderServiceState("ready", "The previous artifact uses an older assessment contract. Select Connect and scan tenant to create the estate-readiness baseline.");
+            document.getElementById("service-help").textContent = error.message;
+            return;
+          }
+        }
+        renderServiceState("ready", status.artifacts.report
+          ? "Previous verified decision loaded. Run verification again after further changes."
+          : status.artifacts.baseline
+            ? "Previous baseline loaded. Review the Assessment page or verify approved corrections."
+            : "Integrated scanner ready. Select Connect and scan tenant.");
+      } catch {
+        localServiceAvailable = false;
+        renderServiceState("failed", "Integrated scanner is not connected.");
+        document.getElementById("service-help").textContent = "This page was opened from a generic web server. Launch it with the AI Flight Deck local server to enable one-click sign-in and scanning. Manual import remains available.";
+      }
+    }
+
+    document.addEventListener("click", event => {
+      const nav = event.target.closest("[data-page]");
+      if (nav) navigate(nav.dataset.page);
+      const go = event.target.closest("[data-go]");
+      if (go) navigate(go.dataset.go);
+      const scenario = event.target.closest("[data-scenario]");
+      if (scenario) {
+        const fromOverview = Boolean(scenario.closest("#overview"));
+        selectedScenario = scenarios.find(s => s.id === scenario.dataset.scenario);
+        renderScenarios();
+        if (fromOverview) navigate("simulator");
+        document.getElementById("simulation-result").classList.remove("visible");
+      }
+      const toggle = event.target.closest(".check");
+      const remediation = toggle?.closest("[data-remediation]");
+      if (toggle && remediation) {
+        const id = remediation.dataset.remediation;
+        applied.has(id) ? applied.delete(id) : applied.add(id);
+        renderRemediations();
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      const scenario = event.target.closest("[data-scenario]");
+      if (scenario && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        scenario.click();
+      }
+      const actionCard = event.target.closest('[data-go][role="button"]');
+      if (actionCard && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        actionCard.click();
+      }
+    });
+
+    document.getElementById("run-simulation").addEventListener("click", runSimulation);
+    document.getElementById("severity-filter").addEventListener("change", event => renderFindings(event.target.value));
+    document.getElementById("connect-scan").addEventListener("click", () => {
+      startLocalWorkflow("baseline").catch(error => showError(error.message));
+    });
+    document.getElementById("cancel-workflow").addEventListener("click", () => {
+      cancelLocalWorkflow().catch(error => showError(error.message));
+    });
+    document.getElementById("verify-workflow").addEventListener("click", () => {
+      startLocalWorkflow("verify").catch(error => showError(error.message));
+    });
+    document.getElementById("copy-auth-code").addEventListener("click", async () => {
+      const code = document.getElementById("auth-code").textContent;
+      try {
+        await navigator.clipboard.writeText(code);
+        showToast("Sign-in code copied");
+      } catch {
+        showError("The browser could not copy the code. Select and copy it manually.");
+      }
+    });
+    document.getElementById("import-button").addEventListener("click", () => document.getElementById("scan-file").click());
+    document.getElementById("guide-import-scan").addEventListener("click", () => document.getElementById("scan-file").click());
+    document.getElementById("scan-file").addEventListener("change", async event => {
+      const [file] = event.target.files;
+      if (!file) return;
+      try {
+        enforceImportGuards(file, "Tenant scan");
+        applyTenantScan(JSON.parse(await file.text()));
+      } catch (error) {
+        showError(error.message || "Unable to import tenant scan");
+      } finally {
+        event.target.value = "";
+      }
+    });
+    document.getElementById("verification-button").addEventListener("click", () => document.getElementById("verification-file").click());
+    document.getElementById("verification-file").addEventListener("change", async event => {
+      const [file] = event.target.files;
+      if (!file) return;
+      try {
+        enforceImportGuards(file, "Comparison report");
+        applyVerificationReport(JSON.parse(await file.text()));
+      } catch (error) {
+        showError(error.message || "Unable to import comparison report");
+      } finally {
+        event.target.value = "";
+      }
+    });
+    document.getElementById("generate-package").addEventListener("click", async () => {
+      if (!applied.size) {
+        showToast("Select at least one correction first");
+        return;
+      }
+      try {
+        const actionPackage = JSON.parse(actionPackagePayload());
+        if (baselineScan?.integrity?.verifiedByLocalService === true && localServiceAvailable) {
+          const selectedEvidenceIds = [...new Set(remediations
+            .filter(remediation => applied.has(remediation.id))
+            .flatMap(remediation => remediation.evidenceIds || []))].sort();
+          const selectedControlIds = [...new Set(remediations
+            .filter(remediation => applied.has(remediation.id))
+            .map(remediation => remediation.controlId)
+            .filter(Boolean))].sort();
+          const binding = await apiJson("/api/action-bindings", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Flight-Deck": "local-ui"
+            },
+            body: JSON.stringify({ actionPackage, selectedEvidenceIds, selectedControlIds })
+          });
+          download("ai-flight-deck-action-package.json", JSON.stringify(binding, null, 2));
+        } else {
+          actionPackage.integrity = {
+            status: "UnboundDemonstration",
+            reason: "No locally verified baseline envelope is available."
+          };
+          download("ai-flight-deck-action-package.json", JSON.stringify(actionPackage, null, 2));
+        }
+      } catch (error) {
+        showError(error.message || "Unable to bind the action package to its baseline evidence.");
+        return;
+      }
+      document.getElementById("package-evidence").className = "evidence-entry complete";
+      document.getElementById("package-evidence").querySelector("small").textContent = `${applied.size} draft actions packaged for administrator review.`;
+      currentJourneyPhase = Math.max(currentJourneyPhase, 3);
+      renderJourneyPhase();
+    });
+    document.getElementById("export-button").addEventListener("click", () => download("ai-flight-deck-report.json", reportPayload()));
+    document.getElementById("export-controls-csv").addEventListener("click", () => {
+      try {
+        exportControlsCsv();
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+    document.getElementById("decision-export-csv").addEventListener("click", () => {
+      try {
+        exportControlsCsv();
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+    document.getElementById("download-clearance").addEventListener("click", () => {
+      try {
+        download("verification-report.json", clearancePayload());
+      } catch (error) {
+        showError(error.message);
+      }
+    });
+    document.getElementById("theme-button").addEventListener("click", () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      showToast(`${next[0].toUpperCase() + next.slice(1)} theme enabled`);
+    });
+
+    renderScenarios();
+    renderFindings();
+    renderRemediations();
+    renderClearance();
+    renderJourneyPhase();
+    initializeReadinessCatalog()
+      .then(() => initializeLocalService())
+      .catch(error => showError(error.message || "Unable to initialize the readiness catalogue."));
+    const requestedPage = new URLSearchParams(window.location.search).get("page");
+    if (requestedPage && Object.prototype.hasOwnProperty.call(pageMeta, requestedPage)) {
+      navigate(requestedPage);
+    }
+    requestAnimationFrame(() => document.querySelectorAll(".progress-fill[data-width]").forEach(el => {
+      el.style.width = `${el.dataset.width}%`;
+    }));
+  </script>
+</body>
+</html>

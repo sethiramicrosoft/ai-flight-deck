@@ -1,0 +1,2273 @@
+{
+  "schemaVersion": "1.0",
+  "catalogVersion": "1.0.0",
+  "statuses": [
+    "Pass",
+    "Fail",
+    "Warning",
+    "Unknown",
+    "NotApplicable"
+  ],
+  "missions": [
+    {
+      "id": "activation",
+      "order": 1,
+      "name": "Activation",
+      "purpose": "Confirm the tenant is licensed, identity is trustworthy, and Copilot can be safely enabled for a first cohort.",
+      "progressionRule": "All Gate controls whose missions include 'activation' must return Pass or approved NotApplicable. Any Unknown Gate blocks progression until a fresh control result is obtained or a NotApplicable is approved with an accountable owner and expiry.",
+      "requiredControlIds": [
+        "AFD-LIC-001",
+        "AFD-LIC-003",
+        "AFD-IAM-001",
+        "AFD-IAM-002",
+        "AFD-IAM-006",
+        "AFD-IAM-007",
+        "AFD-DEV-001",
+        "AFD-NET-001",
+        "AFD-NET-002",
+        "AFD-NET-003",
+        "AFD-NET-005",
+        "AFD-OPS-001",
+        "AFD-EXO-001",
+        "AFD-EXO-002",
+        "AFD-SPO-001",
+        "AFD-PURV-004",
+        "AFD-COPILOT-001",
+        "AFD-COPILOT-002"
+      ]
+    },
+    {
+      "id": "safePilot",
+      "order": 2,
+      "name": "Safe pilot",
+      "purpose": "Prove that a bounded pilot cohort can use Copilot without oversharing, data leakage, or unsafe grounding sources.",
+      "progressionRule": "All Gate controls whose missions include 'safePilot' must return Pass or approved NotApplicable for the pilot cohort, and no Advisory control may be Fail without a documented owner-approved risk acceptance.",
+      "requiredControlIds": [
+        "AFD-LIC-001",
+        "AFD-LIC-002",
+        "AFD-LIC-003",
+        "AFD-IAM-001",
+        "AFD-IAM-002",
+        "AFD-IAM-003",
+        "AFD-IAM-005",
+        "AFD-IAM-006",
+        "AFD-DEV-001",
+        "AFD-DEV-002",
+        "AFD-DEV-004",
+        "AFD-NET-001",
+        "AFD-NET-002",
+        "AFD-NET-003",
+        "AFD-NET-005",
+        "AFD-OPS-001",
+        "AFD-EXO-001",
+        "AFD-EXO-002",
+        "AFD-TEAMS-001",
+        "AFD-TEAMS-002",
+        "AFD-TEAMS-004",
+        "AFD-TEAMS-005",
+        "AFD-SPO-001",
+        "AFD-SPO-002",
+        "AFD-SPO-003",
+        "AFD-SPO-007",
+        "AFD-PURV-001",
+        "AFD-PURV-003",
+        "AFD-PURV-004",
+        "AFD-SEC-002",
+        "AFD-COPILOT-001",
+        "AFD-COPILOT-002",
+        "AFD-COPILOT-004",
+        "AFD-PPA-001",
+        "AFD-PPA-003",
+        "AFD-PPA-004",
+        "AFD-ADOPT-001",
+        "AFD-ADOPT-002",
+        "AFD-ADOPT-004"
+      ]
+    },
+    {
+      "id": "scale",
+      "order": 3,
+      "name": "Scale",
+      "purpose": "Expand Copilot to the broader estate with governed connectors, agents, cohort-aware policies, and adoption enablement.",
+      "progressionRule": "All Gate controls whose missions include 'scale' must return Pass or approved NotApplicable for the target cohort, coverage across the cohort must be at least 95 percent, and drift from the pilot baseline must be reconciled.",
+      "requiredControlIds": [
+        "AFD-LIC-001",
+        "AFD-LIC-002",
+        "AFD-LIC-003",
+        "AFD-IAM-001",
+        "AFD-IAM-002",
+        "AFD-IAM-003",
+        "AFD-IAM-005",
+        "AFD-IAM-006",
+        "AFD-DEV-001",
+        "AFD-DEV-002",
+        "AFD-DEV-004",
+        "AFD-NET-001",
+        "AFD-NET-002",
+        "AFD-NET-003",
+        "AFD-OPS-001",
+        "AFD-EXO-001",
+        "AFD-TEAMS-001",
+        "AFD-TEAMS-002",
+        "AFD-TEAMS-004",
+        "AFD-TEAMS-005",
+        "AFD-SPO-001",
+        "AFD-SPO-002",
+        "AFD-SPO-003",
+        "AFD-SPO-007",
+        "AFD-PURV-001",
+        "AFD-PURV-003",
+        "AFD-PURV-004",
+        "AFD-SEC-002",
+        "AFD-COPILOT-001",
+        "AFD-COPILOT-002",
+        "AFD-COPILOT-004",
+        "AFD-PPA-001",
+        "AFD-PPA-003",
+        "AFD-PPA-004",
+        "AFD-PPA-006",
+        "AFD-ADOPT-001",
+        "AFD-ADOPT-002",
+        "AFD-ADOPT-004"
+      ]
+    },
+    {
+      "id": "assure",
+      "order": 4,
+      "name": "Assure",
+      "purpose": "Continuously verify that readiness is fresh, that adoption is producing value, and that new risk is detected and remediated.",
+      "progressionRule": "Mission 04 is continuous. It reopens whenever any Gate control expires, regresses to Fail or Unknown, when insider risk or communication compliance alerts trigger, or when adoption or value KPIs miss their published targets.",
+      "requiredControlIds": [
+        "AFD-IAM-006",
+        "AFD-IAM-007",
+        "AFD-PURV-004",
+        "AFD-PPA-006"
+      ]
+    }
+  ],
+  "domains": [
+    {
+      "id": "licensingAndTenantEntitlement",
+      "order": 1,
+      "name": "Licensing and tenant entitlement",
+      "description": "Confirms that Microsoft 365 Copilot and prerequisite service plans are licensed, assigned to intended cohorts, and enabled at the tenant level.",
+      "ownerRoles": [
+        "Global Administrator",
+        "License Administrator",
+        "Billing Administrator"
+      ],
+      "controls": [
+        {
+          "id": "AFD-LIC-001",
+          "title": "Copilot for Microsoft 365 subscription entitlement",
+          "description": "Verifies the tenant holds active Microsoft 365 Copilot subscriptions with sufficient unassigned units for the target cohort.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph subscribedSkus",
+            "Microsoft 365 admin center billing"
+          ],
+          "requiredPermissions": [
+            "Organization.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every tenant that intends to enable Microsoft 365 Copilot.",
+          "passCondition": "At least one active Microsoft 365 Copilot SKU exists and total prepaid units minus consumed units is greater than or equal to the target cohort size.",
+          "unavailableBehavior": "If subscribedSkus cannot be read, the control returns Unknown; a NotApplicable requires an approved exemption from the License Administrator with a documented expiry.",
+          "remediation": "Purchase or reallocate Microsoft 365 Copilot licences to cover the target cohort before enabling Mission 01."
+        },
+        {
+          "id": "AFD-LIC-002",
+          "title": "Copilot licence assignment to pilot cohort",
+          "description": "Confirms Copilot licences are assigned only to members of the approved pilot cohort during Mission 02.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph user license details",
+            "Entra group membership"
+          ],
+          "requiredPermissions": [
+            "User.Read.All",
+            "GroupMember.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies when a pilot or scale cohort is defined for the tenant.",
+          "passCondition": "Every user with the Copilot service plan enabled is a member of the approved cohort group and no cohort member is missing the plan.",
+          "unavailableBehavior": "If licence assignment cannot be read or the cohort group is not resolvable, the control returns Unknown; NotApplicable requires an approved exemption naming the accountable owner.",
+          "remediation": "Reassign licences using group-based licensing or PIM-approved individual assignments so cohort and licence membership match."
+        },
+        {
+          "id": "AFD-LIC-003",
+          "title": "Prerequisite service plan enablement",
+          "description": "Ensures required prerequisite service plans (Exchange Online, SharePoint Online, Teams, OneDrive, Microsoft 365 Apps) are enabled for Copilot-licensed users.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph user license assignment states"
+          ],
+          "requiredPermissions": [
+            "User.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every Copilot-licensed user.",
+          "passCondition": "For each Copilot-licensed user, none of Exchange Online, SharePoint Online, Teams, OneDrive, or Microsoft 365 Apps service plans are in a disabled state.",
+          "unavailableBehavior": "If assignment states cannot be read, the control returns Unknown; approved NotApplicable requires documentation of a compensating configuration and owner.",
+          "remediation": "Re-enable disabled service plans on the Copilot-licensed users or move the users to a licence group that keeps prerequisites enabled."
+        },
+        {
+          "id": "AFD-LIC-004",
+          "title": "Add-on entitlement inventory",
+          "description": "Inventories add-on entitlements that unlock premium controls such as Purview Premium, Defender for Cloud Apps, Entra P2, and Copilot Studio, so downstream controls can be evaluated honestly.",
+          "requirement": "Advisory",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph subscribedSkus",
+            "Microsoft 365 admin center billing"
+          ],
+          "requiredPermissions": [
+            "Organization.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 24,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "The catalogue records which premium add-ons are present so that controls requiring them can be scoped correctly and unavailable ones can be reported as Unknown or NotApplicable.",
+          "unavailableBehavior": "If subscribedSkus cannot be read, the inventory returns Unknown and downstream premium-gated controls must also return Unknown until this control is fresh.",
+          "remediation": "Procure the missing add-on or record an approved NotApplicable with a documented compensating control."
+        },
+        {
+          "id": "AFD-LIC-005",
+          "title": "Tenant readiness expiry and renewal watch",
+          "description": "Tracks upcoming subscription expiry dates so readiness does not silently degrade when a subscription lapses.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph subscribedSkus",
+            "Microsoft 365 admin center billing"
+          ],
+          "requiredPermissions": [
+            "Organization.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with Copilot or prerequisite subscriptions.",
+          "passCondition": "No Copilot or prerequisite subscription is within 30 days of expiry without a documented renewal owner and target date.",
+          "unavailableBehavior": "If subscription expiry data cannot be read, the control returns Unknown until the next successful collection.",
+          "remediation": "Assign a renewal owner and confirm renewal orders with the Billing Administrator before the expiry date."
+        }
+      ]
+    },
+    {
+      "id": "identityAndAccess",
+      "order": 2,
+      "name": "Identity and access",
+      "description": "Confirms Entra ID is configured to authenticate Copilot users safely with strong authentication, conditional access, risk-based controls, guest governance, and privileged access management.",
+      "ownerRoles": [
+        "Global Administrator",
+        "Security Administrator",
+        "Conditional Access Administrator",
+        "Identity Governance Administrator"
+      ],
+      "controls": [
+        {
+          "id": "AFD-IAM-001",
+          "title": "Multi-factor authentication enforced on Copilot users",
+          "description": "Verifies that Copilot-licensed users are covered by an enforced MFA policy via Conditional Access or Security Defaults.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph conditionalAccess policies",
+            "Graph identityProtection userRegistrationDetails"
+          ],
+          "requiredPermissions": [
+            "Policy.Read.All",
+            "UserAuthenticationMethod.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Entra ID P1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every Copilot-licensed user account.",
+          "passCondition": "Every Copilot-licensed user is either covered by an enabled Conditional Access policy that requires MFA on all cloud apps, or the tenant has Security Defaults enabled, and has completed MFA registration.",
+          "unavailableBehavior": "If Conditional Access policies cannot be read or authentication methods cannot be enumerated, the control returns Unknown; NotApplicable requires an approved exemption from the Security Administrator.",
+          "remediation": "Enable a Conditional Access policy that requires MFA for the Copilot cohort or migrate them to a compliant authentication policy."
+        },
+        {
+          "id": "AFD-IAM-002",
+          "title": "Legacy authentication blocked",
+          "description": "Confirms Conditional Access blocks legacy authentication protocols that bypass MFA.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph conditionalAccess policies",
+            "Entra sign-in logs"
+          ],
+          "requiredPermissions": [
+            "Policy.Read.All",
+            "AuditLog.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Entra ID P1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "An enabled Conditional Access policy blocks legacy authentication clients for all users, and no successful legacy authentication sign-ins were observed for Copilot-licensed users in the last 7 days.",
+          "unavailableBehavior": "If Conditional Access policy or sign-in logs cannot be read, the control returns Unknown; NotApplicable requires a documented exemption naming the accountable owner.",
+          "remediation": "Create or enable a Conditional Access policy that blocks legacy authentication and migrate any remaining legacy clients."
+        },
+        {
+          "id": "AFD-IAM-003",
+          "title": "Conditional Access baseline covers Copilot",
+          "description": "Confirms Conditional Access explicitly covers the Microsoft 365 Copilot cloud app or All cloud apps for the Copilot cohort.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph conditionalAccess policies",
+            "Graph applications"
+          ],
+          "requiredPermissions": [
+            "Policy.Read.All",
+            "Application.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Entra ID P1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies once a pilot or scale cohort is defined.",
+          "passCondition": "At least one enabled Conditional Access policy includes the Copilot cohort and targets either All cloud apps or the Microsoft 365 Copilot cloud app, with a controlled grant such as MFA and compliant device.",
+          "unavailableBehavior": "If Conditional Access policies or applications cannot be read, the control returns Unknown; approved NotApplicable requires the Conditional Access Administrator to attest to a compensating policy.",
+          "remediation": "Extend Conditional Access to include Copilot and the cohort, applying required grants for MFA and device compliance."
+        },
+        {
+          "id": "AFD-IAM-004",
+          "title": "Risk-based sign-in and user risk policies",
+          "description": "Confirms Entra ID Protection risk policies are enabled for sign-in risk and user risk on Copilot users.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Graph identityProtection risk policies",
+            "Graph riskDetections"
+          ],
+          "requiredPermissions": [
+            "IdentityRiskyUser.Read.All",
+            "Policy.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Entra ID P2"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to tenants entitled to Entra ID P2.",
+          "passCondition": "Sign-in and user risk policies are enabled with a documented risk threshold and remediation action, and outstanding risky users for the cohort is zero or all are in an approved remediation flow.",
+          "unavailableBehavior": "If the tenant is not entitled to Entra ID P2 or Graph risk endpoints are unavailable, the control returns Unknown; NotApplicable requires an approved exemption with a compensating detection.",
+          "remediation": "Enable Entra ID Protection risk policies or attest to a compensating conditional access risk grant with the Security Administrator."
+        },
+        {
+          "id": "AFD-IAM-005",
+          "title": "Guest access governed for Copilot workspaces",
+          "description": "Confirms guest access to Copilot-integrated Teams and SharePoint sites is governed by access reviews and sensitivity labelling.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Graph accessReviews",
+            "Graph guest users",
+            "Graph groups"
+          ],
+          "requiredPermissions": [
+            "AccessReview.Read.All",
+            "User.Read.All",
+            "Group.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Entra ID P2"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies when guest users are members of any group that shares content with Copilot users.",
+          "passCondition": "Every guest with membership in a Copilot-integrated group is covered by an active access review and either the group has an appropriate sensitivity label or is explicitly excluded from Copilot grounding.",
+          "unavailableBehavior": "If access reviews or guest data cannot be read, the control returns Unknown; NotApplicable requires the Identity Governance Administrator to approve an exemption with an owner and expiry.",
+          "remediation": "Create an Entra access review for guests in Copilot-integrated groups and apply appropriate sensitivity labels to those groups."
+        },
+        {
+          "id": "AFD-IAM-006",
+          "title": "Privileged access governance",
+          "description": "Confirms Global Administrator and other tier-0 roles are governed by Privileged Identity Management with just-in-time activation and approval.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Graph roleManagement",
+            "PIM eligibility and assignment"
+          ],
+          "requiredPermissions": [
+            "RoleManagement.Read.Directory"
+          ],
+          "requiredLicenses": [
+            "Microsoft Entra ID P2"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every tenant with any Entra directory role assignment.",
+          "passCondition": "No standing permanent Global Administrator assignments exist outside a break-glass account, and tier-0 roles are covered by PIM policies that require MFA and approval to activate.",
+          "unavailableBehavior": "If PIM data cannot be read or the tenant is not entitled to Entra ID P2, the control returns Unknown; approved NotApplicable requires attestation of a documented alternative privilege model.",
+          "remediation": "Migrate standing role assignments to PIM eligibility with MFA and approval requirements, and document the break-glass account."
+        },
+        {
+          "id": "AFD-IAM-007",
+          "title": "Break-glass account documented and monitored",
+          "description": "Confirms at least one break-glass administrator account exists, is documented, is excluded from Conditional Access blocking policies, and is monitored for sign-in.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Attestation from Global Administrator",
+            "Sign-in log alert configuration"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 720,
+          "applicability": "Applies to every production tenant.",
+          "passCondition": "A named break-glass account is documented with an owner, is excluded from Conditional Access policies that could lock the tenant out, and has monitoring alerts on sign-in.",
+          "unavailableBehavior": "If no attestation is present the control returns Unknown; NotApplicable is not permitted for production tenants and only allowed for sandbox tenants with an approved exemption.",
+          "remediation": "Document break-glass accounts, apply Conditional Access exclusions, and configure sign-in alerts."
+        }
+      ]
+    },
+    {
+      "id": "devicesAndApps",
+      "order": 3,
+      "name": "Devices and apps",
+      "description": "Confirms devices and Microsoft 365 client apps meet the supported build, update channel, and management requirements for Copilot.",
+      "ownerRoles": [
+        "Intune Administrator",
+        "Endpoint Manager",
+        "Modern Workplace Administrator"
+      ],
+      "controls": [
+        {
+          "id": "AFD-DEV-001",
+          "title": "Microsoft 365 Apps supported channel and build",
+          "description": "Verifies Copilot users run Microsoft 365 Apps on a supported update channel and minimum build.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Intune managed apps inventory",
+            "Microsoft 365 Apps admin center serviceability"
+          ],
+          "requiredPermissions": [
+            "DeviceManagementApps.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Intune Plan 1"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to Copilot users on Windows and macOS Microsoft 365 Apps.",
+          "passCondition": "At least 95 percent of Copilot users have Microsoft 365 Apps installations on Current Channel or Monthly Enterprise Channel at or above the Copilot-supported build.",
+          "unavailableBehavior": "If Intune app inventory cannot be read, the control returns Unknown; NotApplicable requires an approved exemption naming the Endpoint Manager owner.",
+          "remediation": "Move devices to Current or Monthly Enterprise Channel and update to the supported build."
+        },
+        {
+          "id": "AFD-DEV-002",
+          "title": "Device compliance policy for Copilot cohort",
+          "description": "Confirms devices used by Copilot users are covered by an Intune compliance policy required by Conditional Access.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Intune device compliance",
+            "Graph managedDevices"
+          ],
+          "requiredPermissions": [
+            "DeviceManagementManagedDevices.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Intune Plan 1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies when Copilot users have registered devices in Entra ID.",
+          "passCondition": "At least 95 percent of primary user devices for the Copilot cohort are Intune-managed and compliant with an assigned compliance policy.",
+          "unavailableBehavior": "If Intune device data cannot be read or the tenant is not entitled to Intune, the control returns Unknown; NotApplicable requires an approved exemption with a compensating device posture solution.",
+          "remediation": "Assign a compliance policy targeting the Copilot cohort devices and remediate non-compliant devices."
+        },
+        {
+          "id": "AFD-DEV-003",
+          "title": "Windows update ring and feature update posture",
+          "description": "Confirms Copilot user devices are on a supported Windows version with an active update ring.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Intune update rings",
+            "Graph windowsUpdates deploymentAudience"
+          ],
+          "requiredPermissions": [
+            "DeviceManagementConfiguration.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Intune Plan 1"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to Windows devices used by Copilot users.",
+          "passCondition": "At least 95 percent of Windows Copilot cohort devices are on a supported Windows 10 or Windows 11 build and are targeted by an assigned Windows update ring.",
+          "unavailableBehavior": "If update ring data cannot be read, the control returns Unknown; NotApplicable requires attestation of an equivalent OS update strategy.",
+          "remediation": "Assign a Windows update ring and remediate devices on unsupported builds."
+        },
+        {
+          "id": "AFD-DEV-004",
+          "title": "Mobile and unmanaged access posture",
+          "description": "Confirms mobile Copilot access from unmanaged devices is either blocked or restricted through app protection policies.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Intune app protection policies",
+            "Conditional Access policies"
+          ],
+          "requiredPermissions": [
+            "DeviceManagementApps.Read.All",
+            "Policy.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Intune Plan 1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies when mobile access to Microsoft 365 is permitted.",
+          "passCondition": "Mobile Copilot experiences are either blocked on unmanaged devices via Conditional Access or require an assigned App Protection Policy that prevents cut/copy/paste and enforces app-level encryption.",
+          "unavailableBehavior": "If app protection policies or Conditional Access cannot be read, the control returns Unknown; approved NotApplicable requires attestation of an equivalent BYOD control.",
+          "remediation": "Publish App Protection Policies for iOS and Android Copilot-integrated apps or block mobile access from unmanaged devices."
+        },
+        {
+          "id": "AFD-DEV-005",
+          "title": "BYOD boundary defined and enforced",
+          "description": "Confirms the tenant has a documented, enforced BYOD boundary consistent with the Copilot data protection stance.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "BYOD policy attestation",
+            "Conditional Access policies",
+            "Intune enrollment restrictions"
+          ],
+          "requiredPermissions": [
+            "Policy.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 720,
+          "applicability": "Applies to every tenant that permits BYOD access to Microsoft 365.",
+          "passCondition": "A BYOD policy is documented, an accountable owner is named, and Conditional Access and Intune enrollment restrictions match the policy statement.",
+          "unavailableBehavior": "If no attestation is provided, the control returns Unknown; NotApplicable requires that BYOD is not permitted and Conditional Access blocks BYOD sign-in.",
+          "remediation": "Publish and attest to the BYOD policy and align Conditional Access and enrollment restrictions."
+        },
+        {
+          "id": "AFD-DEV-006",
+          "title": "Copilot add-in and plugin allow-list on clients",
+          "description": "Confirms the tenant governs which Copilot plugins, add-ins, and connectors can be installed on client apps.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 Apps admin center integrated apps",
+            "Cloud Policy service configuration"
+          ],
+          "requiredPermissions": [
+            "Application.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants that permit Copilot plugin or add-in use.",
+          "passCondition": "A documented plugin and add-in allow-list is deployed via Cloud Policy or admin center integrated apps, and unmanaged plugin installs are blocked for the Copilot cohort.",
+          "unavailableBehavior": "If integrated apps or Cloud Policy cannot be read, the control returns Unknown; NotApplicable requires attestation that no plugins or add-ins are permitted.",
+          "remediation": "Define and deploy a plugin allow-list via Cloud Policy and block unmanaged installs."
+        }
+      ]
+    },
+    {
+      "id": "networkConnectivity",
+      "order": 4,
+      "name": "Network connectivity",
+      "description": "Confirms the network path from Copilot users to Microsoft 365 endpoints supports required protocols, latency, and telemetry.",
+      "ownerRoles": [
+        "Network Administrator",
+        "Modern Workplace Architect"
+      ],
+      "controls": [
+        {
+          "id": "AFD-NET-001",
+          "title": "Microsoft 365 optimize endpoints reachable",
+          "description": "Verifies the network path can reach Microsoft 365 optimize category endpoints without interception.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 network connectivity API",
+            "Network insights report"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant enabling Copilot for on-network users.",
+          "passCondition": "Microsoft 365 optimize endpoints for Exchange, SharePoint, and Teams resolve directly and are not intercepted by TLS inspection or forced through a proxy.",
+          "unavailableBehavior": "If the connectivity API data or network telemetry cannot be read, the control returns Unknown; NotApplicable requires an approved exemption from the Network Administrator.",
+          "remediation": "Bypass proxy and TLS interception for Microsoft 365 optimize endpoints per the Microsoft 365 connectivity principles."
+        },
+        {
+          "id": "AFD-NET-002",
+          "title": "WebSocket and Teams media requirements met",
+          "description": "Confirms WebSocket connections and UDP media required by Teams and Copilot experiences are permitted end to end.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Teams network assessment tool",
+            "Microsoft 365 network insights"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant enabling Teams-integrated Copilot experiences.",
+          "passCondition": "WebSocket over TLS 443 and Teams media UDP ports meet documented reachability, packet loss, and jitter thresholds for the Copilot cohort locations.",
+          "unavailableBehavior": "If network assessment data is unavailable, the control returns Unknown; NotApplicable requires attestation from the Network Administrator that a compensating network path was tested.",
+          "remediation": "Update perimeter policies to permit WebSocket and Teams media and rerun the Teams network assessment."
+        },
+        {
+          "id": "AFD-NET-003",
+          "title": "TLS 1.2 or greater enforced end to end",
+          "description": "Confirms clients and outbound network devices negotiate TLS 1.2 or greater to Microsoft 365 endpoints.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Client build inventory",
+            "Network device TLS configuration"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "All client platforms and outbound network devices negotiate TLS 1.2 or higher and no successful TLS 1.0 or 1.1 negotiations were observed for Microsoft 365 endpoints in the last 7 days.",
+          "unavailableBehavior": "If TLS negotiation telemetry cannot be read, the control returns Unknown; NotApplicable requires an approved exemption citing a compensating boundary control.",
+          "remediation": "Disable TLS 1.0 and 1.1 on the client platforms and network devices, update inspection appliances, and re-test."
+        },
+        {
+          "id": "AFD-NET-004",
+          "title": "Latency to Microsoft 365 front doors within target",
+          "description": "Confirms round-trip latency from the cohort locations to Microsoft 365 front doors meets Copilot user experience targets.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 network insights",
+            "Client-side connectivity data"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to cohorts with location-specific network insights available.",
+          "passCondition": "P95 round-trip latency from cohort locations to the nearest Microsoft 365 front door is at or below 50 ms and no location exceeds 100 ms.",
+          "unavailableBehavior": "If network insights data cannot be read, the control returns Unknown; NotApplicable requires attestation with locally measured latency evidence.",
+          "remediation": "Introduce a local egress path or relocate egress closer to a Microsoft 365 front door."
+        },
+        {
+          "id": "AFD-NET-005",
+          "title": "Copilot service endpoint reachability tested",
+          "description": "Confirms Copilot service endpoints and dependent grounding endpoints are reachable and not blocked by firewall or DNS policy.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Client-side reachability probes",
+            "Firewall and DNS configuration"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant before Copilot enablement.",
+          "passCondition": "Every published Copilot service and grounding endpoint responds successfully to a controlled probe from the cohort network segments.",
+          "unavailableBehavior": "If probe data cannot be collected, the control returns Unknown; NotApplicable requires an approved exemption naming a compensating network validation.",
+          "remediation": "Update DNS, firewall, and proxy allow-lists to include Copilot service and grounding endpoints and rerun the probes."
+        }
+      ]
+    },
+    {
+      "id": "serviceHealthOperations",
+      "order": 5,
+      "name": "Service health and operations",
+      "description": "Confirms the tenant has healthy Microsoft 365 services, tracks change and advisories, and has defined operational ownership for readiness signals.",
+      "ownerRoles": [
+        "Service Support Administrator",
+        "Modern Workplace Operations Lead"
+      ],
+      "controls": [
+        {
+          "id": "AFD-OPS-001",
+          "title": "No active service health incidents blocking Copilot",
+          "description": "Confirms there are no active Microsoft 365 service health incidents affecting Copilot, Exchange Online, SharePoint Online, or Teams for the tenant region.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph serviceAnnouncement healthOverviews",
+            "Graph issues"
+          ],
+          "requiredPermissions": [
+            "ServiceHealth.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 4,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "No active service health issue with Copilot or a prerequisite service exists that is flagged as service degradation or incident for the tenant region.",
+          "unavailableBehavior": "If serviceAnnouncement endpoints cannot be read, the control returns Unknown; approved NotApplicable is not permitted while the tenant is in production.",
+          "remediation": "Wait for Microsoft to resolve the incident and re-evaluate. Escalate through the Microsoft 365 admin center if the incident is not visible."
+        },
+        {
+          "id": "AFD-OPS-002",
+          "title": "Message center change ownership assigned",
+          "description": "Confirms the tenant has an owner reviewing Microsoft 365 message center posts that affect Copilot readiness.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Graph serviceAnnouncement messages",
+            "Message center owner attestation"
+          ],
+          "requiredPermissions": [
+            "ServiceMessage.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every production tenant.",
+          "passCondition": "Every message center post tagged as action-required in the last 30 days has a documented owner and status, and no items are overdue past their action-by date.",
+          "unavailableBehavior": "If message center data cannot be read, the control returns Unknown; NotApplicable requires attestation that message center notifications are handled through an equivalent process.",
+          "remediation": "Assign a message center owner, review overdue posts, and record actions in the operational log."
+        },
+        {
+          "id": "AFD-OPS-003",
+          "title": "Tenant health dashboard evidence current",
+          "description": "Confirms the Microsoft 365 admin center tenant health dashboard evidence is current and reviewed.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 admin center health"
+          ],
+          "requiredPermissions": [
+            "ServiceHealth.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 24,
+          "applicability": "Applies to every production tenant.",
+          "passCondition": "The tenant health dashboard was reviewed within the last 24 hours and no health category is red or amber without an assigned owner.",
+          "unavailableBehavior": "If health dashboard data cannot be read, the control returns Unknown; NotApplicable requires attestation of a compensating monitoring solution.",
+          "remediation": "Assign a daily reviewer and remediate any red or amber category with the operations lead."
+        },
+        {
+          "id": "AFD-OPS-004",
+          "title": "Change advisories triaged for Copilot",
+          "description": "Confirms recent Copilot roadmap and message center change advisories are triaged for impact on the readiness catalogue.",
+          "requirement": "Advisory",
+          "missions": [
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Message center",
+            "Microsoft 365 roadmap owner review"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every production tenant during Mission 04.",
+          "passCondition": "The operations lead has recorded a review of Copilot-related advisories in the last 7 days and any control-affecting change has an updated catalogue entry.",
+          "unavailableBehavior": "If no review record exists, the control returns Unknown; NotApplicable is not permitted for production tenants.",
+          "remediation": "Assign a weekly reviewer for Copilot advisories and update the readiness catalogue for any change."
+        },
+        {
+          "id": "AFD-OPS-005",
+          "title": "Operational escalation contacts current",
+          "description": "Confirms the tenant has current Microsoft 365 technical and executive contacts on file for Copilot escalation.",
+          "requirement": "Advisory",
+          "missions": [
+            "activation",
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Microsoft 365 admin center contacts attestation"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 720,
+          "applicability": "Applies to every production tenant.",
+          "passCondition": "Named technical and executive contacts for Copilot escalations exist, have been reviewed in the last 30 days, and match the tenant of record.",
+          "unavailableBehavior": "If no attestation exists, the control returns Unknown; NotApplicable is not permitted for production tenants.",
+          "remediation": "Assign and record current escalation contacts in the Microsoft 365 admin center and the readiness catalogue."
+        }
+      ]
+    },
+    {
+      "id": "exchangeOnline",
+      "order": 6,
+      "name": "Exchange Online",
+      "description": "Confirms Exchange Online mailboxes are cloud-resident, correctly delegated, and ready to be grounding sources for Copilot.",
+      "ownerRoles": [
+        "Exchange Administrator",
+        "Messaging Lead"
+      ],
+      "controls": [
+        {
+          "id": "AFD-EXO-001",
+          "title": "Cohort mailboxes are cloud-resident",
+          "description": "Confirms every Copilot cohort user has a mailbox hosted in Exchange Online, not on-premises.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph mailboxSettings",
+            "Exchange Online recipient"
+          ],
+          "requiredPermissions": [
+            "MailboxSettings.Read"
+          ],
+          "requiredLicenses": [
+            "Exchange Online Plan 1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every Copilot cohort user.",
+          "passCondition": "Every Copilot cohort user has recipientTypeDetails of UserMailbox in Exchange Online with a valid primary SMTP address.",
+          "unavailableBehavior": "If mailbox data cannot be read, the control returns Unknown; NotApplicable requires an approved exemption for accounts that are intentionally shared or resource mailboxes.",
+          "remediation": "Migrate the affected mailboxes to Exchange Online or exclude the user from the Copilot cohort."
+        },
+        {
+          "id": "AFD-EXO-002",
+          "title": "Hybrid free/busy and mail flow validated",
+          "description": "Confirms hybrid coexistence for mail flow and free/busy works for Copilot cohort users when a hybrid deployment exists.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Exchange Online remote domains",
+            "Hybrid configuration wizard results"
+          ],
+          "requiredPermissions": [
+            "Exchange.ManageAsApp"
+          ],
+          "requiredLicenses": [
+            "Exchange Online Plan 1"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants with an Exchange hybrid deployment.",
+          "passCondition": "Hybrid mail flow is validated in the last 7 days and free/busy lookups from Copilot cohort users to on-premises calendars succeed.",
+          "unavailableBehavior": "If hybrid configuration cannot be read, the control returns Unknown; NotApplicable requires attestation that no hybrid deployment exists.",
+          "remediation": "Rerun the Hybrid Configuration Wizard, validate connectors and remote domains, and test free/busy."
+        },
+        {
+          "id": "AFD-EXO-003",
+          "title": "Mailbox delegation and full access reviewed",
+          "description": "Confirms mailbox delegation and full access permissions on cohort mailboxes are reviewed and reflect current owners.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Exchange Online mailbox permissions"
+          ],
+          "requiredPermissions": [
+            "Exchange.ManageAsApp"
+          ],
+          "requiredLicenses": [
+            "Exchange Online Plan 1"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every Copilot cohort user.",
+          "passCondition": "Every FullAccess or SendAs permission on a Copilot cohort mailbox has a current owner attestation and is not held by a disabled or offboarded account.",
+          "unavailableBehavior": "If mailbox permissions cannot be read, the control returns Unknown; NotApplicable requires an owner-approved exemption with an expiry.",
+          "remediation": "Remove or update stale mailbox delegations and rotate ownership."
+        },
+        {
+          "id": "AFD-EXO-004",
+          "title": "Outlook client and shared mailbox readiness",
+          "description": "Confirms Copilot users are on a supported Outlook client and shared mailbox configuration compatible with Copilot in Outlook.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 Apps inventory",
+            "Outlook Cloud Policy configuration"
+          ],
+          "requiredPermissions": [
+            "DeviceManagementApps.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to Copilot users who use Outlook on Windows, Mac, or web.",
+          "passCondition": "At least 95 percent of Copilot users run Outlook on a supported client version with the new Outlook or classic Outlook configuration required for Copilot in Outlook.",
+          "unavailableBehavior": "If client build data cannot be read, the control returns Unknown; NotApplicable requires attestation from the Messaging Lead of a compensating client rollout plan.",
+          "remediation": "Roll out the supported Outlook client and update shared mailbox configurations."
+        },
+        {
+          "id": "AFD-EXO-005",
+          "title": "Exchange transport rules do not block Copilot",
+          "description": "Confirms Exchange transport rules and connectors do not block or scrub Copilot-related message classes or attachments.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Exchange Online transport rules",
+            "Message trace samples"
+          ],
+          "requiredPermissions": [
+            "Exchange.ManageAsApp"
+          ],
+          "requiredLicenses": [
+            "Exchange Online Plan 1"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with transport rules configured.",
+          "passCondition": "No enabled transport rule blocks or strips Copilot-generated content or notifications, and message trace samples confirm delivery.",
+          "unavailableBehavior": "If transport rule data cannot be read, the control returns Unknown; NotApplicable requires an approved exemption naming the Messaging Lead.",
+          "remediation": "Update the transport rules or connectors to permit Copilot content and re-run message trace validation."
+        }
+      ]
+    },
+    {
+      "id": "teamsReadiness",
+      "order": 7,
+      "name": "Teams readiness",
+      "description": "Confirms Microsoft Teams meeting, chat, channel, and guest policies are configured to support Copilot in Teams safely.",
+      "ownerRoles": [
+        "Teams Administrator",
+        "Collaboration Lead"
+      ],
+      "controls": [
+        {
+          "id": "AFD-TEAMS-001",
+          "title": "Teams meeting transcription policy configured",
+          "description": "Confirms Teams meeting policies enable transcription where Copilot in meetings requires it, or explicitly disable it with a documented reason.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Teams meeting policies via Graph or PowerShell"
+          ],
+          "requiredPermissions": [
+            "Teams.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to Copilot cohort users who join Teams meetings.",
+          "passCondition": "The meeting policy assigned to the Copilot cohort enables transcription and controls who can start it, or documents an accountable disablement decision.",
+          "unavailableBehavior": "If Teams policy data cannot be read, the control returns Unknown; NotApplicable requires an owner-approved exemption from the Teams Administrator.",
+          "remediation": "Assign a meeting policy enabling transcription to the Copilot cohort or document and approve the disablement."
+        },
+        {
+          "id": "AFD-TEAMS-002",
+          "title": "Teams meeting recording governance",
+          "description": "Confirms Teams meeting recording storage, retention, and access are governed for Copilot cohort meetings.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Teams meeting policies",
+            "OneDrive storage location for recordings",
+            "Purview retention policy"
+          ],
+          "requiredPermissions": [
+            "Teams.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to Copilot cohort meetings that permit recording.",
+          "passCondition": "Recording is either disabled or stored in a governed OneDrive location covered by a retention policy and an accountable owner.",
+          "unavailableBehavior": "If policy or retention data cannot be read, the control returns Unknown; NotApplicable requires attestation that recording is disabled tenant-wide.",
+          "remediation": "Configure meeting policies to store recordings in a governed location and apply a retention label."
+        },
+        {
+          "id": "AFD-TEAMS-003",
+          "title": "Teams channels and private channels inventoried",
+          "description": "Confirms an inventory of Teams and private channels used by the Copilot cohort exists with owners and sensitivity labels.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph teams",
+            "Graph channels",
+            "Graph groups"
+          ],
+          "requiredPermissions": [
+            "Team.ReadBasic.All",
+            "Channel.ReadBasic.All",
+            "Group.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to Copilot cohort users who belong to any Team.",
+          "passCondition": "Every Team accessible to the Copilot cohort has at least one active owner, a sensitivity label, and the private channel inventory is current within 7 days.",
+          "unavailableBehavior": "If Teams and channels cannot be read, the control returns Unknown; NotApplicable requires an approved exemption for tenants with no team collaboration.",
+          "remediation": "Assign owners, apply sensitivity labels, and reconcile the private channel inventory."
+        },
+        {
+          "id": "AFD-TEAMS-004",
+          "title": "Teams external and guest access aligned",
+          "description": "Confirms Teams external access and guest access settings align with the Copilot readiness posture defined in identity and access.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Teams federation configuration",
+            "Teams guest policy"
+          ],
+          "requiredPermissions": [
+            "Teams.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with Teams enabled.",
+          "passCondition": "External access is either restricted to an allow-list of federated domains or documented as open with owner approval, and guest access controls match the Copilot readiness posture.",
+          "unavailableBehavior": "If Teams federation data cannot be read, the control returns Unknown; NotApplicable requires attestation from the Collaboration Lead.",
+          "remediation": "Configure federation and guest access to match the readiness posture and record the decision."
+        },
+        {
+          "id": "AFD-TEAMS-005",
+          "title": "Copilot for Teams user policy assignment",
+          "description": "Confirms Copilot policies for Teams are assigned to cohort users so Copilot experiences in chat, meetings, and channels behave as intended.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Teams user Copilot policy assignment"
+          ],
+          "requiredPermissions": [
+            "Teams.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every Copilot cohort user.",
+          "passCondition": "Every Copilot cohort user has an assigned Copilot for Teams policy consistent with the readiness catalogue.",
+          "unavailableBehavior": "If policy assignments cannot be read, the control returns Unknown; NotApplicable requires an approved exemption naming the Teams Administrator.",
+          "remediation": "Assign the correct Copilot for Teams policy to the cohort user group."
+        },
+        {
+          "id": "AFD-TEAMS-006",
+          "title": "Teams apps and connector governance",
+          "description": "Confirms only approved Teams apps and connectors are permitted for the Copilot cohort.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Teams app permission policies",
+            "Teams app setup policies",
+            "Teams admin center app catalog"
+          ],
+          "requiredPermissions": [
+            "Teams.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with Teams enabled.",
+          "passCondition": "The Copilot cohort is assigned Teams app permission and setup policies that align with the approved app inventory.",
+          "unavailableBehavior": "If app policy data cannot be read, the control returns Unknown; NotApplicable requires attestation that Teams apps are managed through a compensating process.",
+          "remediation": "Publish app permission and setup policies aligned with the approved inventory and assign them to the cohort."
+        }
+      ]
+    },
+    {
+      "id": "sharePointOneDrive",
+      "order": 8,
+      "name": "SharePoint and OneDrive",
+      "description": "Confirms SharePoint Online and OneDrive for Business sharing, effective access, and lifecycle controls limit oversharing risk before Copilot grounds on tenant content.",
+      "ownerRoles": [
+        "SharePoint Administrator",
+        "Data Governance Lead"
+      ],
+      "controls": [
+        {
+          "id": "AFD-SPO-001",
+          "title": "Tenant-level external sharing posture",
+          "description": "Confirms the tenant-level SharePoint and OneDrive external sharing settings match the Copilot readiness posture.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "SPO tenant settings",
+            "Graph sharePointSettings"
+          ],
+          "requiredPermissions": [
+            "SharePointTenantSettings.Read.All"
+          ],
+          "requiredLicenses": [
+            "SharePoint Online Plan 1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "SharePoint and OneDrive tenant sharing capabilities are set no more permissive than the documented readiness posture and match between SharePoint and OneDrive.",
+          "unavailableBehavior": "If tenant settings cannot be read, the control returns Unknown; NotApplicable requires an owner-approved exemption from the SharePoint Administrator.",
+          "remediation": "Update the tenant sharing capability to match the documented readiness posture."
+        },
+        {
+          "id": "AFD-SPO-002",
+          "title": "Site-level sharing and access request review",
+          "description": "Confirms high-risk SharePoint sites have their sharing scope and access request settings reviewed against the tenant posture.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "SPO sites report",
+            "SharePoint Advanced Management site access reports"
+          ],
+          "requiredPermissions": [
+            "Sites.FullControl.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft SharePoint Premium - SharePoint Advanced Management"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to sites classified as high risk by the tenant posture or exposed to the Copilot cohort.",
+          "passCondition": "Every in-scope site has a documented sharing scope no more permissive than the tenant posture and an active access request approver.",
+          "unavailableBehavior": "If site-level data or SAM reports cannot be read, the control returns Unknown; NotApplicable requires attestation of a compensating site inventory process.",
+          "remediation": "Update site sharing scopes and access request configuration and rerun the SAM report."
+        },
+        {
+          "id": "AFD-SPO-003",
+          "title": "Effective access and oversharing baseline",
+          "description": "Confirms effective access on Copilot-grounded content has been measured with SharePoint Advanced Management and remediation is planned for oversharing hotspots.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "SharePoint Advanced Management data access governance"
+          ],
+          "requiredPermissions": [
+            "Sites.FullControl.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft SharePoint Premium - SharePoint Advanced Management"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to SharePoint Advanced Management.",
+          "passCondition": "At least one full effective access baseline has been produced in the last 7 days for the Copilot cohort scope and every oversharing hotspot has an assigned owner and remediation plan.",
+          "unavailableBehavior": "If SharePoint Advanced Management is not entitled or reports cannot be read, the control returns Unknown; NotApplicable requires the SharePoint Administrator to approve a compensating oversharing control.",
+          "remediation": "Procure or enable SharePoint Advanced Management and run the data access governance reports."
+        },
+        {
+          "id": "AFD-SPO-004",
+          "title": "Restricted content discovery for pilots",
+          "description": "Confirms Restricted Content Discoverability is applied to sites or content that should not be discoverable by Copilot in the pilot cohort.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "SharePoint Advanced Management restricted content discoverability"
+          ],
+          "requiredPermissions": [
+            "Sites.FullControl.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft SharePoint Premium - SharePoint Advanced Management"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to SharePoint Advanced Management.",
+          "passCondition": "Every site or library flagged as restricted by the data governance lead is covered by Restricted Content Discoverability and confirmed excluded from Copilot grounding.",
+          "unavailableBehavior": "If reports cannot be read or SharePoint Advanced Management is not entitled, the control returns Unknown; NotApplicable requires an approved compensating control.",
+          "remediation": "Apply Restricted Content Discoverability to the flagged sites or libraries and verify Copilot exclusion."
+        },
+        {
+          "id": "AFD-SPO-005",
+          "title": "Restricted SharePoint Search and RSS scope",
+          "description": "Confirms Restricted SharePoint Search is scoped correctly for pilots that require a narrow grounding scope.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "SharePoint Restricted Search configuration"
+          ],
+          "requiredPermissions": [
+            "Sites.FullControl.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies during Mission 02 when the pilot uses Restricted SharePoint Search.",
+          "passCondition": "Restricted SharePoint Search is enabled with a documented allow-list of sites that matches the pilot cohort scope and expected grounding content.",
+          "unavailableBehavior": "If Restricted Search configuration cannot be read, the control returns Unknown; NotApplicable requires an owner-approved exemption when RSS is intentionally not used.",
+          "remediation": "Configure Restricted SharePoint Search with the pilot allow-list and re-verify grounding scope."
+        },
+        {
+          "id": "AFD-SPO-006",
+          "title": "Data access governance and site lifecycle",
+          "description": "Confirms sites have owners, inactivity policies, and lifecycle rules that keep Copilot grounding surface honest.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "SharePoint Advanced Management site lifecycle policies",
+            "SPO site ownership report"
+          ],
+          "requiredPermissions": [
+            "Sites.FullControl.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft SharePoint Premium - SharePoint Advanced Management"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with SharePoint Online.",
+          "passCondition": "Every site in the Copilot cohort scope has an active owner, an inactivity policy assignment, and no unowned site is in the grounding surface.",
+          "unavailableBehavior": "If lifecycle data cannot be read, the control returns Unknown; NotApplicable requires attestation from the Data Governance Lead of a compensating lifecycle process.",
+          "remediation": "Assign owners, apply inactivity policies, and remove or archive unowned sites."
+        },
+        {
+          "id": "AFD-SPO-007",
+          "title": "OneDrive sharing defaults for cohort",
+          "description": "Confirms OneDrive default sharing links and access request defaults for the Copilot cohort match the tenant posture.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "OneDrive tenant settings"
+          ],
+          "requiredPermissions": [
+            "SharePointTenantSettings.Read.All"
+          ],
+          "requiredLicenses": [
+            "OneDrive for Business Plan 1"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every Copilot cohort user with OneDrive provisioned.",
+          "passCondition": "OneDrive default sharing link type and permissions match the tenant posture, and no cohort user has a more permissive per-user override.",
+          "unavailableBehavior": "If OneDrive settings cannot be read, the control returns Unknown; NotApplicable requires an approved exemption from the SharePoint Administrator.",
+          "remediation": "Update OneDrive tenant defaults and remove overrides that widen sharing."
+        }
+      ]
+    },
+    {
+      "id": "purviewCompliance",
+      "order": 9,
+      "name": "Purview compliance",
+      "description": "Confirms Microsoft Purview information protection, DLP, audit, retention, eDiscovery, DSPM, communication compliance, and insider risk controls are configured to safely ground and monitor Copilot.",
+      "ownerRoles": [
+        "Compliance Administrator",
+        "Purview Administrator",
+        "Records Manager"
+      ],
+      "controls": [
+        {
+          "id": "AFD-PURV-001",
+          "title": "Sensitivity label taxonomy published",
+          "description": "Confirms a sensitivity label taxonomy is published and available to users and services that Copilot will reason about.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph informationProtection labels",
+            "Purview compliance portal"
+          ],
+          "requiredPermissions": [
+            "InformationProtectionPolicy.Read"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E3"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant grounding Copilot on protected content.",
+          "passCondition": "At least three labels covering Public, General, Confidential, and a Highly Confidential-equivalent level are published, and every label has a documented usage guideline.",
+          "unavailableBehavior": "If information protection labels cannot be read, the control returns Unknown; NotApplicable requires attestation of a compensating classification scheme.",
+          "remediation": "Publish the sensitivity label taxonomy and its usage guidance."
+        },
+        {
+          "id": "AFD-PURV-002",
+          "title": "Auto-labelling and content marking active",
+          "description": "Confirms auto-labelling policies are applied to sites and mailboxes in the Copilot cohort scope so grounding content carries the correct sensitivity.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Purview auto-labelling policies",
+            "Auto-labelling simulation report"
+          ],
+          "requiredPermissions": [
+            "InformationProtectionPolicy.Read"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E5 Compliance"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies when auto-labelling is entitled and required by the readiness posture.",
+          "passCondition": "Auto-labelling is active in Simulation or Enabled mode for cohort scope with a documented rollout owner, and label coverage on grounding content is at least 80 percent.",
+          "unavailableBehavior": "If auto-labelling data or premium entitlement cannot be read, the control returns Unknown; NotApplicable requires an owner-approved compensating manual labelling process.",
+          "remediation": "Configure auto-labelling policies for the cohort scope and increase coverage."
+        },
+        {
+          "id": "AFD-PURV-003",
+          "title": "Data Loss Prevention baseline for Copilot",
+          "description": "Confirms Purview DLP policies protect regulated data in Exchange, SharePoint, OneDrive, Teams, and Copilot prompts.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Purview DLP policies"
+          ],
+          "requiredPermissions": [
+            "InformationProtectionPolicy.Read"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E5 Compliance"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant subject to regulated data controls.",
+          "passCondition": "DLP policies covering the tenant's regulated data types are enabled across Exchange, SharePoint, OneDrive, Teams, and Copilot with a documented owner, and no policy is in test mode without an expiry.",
+          "unavailableBehavior": "If DLP policy data cannot be read, the control returns Unknown; NotApplicable requires an approved exemption naming the Compliance Administrator.",
+          "remediation": "Publish or promote DLP policies to enforce mode with a documented owner and expiry for any test-mode policies."
+        },
+        {
+          "id": "AFD-PURV-004",
+          "title": "Audit log ingestion healthy",
+          "description": "Confirms the Microsoft 365 unified audit log is enabled, ingesting Copilot interaction records, and retained per policy.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph auditLogs",
+            "Purview audit search"
+          ],
+          "requiredPermissions": [
+            "AuditLog.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E3"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "Unified audit logging is enabled, Copilot interaction records are present for the last 24 hours, and the tenant retention configuration matches the readiness posture.",
+          "unavailableBehavior": "If audit log endpoints cannot be read, the control returns Unknown; approved NotApplicable is not permitted for production tenants.",
+          "remediation": "Enable unified audit logging, verify Copilot event ingestion, and configure the retention policy."
+        },
+        {
+          "id": "AFD-PURV-005",
+          "title": "Retention labels and policies published",
+          "description": "Confirms retention policies and labels cover Copilot-grounded content in Exchange, SharePoint, OneDrive, and Teams.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Purview retention policies",
+            "Purview retention labels"
+          ],
+          "requiredPermissions": [
+            "RecordsManagement.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E5 Compliance"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with a retention obligation.",
+          "passCondition": "Retention policies covering Exchange, SharePoint, OneDrive, and Teams are published with a documented owner and coverage matches the readiness posture.",
+          "unavailableBehavior": "If retention policies cannot be read, the control returns Unknown; NotApplicable requires an owner-approved compensating retention process.",
+          "remediation": "Publish or update retention policies to cover the Copilot grounding surface."
+        },
+        {
+          "id": "AFD-PURV-006",
+          "title": "eDiscovery and legal hold readiness",
+          "description": "Confirms Purview eDiscovery Premium is configured to preserve Copilot interactions and grounding content for legal hold.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Purview eDiscovery Premium cases"
+          ],
+          "requiredPermissions": [
+            "eDiscovery.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E5 Compliance"
+          ],
+          "freshnessHours": 720,
+          "applicability": "Applies to tenants entitled to eDiscovery Premium.",
+          "passCondition": "Copilot interactions are preserved via Purview eDiscovery Premium with a documented case owner and hold coverage validated in the last 30 days.",
+          "unavailableBehavior": "If eDiscovery data cannot be read or the tenant is not entitled to eDiscovery Premium, the control returns Unknown; NotApplicable requires an approved compensating legal hold.",
+          "remediation": "Configure eDiscovery Premium cases and validate holds covering Copilot interactions."
+        },
+        {
+          "id": "AFD-PURV-007",
+          "title": "Insider risk and communication compliance",
+          "description": "Confirms Purview insider risk management and communication compliance policies cover the Copilot cohort.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Purview insider risk policies",
+            "Purview communication compliance policies"
+          ],
+          "requiredPermissions": [
+            "InsiderRiskManagement.Read.All",
+            "CommunicationCompliance.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E5 Compliance"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to Purview premium.",
+          "passCondition": "Insider risk and communication compliance policies target the Copilot cohort with a documented owner, and no unactioned high-severity alert is older than 7 days.",
+          "unavailableBehavior": "If policy data or premium entitlement cannot be read, the control returns Unknown; NotApplicable requires an owner-approved compensating monitoring solution.",
+          "remediation": "Enable insider risk and communication compliance policies and action outstanding alerts."
+        }
+      ]
+    },
+    {
+      "id": "securityPosture",
+      "order": 10,
+      "name": "Security posture",
+      "description": "Confirms Microsoft Defender, Secure Score, incident response, vulnerability management, OAuth governance, and unmanaged access baselines meet Copilot readiness.",
+      "ownerRoles": [
+        "Security Administrator",
+        "Security Operations Lead"
+      ],
+      "controls": [
+        {
+          "id": "AFD-SEC-001",
+          "title": "Microsoft Secure Score baseline",
+          "description": "Confirms Microsoft Secure Score meets or exceeds the tenant's documented baseline for Copilot readiness.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Automated",
+          "evidenceSources": [
+            "Graph security secureScore"
+          ],
+          "requiredPermissions": [
+            "SecurityEvents.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Defender for Office 365 Plan 1"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with Secure Score enabled.",
+          "passCondition": "Current Secure Score is at or above the tenant's documented baseline and no recommended action tagged as Copilot-relevant is in Not Completed status without an owner.",
+          "unavailableBehavior": "If Secure Score cannot be read, the control returns Unknown; NotApplicable requires an approved compensating security score from the Security Administrator.",
+          "remediation": "Complete the outstanding Copilot-relevant Secure Score recommendations."
+        },
+        {
+          "id": "AFD-SEC-002",
+          "title": "Defender for Office 365 policies enabled",
+          "description": "Confirms Defender for Office 365 policies (Safe Links, Safe Attachments, anti-phish) are enabled and cover Copilot cohort mailboxes.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Defender for Office 365 policy configuration"
+          ],
+          "requiredPermissions": [
+            "ThreatIndicators.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Defender for Office 365 Plan 1"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to Defender for Office 365.",
+          "passCondition": "Preset security policies or equivalent custom policies cover the Copilot cohort with Safe Links, Safe Attachments, and anti-phish enabled.",
+          "unavailableBehavior": "If Defender for Office 365 data cannot be read or the tenant is not entitled, the control returns Unknown; NotApplicable requires an approved compensating email protection.",
+          "remediation": "Enable the preset security policies or configure equivalent custom policies for the cohort."
+        },
+        {
+          "id": "AFD-SEC-003",
+          "title": "Defender for Cloud Apps governance",
+          "description": "Confirms Defender for Cloud Apps is monitoring OAuth apps, sensitive session activity, and unmanaged access relevant to Copilot.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Defender for Cloud Apps portal",
+            "OAuth app inventory"
+          ],
+          "requiredPermissions": [
+            "SecurityEvents.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Defender for Cloud Apps"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to Defender for Cloud Apps.",
+          "passCondition": "Defender for Cloud Apps is connected, OAuth apps with high privilege are reviewed, and no unaddressed high-risk alert relevant to Copilot is older than 7 days.",
+          "unavailableBehavior": "If Defender for Cloud Apps data cannot be read or the tenant is not entitled, the control returns Unknown; NotApplicable requires an approved compensating OAuth governance.",
+          "remediation": "Connect Defender for Cloud Apps, review OAuth apps, and remediate outstanding alerts."
+        },
+        {
+          "id": "AFD-SEC-004",
+          "title": "Incident response for Copilot",
+          "description": "Confirms Microsoft Defender incident response covers Copilot-relevant categories with named responders.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 Defender incident queue",
+            "Incident response playbook attestation"
+          ],
+          "requiredPermissions": [
+            "SecurityIncident.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Defender XDR"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to tenants entitled to Microsoft Defender XDR.",
+          "passCondition": "The Defender incident queue has no unassigned high or critical incident older than 24 hours and Copilot-specific detections have named responders.",
+          "unavailableBehavior": "If Defender incidents cannot be read or the tenant is not entitled, the control returns Unknown; NotApplicable requires an approved compensating incident response process.",
+          "remediation": "Assign owners, resolve open incidents, and update the Copilot response playbook."
+        },
+        {
+          "id": "AFD-SEC-005",
+          "title": "Vulnerability management coverage",
+          "description": "Confirms Defender Vulnerability Management coverage of Copilot user endpoints and Microsoft 365 Apps builds.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Defender Vulnerability Management",
+            "Intune managed devices"
+          ],
+          "requiredPermissions": [
+            "SecurityEvents.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Defender for Endpoint Plan 2"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to Defender for Endpoint P2.",
+          "passCondition": "At least 95 percent of Copilot cohort endpoints are onboarded to Defender Vulnerability Management with no unmitigated critical vulnerability older than 30 days.",
+          "unavailableBehavior": "If vulnerability data cannot be read or the tenant is not entitled, the control returns Unknown; NotApplicable requires an approved compensating vulnerability management process.",
+          "remediation": "Onboard endpoints, prioritize critical vulnerabilities, and complete mitigations."
+        },
+        {
+          "id": "AFD-SEC-006",
+          "title": "Unmanaged access alerting configured",
+          "description": "Confirms alerting is configured for Copilot activity originating from unmanaged devices, unusual IPs, or unusual OAuth grants.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Defender for Cloud Apps policies",
+            "Entra sign-in log analytics"
+          ],
+          "requiredPermissions": [
+            "SecurityAlert.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft Defender for Cloud Apps"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to Defender for Cloud Apps or equivalent.",
+          "passCondition": "Documented alerting policies for unmanaged access, unusual IPs, and OAuth grant anomalies are enabled and no unactioned high-severity alert is older than 3 days.",
+          "unavailableBehavior": "If alert policy data cannot be read, the control returns Unknown; NotApplicable requires an approved compensating detection.",
+          "remediation": "Enable the required policies and action the outstanding alerts."
+        }
+      ]
+    },
+    {
+      "id": "copilotConfiguration",
+      "order": 11,
+      "name": "Copilot configuration",
+      "description": "Confirms Microsoft 365 Copilot tenant policies, web grounding, search, connectors, plugins, Cloud Policy, and feedback controls are configured for the readiness posture.",
+      "ownerRoles": [
+        "Global Administrator",
+        "Copilot Administrator",
+        "Modern Workplace Architect"
+      ],
+      "controls": [
+        {
+          "id": "AFD-COPILOT-001",
+          "title": "Copilot tenant experience settings match posture",
+          "description": "Confirms Copilot tenant-level settings for grounding, plugin availability, and enterprise data protection match the readiness posture.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 admin center Copilot settings",
+            "Cloud Policy service"
+          ],
+          "requiredPermissions": [
+            "OrgSettings-Microsoft365Install.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 24,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "Copilot tenant settings for grounding, plugin availability, enterprise data protection, and web query are documented and match the current readiness posture.",
+          "unavailableBehavior": "If tenant settings cannot be read, the control returns Unknown; NotApplicable requires an approved exemption from the Copilot Administrator.",
+          "remediation": "Update Copilot tenant settings to match the posture and record the change."
+        },
+        {
+          "id": "AFD-COPILOT-002",
+          "title": "Web grounding decision documented",
+          "description": "Confirms the tenant has an accountable decision on whether Copilot may use web grounding, and the setting reflects that decision.",
+          "requirement": "Gate",
+          "missions": [
+            "activation",
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 admin center Copilot settings",
+            "Cloud Policy service",
+            "Decision record attestation"
+          ],
+          "requiredPermissions": [
+            "OrgSettings-Microsoft365Install.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "A documented decision on web grounding names the accountable owner and the tenant setting matches the decision.",
+          "unavailableBehavior": "If tenant settings cannot be read, the control returns Unknown; NotApplicable is not permitted since every tenant must make an explicit decision.",
+          "remediation": "Record the decision, assign an owner, and align the tenant setting."
+        },
+        {
+          "id": "AFD-COPILOT-003",
+          "title": "Microsoft Search and connector governance",
+          "description": "Confirms Microsoft Search verticals, connectors, and their content permissions align with the Copilot grounding scope.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft Search admin center",
+            "Graph connectors inventory"
+          ],
+          "requiredPermissions": [
+            "ExternalConnection.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 E3"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants that use Microsoft Search or Graph connectors.",
+          "passCondition": "Every Graph connector has a documented owner and content permissions that match the Copilot grounding scope, and no connector is failing ingestion for more than 24 hours.",
+          "unavailableBehavior": "If connector data cannot be read, the control returns Unknown; NotApplicable requires attestation that no connectors are in use.",
+          "remediation": "Assign owners, remediate failing connectors, and align content permissions with the grounding scope."
+        },
+        {
+          "id": "AFD-COPILOT-004",
+          "title": "Copilot plugin and message extension inventory",
+          "description": "Confirms Copilot plugins and Teams message extensions available to the cohort are inventoried, approved, and reviewed.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 admin center integrated apps",
+            "Teams admin center message extensions"
+          ],
+          "requiredPermissions": [
+            "Application.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants that permit plugins or message extensions.",
+          "passCondition": "Every Copilot plugin and message extension available to the cohort is on the approved inventory with an assigned owner and last-reviewed date within 30 days.",
+          "unavailableBehavior": "If plugin data cannot be read, the control returns Unknown; NotApplicable requires attestation that plugins are blocked tenant-wide.",
+          "remediation": "Publish the approved plugin inventory, remove unapproved plugins, and review approvals."
+        },
+        {
+          "id": "AFD-COPILOT-005",
+          "title": "Cloud Policy configuration for Copilot",
+          "description": "Confirms Microsoft 365 Cloud Policy assigns Copilot-related settings to the cohort user or device groups.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 Apps admin center Cloud Policy"
+          ],
+          "requiredPermissions": [
+            "OrgSettings-Microsoft365Install.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants using Cloud Policy to manage Microsoft 365 Apps.",
+          "passCondition": "The Cloud Policy configuration for the Copilot cohort is documented, enabled, and targets the correct group.",
+          "unavailableBehavior": "If Cloud Policy data cannot be read, the control returns Unknown; NotApplicable requires attestation of an equivalent Group Policy or Intune configuration profile.",
+          "remediation": "Publish and assign the Cloud Policy configuration for the cohort."
+        },
+        {
+          "id": "AFD-COPILOT-006",
+          "title": "Feedback and prompt telemetry configuration",
+          "description": "Confirms the tenant has a documented decision on Copilot feedback and prompt telemetry submission and the setting matches.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Microsoft 365 admin center Copilot settings",
+            "Decision record attestation"
+          ],
+          "requiredPermissions": [
+            "OrgSettings-Microsoft365Install.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 720,
+          "applicability": "Applies to every tenant.",
+          "passCondition": "A documented decision on Copilot feedback and prompt telemetry names an owner, references the applicable privacy assessment, and matches the tenant setting.",
+          "unavailableBehavior": "If tenant settings cannot be read, the control returns Unknown; NotApplicable is not permitted since a decision is required for every tenant.",
+          "remediation": "Record the decision, complete the privacy assessment, and align the tenant setting."
+        }
+      ]
+    },
+    {
+      "id": "powerPlatformAgents",
+      "order": 12,
+      "name": "Power Platform and agents",
+      "description": "Confirms Power Platform DLP, environments, Copilot Studio agents, connector authentication, knowledge sources, tools, and publishing policies are governed for Copilot readiness.",
+      "ownerRoles": [
+        "Power Platform Administrator",
+        "Copilot Studio Administrator",
+        "Data Governance Lead"
+      ],
+      "controls": [
+        {
+          "id": "AFD-PPA-001",
+          "title": "Power Platform tenant DLP baseline",
+          "description": "Confirms Power Platform DLP policies segregate business, non-business, and blocked connectors at the tenant scope.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Power Platform admin center DLP policies"
+          ],
+          "requiredPermissions": [
+            "PowerPlatformAdmin.Read"
+          ],
+          "requiredLicenses": [
+            "Power Apps"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with Power Platform enabled.",
+          "passCondition": "A tenant-scope DLP policy exists that classifies connectors as business, non-business, and blocked, and no environment is missing DLP coverage.",
+          "unavailableBehavior": "If DLP policy data cannot be read, the control returns Unknown; NotApplicable requires an approved exemption from the Power Platform Administrator.",
+          "remediation": "Publish or update the Power Platform DLP baseline and enforce it across environments."
+        },
+        {
+          "id": "AFD-PPA-002",
+          "title": "Environment strategy documented",
+          "description": "Confirms production, development, and cohort-specific Power Platform environments are documented with owners and security groups.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Power Platform admin center environments"
+          ],
+          "requiredPermissions": [
+            "PowerPlatformAdmin.Read"
+          ],
+          "requiredLicenses": [
+            "Power Apps"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant with Power Platform enabled.",
+          "passCondition": "Every environment used by the Copilot cohort has a documented purpose, owner, security group, and DLP assignment.",
+          "unavailableBehavior": "If environment data cannot be read, the control returns Unknown; NotApplicable requires attestation of a compensating environment governance process.",
+          "remediation": "Document environments, assign security groups and owners, and align DLP assignments."
+        },
+        {
+          "id": "AFD-PPA-003",
+          "title": "Copilot Studio agent inventory",
+          "description": "Confirms an inventory of Copilot Studio agents used by the cohort exists with owners and approval status.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Copilot Studio agent inventory",
+            "Power Platform admin center"
+          ],
+          "requiredPermissions": [
+            "PowerPlatformAdmin.Read"
+          ],
+          "requiredLicenses": [
+            "Copilot Studio"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to Copilot Studio.",
+          "passCondition": "Every Copilot Studio agent available to the cohort has a documented owner, business purpose, and approval status.",
+          "unavailableBehavior": "If Copilot Studio inventory cannot be read or the tenant is not entitled, the control returns Unknown; NotApplicable requires an approved compensating inventory process.",
+          "remediation": "Publish the agent inventory, assign owners, and approve or remove agents."
+        },
+        {
+          "id": "AFD-PPA-004",
+          "title": "Agent authentication and connector governance",
+          "description": "Confirms Copilot Studio agents authenticate through governed identities and connectors, not shared credentials or ad-hoc secrets.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Copilot Studio agent configuration",
+            "Power Platform connector inventory"
+          ],
+          "requiredPermissions": [
+            "PowerPlatformAdmin.Read"
+          ],
+          "requiredLicenses": [
+            "Copilot Studio"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every Copilot Studio agent in the cohort scope.",
+          "passCondition": "Every agent uses a documented identity that respects the tenant DLP baseline, and no agent authenticates through shared user credentials or unmanaged secrets.",
+          "unavailableBehavior": "If agent configuration cannot be read, the control returns Unknown; NotApplicable requires attestation that no agents are in use.",
+          "remediation": "Update agents to use governed identities and connectors and rotate any shared credentials."
+        },
+        {
+          "id": "AFD-PPA-005",
+          "title": "Agent knowledge sources and tools reviewed",
+          "description": "Confirms Copilot Studio agent knowledge sources and tools are reviewed for sensitivity, DLP alignment, and prompt injection risk.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Copilot Studio agent knowledge sources",
+            "Prompt injection risk attestation"
+          ],
+          "requiredPermissions": [
+            "PowerPlatformAdmin.Read"
+          ],
+          "requiredLicenses": [
+            "Copilot Studio"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to every Copilot Studio agent grounded on tenant content.",
+          "passCondition": "Every agent knowledge source is documented with sensitivity label, DLP alignment, and prompt injection review, and every tool is documented with input and output boundaries.",
+          "unavailableBehavior": "If review records cannot be read, the control returns Unknown; NotApplicable requires an approved exemption for read-only agents that ground only on public content.",
+          "remediation": "Complete knowledge source and tool reviews and update the agent inventory."
+        },
+        {
+          "id": "AFD-PPA-006",
+          "title": "Agent publishing and consumption controls",
+          "description": "Confirms Copilot Studio agent publishing to channels such as Teams, Microsoft 365 Copilot, or public web is controlled by an approval workflow.",
+          "requirement": "Gate",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Copilot Studio publishing configuration",
+            "Approval workflow attestation"
+          ],
+          "requiredPermissions": [
+            "PowerPlatformAdmin.Read"
+          ],
+          "requiredLicenses": [
+            "Copilot Studio"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants entitled to Copilot Studio.",
+          "passCondition": "Agent publishing to any consumption channel requires named approval, and no agent is published to a public channel without documented approval.",
+          "unavailableBehavior": "If publishing data cannot be read, the control returns Unknown; NotApplicable requires an approved compensating publishing control.",
+          "remediation": "Configure the publishing approval workflow and remove unapproved published agents."
+        }
+      ]
+    },
+    {
+      "id": "adoptionMeasurementGovernance",
+      "order": 13,
+      "name": "Adoption, measurement, and governance",
+      "description": "Confirms use cases, cohorts, training, support, responsible AI, usage measurement, value tracking, and expansion planning are in place so Copilot readiness produces business value.",
+      "ownerRoles": [
+        "Adoption Lead",
+        "Change Management Lead",
+        "Responsible AI Champion"
+      ],
+      "controls": [
+        {
+          "id": "AFD-ADOPT-001",
+          "title": "Priority use cases documented",
+          "description": "Confirms priority Copilot use cases are documented with expected outcome, target cohort, and measurement approach.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Use case register attestation"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant enabling Copilot.",
+          "passCondition": "At least three priority use cases are documented with owner, target cohort, expected outcome, and a measurable success metric.",
+          "unavailableBehavior": "If no use case register exists, the control returns Unknown; NotApplicable is not permitted since a use case register is required to justify enablement.",
+          "remediation": "Author and publish the use case register with owners and metrics."
+        },
+        {
+          "id": "AFD-ADOPT-002",
+          "title": "Cohort segmentation defined",
+          "description": "Confirms the cohort segmentation used to sequence Copilot enablement is documented and mapped to Entra groups.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Cohort register attestation",
+            "Entra groups"
+          ],
+          "requiredPermissions": [
+            "Group.Read.All"
+          ],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every tenant that segments Copilot rollout by cohort.",
+          "passCondition": "Every cohort has a documented owner, a mapped Entra security or Microsoft 365 group, and a defined entry and exit criteria for missions.",
+          "unavailableBehavior": "If cohort data cannot be read, the control returns Unknown; NotApplicable is only permitted for tenants that enable Copilot for all users simultaneously with an approved plan.",
+          "remediation": "Publish the cohort register and align Entra groups."
+        },
+        {
+          "id": "AFD-ADOPT-003",
+          "title": "Training and support plan active",
+          "description": "Confirms a training and support plan for Copilot cohorts is active with content delivery and support intake defined.",
+          "requirement": "Advisory",
+          "missions": [
+            "safePilot",
+            "scale",
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Training plan attestation",
+            "Support desk intake"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every Copilot cohort.",
+          "passCondition": "The cohort has active training content delivered in the last 30 days and a documented support intake with response targets.",
+          "unavailableBehavior": "If no plan is present, the control returns Unknown; NotApplicable requires an approved compensating enablement plan.",
+          "remediation": "Deliver training content and stand up the support intake."
+        },
+        {
+          "id": "AFD-ADOPT-004",
+          "title": "Responsible AI acceptance obtained",
+          "description": "Confirms named responsible AI acceptance of the Copilot use cases has been recorded before broad enablement.",
+          "requirement": "Gate",
+          "missions": [
+            "safePilot",
+            "scale"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Responsible AI acceptance attestation"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 720,
+          "applicability": "Applies to every tenant before broad enablement or before adding a new use case.",
+          "passCondition": "Every published use case has a Responsible AI acceptance record with a named champion, an expiry date, and a link to the impact assessment.",
+          "unavailableBehavior": "If no acceptance record exists, the control returns Unknown; NotApplicable is not permitted since acceptance is required.",
+          "remediation": "Complete the Responsible AI acceptance and record it in the register."
+        },
+        {
+          "id": "AFD-ADOPT-005",
+          "title": "Usage and value measurement",
+          "description": "Confirms Copilot usage and value KPIs are measured for the cohort and match published targets.",
+          "requirement": "Advisory",
+          "missions": [
+            "scale",
+            "assure"
+          ],
+          "automation": "Partial",
+          "evidenceSources": [
+            "Microsoft 365 Copilot Dashboard",
+            "Viva Insights Copilot analytics"
+          ],
+          "requiredPermissions": [
+            "Reports.Read.All"
+          ],
+          "requiredLicenses": [
+            "Microsoft 365 Copilot"
+          ],
+          "freshnessHours": 168,
+          "applicability": "Applies to tenants with the Copilot Dashboard enabled.",
+          "passCondition": "The cohort has a published set of usage and value KPIs measured within the last 7 days, and every KPI has a documented owner and current value against target.",
+          "unavailableBehavior": "If usage data cannot be read, the control returns Unknown; NotApplicable requires attestation of a compensating measurement approach.",
+          "remediation": "Enable the Copilot Dashboard, publish KPIs, and record values."
+        },
+        {
+          "id": "AFD-ADOPT-006",
+          "title": "Expansion and drift review cadence",
+          "description": "Confirms an expansion planning cadence exists that reviews new cohorts, use cases, and any drift in the readiness catalogue.",
+          "requirement": "Advisory",
+          "missions": [
+            "assure"
+          ],
+          "automation": "Attested",
+          "evidenceSources": [
+            "Expansion review attestation"
+          ],
+          "requiredPermissions": [],
+          "requiredLicenses": [],
+          "freshnessHours": 168,
+          "applicability": "Applies to every production tenant during Mission 04.",
+          "passCondition": "The expansion review has met in the last 7 days, reviewed drift against the pilot baseline, and recorded decisions on new use cases and cohorts.",
+          "unavailableBehavior": "If no review record exists, the control returns Unknown; NotApplicable is not permitted for production tenants.",
+          "remediation": "Schedule and run the expansion review and record its decisions."
+        }
+      ]
+    }
+  ]
+}
