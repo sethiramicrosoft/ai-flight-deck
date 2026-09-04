@@ -44,6 +44,12 @@ Click any readiness area, and then expand a control. It shows exactly what was
 checked, the result, the evidence collected, what is missing, the required
 correction, and the related Microsoft documentation.
 
+Below the assessment, Flight Deck shows either real access-path scenarios when
+the scan collected that graph, or readiness blocker traces when it did not.
+The blocker trace is not pretending to test a Copilot prompt. It shows which
+evidence source led to a control result, which mission it blocks, and what has
+to change.
+
 The Missions turn the results into stages. Mission 1 covers the basic
 requirements. The later missions cover pilot readiness, scaling, and ongoing
 governance. A mission stays locked while any required control is failed or

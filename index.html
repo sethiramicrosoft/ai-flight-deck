@@ -164,7 +164,7 @@
     h2 { font-size: 20px; letter-spacing: -.02em; }
     h3 { font-size: 15px; }
     .subtitle { margin: 6px 0 0; color: var(--cp-text-muted); max-width: 760px; }
-    .actions { display: flex; gap: 8px; align-items: center; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .btn {
       border: 1px solid var(--cp-border);
       border-radius: 0.625rem;
@@ -1118,8 +1118,8 @@
         </article>
 
         <div class="section-head">
-          <div><h2>Priority simulation scenarios</h2><p>Test realistic questions against effective permissions and policy controls.</p></div>
-          <button class="btn primary" data-go="simulator">Open simulator</button>
+          <div><h2 id="scenario-section-title">Priority simulation scenarios</h2><p id="scenario-section-copy">Test realistic questions against effective permissions and policy controls.</p></div>
+          <button class="btn primary" id="open-simulator" data-go="simulator">Open simulator</button>
         </div>
         <div class="grid scenario-grid" id="overview-scenarios"></div>
       </section>
@@ -1128,17 +1128,17 @@
         <div class="grid two simulator-shell">
           <div>
             <div class="section-head" style="margin-top:0">
-              <div><h2>Choose an adversarial scenario</h2><p>Simulations are read-only and use effective access metadata.</p></div>
+              <div><h2 id="simulator-heading">Choose an adversarial scenario</h2><p id="simulator-copy">Simulations are read-only and use effective access metadata.</p></div>
             </div>
             <div class="grid scenario-grid" id="simulator-scenarios"></div>
             <article class="card simulation-state">
-              <h3>Simulated Copilot request</h3>
+              <h3 id="simulation-prompt-label">Simulated Copilot request</h3>
               <div class="prompt-box" id="simulation-prompt"></div>
               <div class="steps" id="simulation-steps">
-                <div class="step"><span class="step-dot" aria-hidden="true"></span>Resolve requesting user's effective identity<span class="step-status sr-only"></span></div>
-                <div class="step"><span class="step-dot" aria-hidden="true"></span>Traverse groups, sites and inherited permissions<span class="step-status sr-only"></span></div>
-                <div class="step"><span class="step-dot" aria-hidden="true"></span>Match discoverable content to sensitivity signals<span class="step-status sr-only"></span></div>
-                <div class="step"><span class="step-dot" aria-hidden="true"></span>Evaluate policy controls and calculate affected audience<span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Resolve requesting user's effective identity</span><span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Traverse groups, sites and inherited permissions</span><span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Match discoverable content to sensitivity signals</span><span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Evaluate policy controls and calculate affected audience</span><span class="step-status sr-only"></span></div>
               </div>
               <div id="simulation-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
               <button class="btn primary" id="run-simulation" style="margin-top:18px">Run risk simulation</button>
@@ -1146,9 +1146,9 @@
           </div>
           <aside>
             <article class="card">
-              <div class="tenant-label">Simulation mode</div>
-              <h2 style="margin:7px 0">Pre-deployment</h2>
-              <p class="subtitle">No prompts are submitted to a production AI system. AI Flight Deck models discoverability from metadata and policy state.</p>
+              <div class="tenant-label" id="simulation-mode-label">Simulation mode</div>
+              <h2 style="margin:7px 0" id="simulation-mode-title">Pre-deployment</h2>
+              <p class="subtitle" id="simulation-mode-copy">No prompts are submitted to a production AI system. AI Flight Deck models discoverability from metadata and policy state.</p>
               <div class="timeline">
                 <div class="phase complete" data-phase="1">1. Assess</div>
                 <div class="phase current" data-phase="2">2. Simulate</div>
@@ -1161,7 +1161,7 @@
                 <strong id="result-title">Critical exposure confirmed</strong>
                 <p id="result-copy"></p>
               </div>
-              <h3 style="margin-top:20px">Permission attack path</h3>
+              <h3 style="margin-top:20px" id="result-path-title">Permission attack path</h3>
               <div class="path" id="result-path"></div>
               <button class="btn" data-go="remediation">Review remediation</button>
             </article>
@@ -1279,12 +1279,13 @@
           <article class="card">
             <p class="eyebrow">Step 1 of 4</p>
             <h2>Set up an estate-wide Copilot readiness assessment</h2>
-            <p class="subtitle">The assessment orchestrates thirteen bounded collectors covering all 77 readiness controls. Microsoft Graph and local network evidence are collected directly; workload-specific administration evidence and accountable attestations remain explicit blockers until their connectors are authenticated or evidence is supplied.</p>
+            <p class="subtitle">Choose a path: import Microsoft's readiness evidence for a fast start, run the live read-only scan, or combine both for the strongest pilot decision.</p>
             <div class="actions" style="margin-top:18px">
               <button class="btn primary" id="connect-scan">Connect and scan tenant</button>
+              <button class="btn" data-scroll="readiness-file">Import Microsoft readiness</button>
+              <button class="btn" data-scroll="assessment-file">Import Microsoft assessment</button>
               <button class="btn" id="cancel-workflow" hidden>Cancel active scan</button>
               <button class="btn" id="guide-import-scan">Import existing scan</button>
-              <button class="btn" data-go="overview">Open 3D Mission Control</button>
             </div>
             <div class="service-panel" id="service-panel" role="status" aria-live="polite" aria-atomic="true">
               <div class="service-status"><span class="service-dot" aria-hidden="true"></span><span id="service-status">Checking the local scanner...</span></div>
@@ -1309,7 +1310,7 @@
           </article>
         </div>
 
-        <div class="section-head">
+        <div class="section-head" id="microsoft-evidence-section">
           <div><h2>Microsoft evidence sources</h2><p>Combine Microsoft reports with the live tenant scan. Imported evidence never replaces a fresh conclusive live result.</p></div>
         </div>
         <div class="evidence-source-grid">
@@ -1708,7 +1709,7 @@
 
     function scenarioCard(scenario, selected = false) {
       return `<article class="card scenario-card ${selected ? "selected" : ""}" data-scenario="${scenario.id}" tabindex="0" role="button" aria-pressed="${selected}" aria-label="Select scenario: ${scenario.title}">
-        <div class="scenario-number">${scenario.id === "ma" ? "01" : scenario.id === "hr" ? "02" : "03"}</div>
+        <div class="scenario-number">${String(scenario.sequence || 1).padStart(2, "0")}</div>
         <h3>${scenario.title}</h3>
         <p>${scenario.description}</p>
         <span class="badge ${scenario.severity === "Critical" ? "high" : "medium"}">${scenario.severity} scenario</span>
@@ -1719,11 +1720,45 @@
       const overview = document.getElementById("overview-scenarios");
       const simulator = document.getElementById("simulator-scenarios");
       const runButton = document.getElementById("run-simulation");
+      const readinessMode = scenarios[0]?.mode === "readiness";
+      document.getElementById("scenario-section-title").textContent = readinessMode
+        ? "Priority readiness blockers"
+        : "Priority access-path scenarios";
+      document.getElementById("scenario-section-copy").textContent = readinessMode
+        ? "Trace how the strongest failed, warning, and unknown controls affect mission progression."
+        : "Test realistic questions against effective permissions and policy controls.";
+      document.getElementById("open-simulator").textContent = readinessMode
+        ? "Trace blocker impact"
+        : "Open simulator";
+      document.getElementById("simulator-heading").textContent = readinessMode
+        ? "Choose a readiness blocker"
+        : "Choose an adversarial scenario";
+      document.getElementById("simulator-copy").textContent = readinessMode
+        ? "This deterministic trace uses collected control evidence. It does not pretend that an effective-access graph exists."
+        : "Simulations are read-only and use effective access metadata.";
+      document.getElementById("simulation-prompt-label").textContent = readinessMode
+        ? "Decision question"
+        : "Simulated Copilot request";
+      document.getElementById("simulation-mode-title").textContent = readinessMode
+        ? "Control-impact trace"
+        : "Pre-deployment";
+      document.getElementById("simulation-mode-copy").textContent = readinessMode
+        ? "Flight Deck traces an actual control result into its affected mission and required correction."
+        : "No prompts are submitted to a production AI system. AI Flight Deck models discoverability from metadata and policy state.";
+      document.getElementById("result-path-title").textContent = readinessMode
+        ? "Evidence-to-decision path"
+        : "Permission attack path";
+      const stepLabels = readinessMode
+        ? ["Read the collected evidence", "Resolve the readiness control", "Evaluate affected mission gates", "Identify the required correction"]
+        : ["Resolve requesting user's effective identity", "Traverse groups, sites and inherited permissions", "Match discoverable content to sensitivity signals", "Evaluate policy controls and calculate affected audience"];
+      document.querySelectorAll("#simulation-steps .step-copy").forEach((element, index) => {
+        element.textContent = stepLabels[index];
+      });
       if (!scenarios.length) {
-        const message = "Simulator unavailable: this scan did not collect an effective-access graph. Connect principal membership, resource permission, content-sensitivity, AI-surface, and policy evidence before simulation can produce a result.";
+        const message = "No failed, warning, or unknown control is available to trace.";
         overview.innerHTML = `<div class="empty-state">${message}</div>`;
         simulator.innerHTML = `<div class="empty-state">${message}</div>`;
-        document.getElementById("simulation-prompt").textContent = "No scenario is available for this scan.";
+        document.getElementById("simulation-prompt").textContent = "No blocker is available for this scan.";
         runButton.disabled = true;
         return;
       }
@@ -1731,16 +1766,61 @@
       simulator.innerHTML = scenarios.map(s => scenarioCard(s, s.id === selectedScenario.id)).join("");
       document.getElementById("simulation-prompt").textContent = selectedScenario.prompt;
       runButton.disabled = false;
+      runButton.textContent = readinessMode ? "Trace readiness impact" : "Run risk simulation";
+    }
+
+    function buildReadinessScenarios(scan) {
+      const results = scan.estateAssessment?.controlResults || [];
+      const statusRank = { Fail: 4, Warning: 3, Unknown: 2 };
+      return results
+        .filter(result => statusRank[result.status])
+        .sort((left, right) =>
+          statusRank[right.status] - statusRank[left.status] ||
+          String(left.controlId).localeCompare(String(right.controlId)))
+        .slice(0, 6)
+        .map((result, index) => {
+          const domain = readinessCatalog?.domains.find(item => item.id === result.domainId);
+          const control = domain?.controls.find(item => item.id === result.controlId);
+          const missionNames = (control?.missions || []).map(missionId =>
+            readinessCatalog?.missions.find(mission => mission.id === missionId)?.name || missionId);
+          const source = result.provenance?.source || control?.evidenceSources?.join(", ") ||
+            "Required evidence source";
+          const limitation = result.limitations?.map(item => item.description).join(" ") ||
+            result.summary || "The required evidence is incomplete.";
+          const decision = result.status === "Fail"
+            ? "Mission blocked until the control is corrected and re-scanned"
+            : result.status === "Warning"
+              ? "Owner review is required before mission approval"
+              : "Mission blocked until the missing evidence is connected or attested";
+          return {
+            id: `control-${result.controlId}`,
+            sequence: index + 1,
+            mode: "readiness",
+            title: control?.title || result.controlId,
+            description: `${result.status}: ${limitation}`,
+            prompt: `Why does ${result.controlId} affect the next rollout mission, and what evidence is needed to clear it?`,
+            severity: result.status === "Fail" ? "Critical" : "Medium",
+            exposure: `This is a readiness-impact trace, not an access simulation. ${result.controlId} is ${result.status}. ${decision}. Required action: ${result.remediation?.action || control?.remediation || "Collect authoritative evidence and assign an owner."}`,
+            path: [
+              ["Evidence source", source],
+              ["Control", `${result.controlId} / ${result.status}`],
+              ["Mission gate", missionNames.join(", ") || "Estate readiness"],
+              ["Decision impact", decision]
+            ]
+          };
+        });
     }
 
     function buildLiveScenarios(scan) {
-      if (scan.integrity?.verifiedByLocalService !== true || !scan.evidenceGraphEnvelope) return [];
+      if (scan.integrity?.verifiedByLocalService !== true || !scan.evidenceGraphEnvelope) {
+        return buildReadinessScenarios(scan);
+      }
       const simulation = window.FlightDeckEvidenceGraph.simulateEvidenceGraph(scan.evidenceGraphEnvelope, {
         tenantId: scanTenantId(scan),
         cohortId: scan.estateAssessment?.cohorts?.[0]?.id || "tenant-wide",
         sensitiveLevels: ["internal", "confidential", "highly-confidential"]
       });
-      return simulation.sensitiveMatches.slice(0, 6).map((match, index) => {
+      const accessScenarios = simulation.sensitiveMatches.slice(0, 6).map((match, index) => {
         const reachability = simulation.reachableResources.find(item => item.resourceId === match.resourceId);
         const audience = match.principalIds.includes("principal:tenant-users")
           ? `${scan.summary.users} inventoried tenant users`
@@ -1752,6 +1832,8 @@
           : "";
         return {
           id: `live-${index + 1}`,
+          sequence: index + 1,
+          mode: "access",
           title: `Evidence path ${index + 1}`,
           description: `Trace the observed access path to ${match.resourceId}.`,
           prompt: `Evaluate whether the selected cohort can reach ${match.resourceId} through the collected membership and policy evidence.`,
@@ -1767,6 +1849,7 @@
           ]
         };
       });
+      return accessScenarios.length ? accessScenarios : buildReadinessScenarios(scan);
     }
 
     function renderFindings(filter = "all") {
@@ -2273,8 +2356,10 @@
       const live = document.getElementById("simulation-live");
       button.setAttribute("aria-busy", "true");
       button.disabled = true;
-      button.textContent = "Simulation running";
-      live.textContent = "Running risk simulation.";
+      button.textContent = selectedScenario.mode === "readiness" ? "Tracing impact" : "Simulation running";
+      live.textContent = selectedScenario.mode === "readiness"
+        ? "Tracing readiness impact."
+        : "Running risk simulation.";
       result.classList.remove("visible");
       steps.forEach(step => {
         step.className = "step";
@@ -2290,7 +2375,9 @@
         step.querySelector(".step-status").textContent = " complete";
       }
       document.getElementById("result-copy").textContent = selectedScenario.exposure;
-      document.getElementById("result-title").textContent = `${selectedScenario.severity} exposure confirmed`;
+      document.getElementById("result-title").textContent = selectedScenario.mode === "readiness"
+        ? `${selectedScenario.severity} readiness blocker`
+        : `${selectedScenario.severity} exposure confirmed`;
       const path = document.getElementById("result-path");
       path.replaceChildren();
       selectedScenario.path.forEach((node, index) => {
@@ -2313,9 +2400,11 @@
       result.classList.add("visible");
       button.disabled = false;
       button.removeAttribute("aria-busy");
-      button.textContent = "Run again";
+      button.textContent = selectedScenario.mode === "readiness" ? "Trace again" : "Run again";
       button.focus();
-      live.textContent = `${selectedScenario.severity} exposure confirmed. Review the permission path.`;
+      live.textContent = selectedScenario.mode === "readiness"
+        ? `${selectedScenario.severity} readiness impact traced. Review the evidence-to-decision path.`
+        : `${selectedScenario.severity} exposure confirmed. Review the permission path.`;
     }
 
     function download(name, payload) {
@@ -3733,6 +3822,12 @@
       if (nav) navigate(nav.dataset.page);
       const go = event.target.closest("[data-go]");
       if (go) navigate(go.dataset.go);
+      const scroll = event.target.closest("[data-scroll]");
+      if (scroll) {
+        const target = document.getElementById(scroll.dataset.scroll);
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+        target?.focus();
+      }
       const scenario = event.target.closest("[data-scenario]");
       if (scenario) {
         const fromOverview = Boolean(scenario.closest("#overview"));

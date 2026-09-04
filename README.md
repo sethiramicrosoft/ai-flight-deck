@@ -173,16 +173,21 @@ IDs, and maintains an append-only digest chain for each control result. The
 32-byte signing key is stored in the protected user-local workspace so sealed
 artifacts remain verifiable after the local service restarts.
 
-The simulator consumes only a sealed, minimized evidence graph. Its traversal
-is deterministic:
+When a sealed, minimized evidence graph is available, the simulator performs a
+deterministic access-path traversal:
 
 ```text
 Principal -> Membership -> Resource -> Content signal -> AI surface -> Policy
 ```
 
 It reports reachable resources, affected principals, policy blockers,
-confidence, and missing graph edges. It does not send prompts to Copilot, use
-an LLM to decide access, infer missing evidence, or execute remediation.
+confidence, and missing graph edges. When that graph is unavailable, the
+experience switches to a readiness-impact trace built from the actual failed,
+warning, and unknown control results. The trace shows
+`Evidence source -> Control -> Mission gate -> Decision impact` and the required
+correction instead of displaying a dead-end simulator error. Neither mode sends
+prompts to Copilot, uses an LLM to decide access, infers missing evidence, or
+executes remediation.
 
 The product keeps the overall status at `InsufficientEvidence` until all
 mandatory domains have sufficient, current evidence.
