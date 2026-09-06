@@ -1,0 +1,278 @@
+AI Flight Deck - Hackathon Team Explanation
+
+Use this as a natural five-to-seven-minute walkthrough.
+
+
+OPENING
+
+Let me quickly explain what we built, how it is different from the Microsoft
+tools that already exist, and how to use it.
+
+We are not saying Microsoft has no Copilot readiness tools. It already has two
+useful options.
+
+
+WHAT MICROSOFT ALREADY PROVIDES
+
+The first is the Microsoft 365 admin center Copilot Readiness report.
+
+That report is mainly useful for identifying possible Copilot users. It shows
+things such as whether a user has a Copilot licence, whether the user is on an
+eligible Microsoft 365 Apps update channel, which Microsoft 365 workloads they
+have recently used, and whether Microsoft suggests them as a candidate.
+
+It is good input for choosing a pilot group, but it is not a complete rollout
+decision. It covers a rolling 28-day activity window, it can be delayed by up
+to 72 hours, and user identities may be hidden by the tenant's reporting
+privacy settings.
+
+The second tool is Microsoft's open-source M365 Copilot automated readiness
+assessment on GitHub.
+
+That tool collects a much wider set of technical observations across Microsoft
+365, Entra, Defender, Purview, Power Platform, Copilot Studio, and Agent 365.
+It produces a recommendation report with the service, feature, status,
+priority, observation, and recommended action.
+
+That is useful technical input, but it is still a report. It does not bring all
+the evidence together around one named pilot group, show exactly which rollout
+mission is blocked, or prove that a correction was completed.
+
+
+WHAT AI FLIGHT DECK ADDS
+
+That is where AI Flight Deck fits.
+
+We are not replacing Microsoft's tools and we are not trying to build another
+generic scanner.
+
+AI Flight Deck is the control tower above those tools.
+
+Microsoft's tools tell us what they observed.
+
+AI Flight Deck tells us:
+
+- Which users are actually in the proposed pilot.
+- Whether the evidence is complete and current.
+- Which readiness control is passed, failed, warning, or unknown.
+- Why a rollout mission cannot move forward.
+- Who needs to fix the issue.
+- What evidence is needed after the fix.
+- Whether the new evidence proves that the issue was resolved.
+
+The important difference is that AI Flight Deck does not hide missing
+information. If it cannot prove something, it says Unknown. It does not turn
+missing evidence into a green result.
+
+
+HOW TO DEMONSTRATE IT
+
+I will start the tool using Start-AI-Flight-Deck.cmd.
+
+The browser opens the Set up page. At the top there are now three clear paths.
+
+
+PATH 1 - IMPORT THE MICROSOFT 365 READINESS REPORT
+
+The first option is Import Microsoft readiness.
+
+I export the Copilot Readiness CSV from the Microsoft 365 admin center. In
+Flight Deck, I enter the report's as-of date, select the CSV, and import it.
+
+The as-of date matters because we should not make a rollout decision using an
+old report. If I do not provide the date, Flight Deck keeps that evidence as
+Unknown and does not use it as proof.
+
+After import, Flight Deck shows:
+
+- How many users were included in the report.
+- How many already have a Copilot licence.
+- How many licensed users are on an eligible update channel.
+- How many users Microsoft suggested as pilot candidates.
+- Whether the report contains real user identities or concealed identities.
+
+If the identities are visible, I can select the actual users for the pilot,
+enter a cohort name, enter the accountable owner, and save the approved cohort.
+
+If Microsoft has concealed any identities, Flight Deck blocks named cohort
+creation. It does not guess who those users are.
+
+
+PATH 2 - IMPORT MICROSOFT'S AUTOMATED ASSESSMENT
+
+The second option is Import Microsoft assessment.
+
+This accepts the recommendation CSV created by Microsoft's GitHub readiness
+assessment.
+
+I enter the date when the assessment was run and the GitHub commit or release
+used to produce it. We pin the source version because the upstream project can
+change its checks and output over time.
+
+Flight Deck only maps rows that have an exact, verified crosswalk to one of our
+77 controls.
+
+Anything it cannot map safely is kept in a visible staged list. We do not use
+fuzzy title matching and we do not convert an unfamiliar Microsoft result into
+a pass.
+
+There is an important reason for this. In the Microsoft assessment, a Status of
+Success can sometimes mean that the check ran successfully, while the
+observation itself still describes a governance problem. Flight Deck reads the
+meaning of the exact check instead of blindly trusting the word Success.
+
+
+PATH 3 - RUN THE LIVE SCAN
+
+The third option is Connect and scan tenant.
+
+The tool opens Microsoft's device sign-in page and displays a one-time code. I
+sign in with an approved account, and the scanner uses read-only permissions.
+
+It does not enable Copilot, change policies, remove sharing links, or modify the
+tenant.
+
+The scan attempts all 13 readiness areas and always returns a result for all 77
+controls.
+
+If we saved a pilot cohort, the live scan resolves every selected email address
+to a real Microsoft Entra user. It follows Microsoft Graph pagination, so it is
+not limited to the first 999 directory users.
+
+If even one selected person cannot be resolved, Flight Deck shows that user and
+does not treat the cohort as approved.
+
+
+ASSESSMENT
+
+Now I open Assessment.
+
+The 13 areas are licensing, identity, devices and apps, network, service
+health, Exchange, Teams, SharePoint and OneDrive, Purview, security, Copilot
+configuration, Power Platform and agents, and adoption and governance.
+
+Every control has one of four results:
+
+- Pass means the required evidence proves the condition.
+- Fail means the evidence proves the requirement is not met.
+- Warning means there is a real concern or incomplete condition that needs
+  review.
+- Unknown means Flight Deck does not have enough trustworthy evidence.
+
+I can open any area and then open a control to see:
+
+- What was checked.
+- Why it matters.
+- What evidence was used.
+- When the evidence was collected.
+- What is missing.
+- What must be corrected.
+- The relevant Microsoft documentation.
+
+Fresh live evidence has priority over imported evidence. If two sources
+disagree, Flight Deck keeps the live result and records the conflict instead
+of silently overwriting it.
+
+
+MISSIONS
+
+The missions turn 77 technical checks into a rollout sequence.
+
+Mission 01 covers the basic activation requirements.
+
+Mission 02 checks whether a controlled pilot can begin safely.
+
+Mission 03 checks whether the organization is ready to scale beyond the pilot.
+
+Mission 04 covers ongoing assurance, monitoring, and governance.
+
+A mission does not advance because somebody clicked Next. It advances only
+when its required controls have acceptable, current evidence.
+
+
+READINESS IMPACT TRACE
+
+At the bottom of Assessment, Flight Deck now shows Priority readiness blockers.
+
+Previously, this area only worked when the scan had a complete effective-access
+graph. That was not useful for most scans.
+
+Now, if the access graph is unavailable, Flight Deck uses the actual control
+results and traces:
+
+Evidence source, then the failed or unknown control, then the affected mission,
+then the decision impact, and finally the required correction.
+
+This is not pretending to simulate a Copilot prompt. It is a practical answer
+to: Why are we blocked, and what do we need to do next?
+
+If a future connector supplies the full identity, permission, content, AI
+surface, and policy graph, the same area automatically switches to a real
+access-path simulation.
+
+
+CORRECTIONS
+
+Next, I open Corrections.
+
+Every failed, warning, or unknown control becomes an actionable correction.
+
+I select the corrections we want to take forward and generate the
+administrator action package.
+
+The package contains the selected control IDs, evidence references, findings,
+recommended actions, and the baseline it came from.
+
+Generating the package does not make any tenant changes. It gives the correct
+administrator a reviewable plan.
+
+
+DECISION
+
+Finally, I open Decision.
+
+This page answers the main question: do we have enough evidence for this named
+pilot to move to the next mission?
+
+If not, it lists every blocker. There is no hidden score that makes ten missing
+checks disappear.
+
+After administrators complete the approved corrections, we run the scan again.
+Flight Deck compares the before and after evidence and shows whether the issue
+was actually resolved, whether there was no material change, or whether the
+tenant drifted in the wrong direction.
+
+
+CLOSING
+
+The simple way to describe the product is:
+
+Microsoft's tools provide valuable readiness observations.
+
+AI Flight Deck combines those observations with live evidence, applies them to
+a named pilot group, shows exactly why a rollout mission is blocked, creates a
+controlled correction package, and verifies the result after the change.
+
+So the product is not just another readiness report. It is the decision and
+evidence workflow around the reports.
+
+
+CLICK SEQUENCE
+
+1. Set up - point to the three evidence paths.
+2. Import Microsoft readiness - choose date and CSV.
+3. Select suggested users - enter cohort name and owner - save cohort.
+4. Import Microsoft assessment - choose date, commit, and CSV.
+5. Connect and scan tenant - complete device sign-in.
+6. Assessment - open one domain and one control.
+7. Priority readiness blockers - open one trace and run it.
+8. Missions - show why Mission 01 or Mission 02 is blocked.
+9. Corrections - select one action and generate the package.
+10. Decision - show remaining blockers and explain the re-scan.
+
+
+ONE-SENTENCE VERSION
+
+Microsoft tells us what it observed; AI Flight Deck tells us whether this
+specific pilot can launch, why it cannot, who must act, and whether the evidence
+proves the fix worked.

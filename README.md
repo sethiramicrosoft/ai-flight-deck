@@ -18,12 +18,350 @@ Defender, Power Platform, or accountable human evidence return `Unknown` until
 the required workload connection or signed attestation is supplied. The
 product never converts missing evidence into a passing result.
 
-## Run the product
+## Microsoft tools used and credited
+
+AI Flight Deck is an independent hackathon prototype. It is not a Microsoft
+product, service, or replacement for Microsoft's readiness tooling.
+
+It deliberately builds on evidence produced by these Microsoft resources:
+
+| Microsoft resource | What Microsoft provides | How AI Flight Deck uses it |
+|---|---|---|
+| [Microsoft 365 Copilot Readiness report](https://learn.microsoft.com/en-us/microsoft-365/admin/activity-reports/microsoft-365-copilot-readiness?view=o365-worldwide) | Microsoft 365 admin-center reporting for licence assignment, eligible app update channel, recent workload usage, and suggested Copilot candidates | Imports the CSV as time-bounded cohort-planning evidence and preserves its privacy, 28-day activity-window, and reporting-latency limitations |
+| [Microsoft M365 Copilot automated readiness assessment](https://github.com/microsoft/m365-copilot-automated-readiness-assessment) | Microsoft-authored open-source collection and recommendations across Microsoft 365, Entra, Defender, Purview, Power Platform, Copilot Studio, and Agent 365 | Imports its recommendation CSV, records the source revision, maps only verified exact checks, and stages unrecognized rows instead of guessing |
+| [Microsoft Graph](https://learn.microsoft.com/en-us/graph/overview) | Microsoft APIs for tenant, identity, policy, device, service-health, security, collaboration, and reporting data | Performs the live delegated read-only scan |
+| [Microsoft Learn](https://learn.microsoft.com/) | Authoritative product documentation and configuration guidance | Links every readiness control and correction back to relevant Microsoft documentation |
+
+Microsoft's open-source readiness assessment is licensed under the MIT
+License by its authors. AI Flight Deck currently consumes its exported report;
+it does not copy or redistribute the upstream source code. See
+[`ACKNOWLEDGEMENTS.md`](ACKNOWLEDGEMENTS.md) for attribution and integration
+details.
+
+## What AI Flight Deck adds
+
+Microsoft's tools remain the source for valuable readiness observations. AI
+Flight Deck adds the decision and evidence workflow around them:
+
+| AI Flight Deck capability | What it offers |
+|---|---|
+| Cross-source evidence control tower | Combines Microsoft reports, a live Graph scan, workload evidence, and accountable attestations without hiding their source |
+| Named pilot cohort | Converts suggested candidates into an explicitly selected pilot with an accountable owner, then resolves every selected user against Microsoft Entra |
+| 13 domains and 77 controls | Normalizes licensing, identity, devices, network, service health, Exchange, Teams, SharePoint/OneDrive, Purview, security, Copilot configuration, Power Platform/agents, and adoption/governance |
+| Honest `Unknown` results | Missing permission, stale data, unavailable connector, concealed identity, or absent attestation never becomes a false pass |
+| Mission gates | Shows whether activation, safe pilot, scale, and assurance missions can advance and identifies the exact blocking controls |
+| Readiness-impact traces | Connects evidence source to control, affected mission, decision impact, and required correction when a full access graph is unavailable |
+| Evidence-bound corrections | Produces administrator action packages tied to the selected controls and signed baseline rather than claiming that changes were applied |
+| Before-and-after proof | Re-scans after remediation and distinguishes verified improvement, no material change, and regression |
+| Provenance and freshness | Retains source artifact hashes, report dates, collector identity, evidence limitations, and conflicts between imported and live evidence |
+| Detailed exports | Exports the complete control-level assessment and correction context for review outside the application |
+
+In one sentence: **Microsoft tools tell you what they observed; AI Flight Deck
+tells you whether a specific pilot can launch, why it cannot, who must act, and
+whether the evidence proves the fix worked.**
+
+## Install AI Flight Deck on a Windows computer
+
+AI Flight Deck is a local Windows application. It runs a web interface on
+`127.0.0.1` and does not require Azure hosting, a database, `npm install`, or a
+web-server setup.
+
+### Simplest first-time setup
+
+1. Download the repository ZIP from GitHub.
+2. Extract the entire ZIP to a normal local folder.
+3. Double-click:
+
+   ```text
+   SETUP-AI-Flight-Deck.cmd
+   ```
+
+The guided setup checks that all application files are present, checks the
+Node.js version, offers to install Node.js LTS through Windows Package Manager
+when necessary, installs `Microsoft.Graph.Authentication` for the current
+Windows user, checks port `8080`, offers to create a desktop shortcut, and
+starts AI Flight Deck.
+
+The setup asks before installing prerequisites. It does not connect to or
+change a Microsoft 365 tenant. Tenant sign-in starts only after the user selects
+**Connect and scan tenant** inside the application.
+
+### Requirements
+
+Before downloading the repository, confirm that the computer has:
+
+- Windows 10 or Windows 11.
+- Permission to run PowerShell.
+- Microsoft Edge, Google Chrome, or another current browser.
+- Network access to Microsoft sign-in, Microsoft Graph, and Microsoft 365.
+- A Microsoft 365 test-tenant account approved to grant or request the
+  displayed read-only permissions.
+
+The guided setup can install
+[Node.js 18 or later](https://nodejs.org/en/download) when Windows Package
+Manager is available. Git is optional and is needed only when installing with
+`git clone`.
+
+### Manual fallback: install Node.js
+
+Use this only if the guided setup cannot install Node.js. Download and install
+the current Node.js LTS release:
+
+```text
+https://nodejs.org/en/download
+```
+
+Keep the installer option that adds Node.js to `PATH`. Close and reopen
+Command Prompt after installation, then confirm:
+
+```powershell
+node --version
+```
+
+The command must print version 18 or later. No Node packages need to be
+installed for AI Flight Deck.
+
+### Download AI Flight Deck
+
+Choose either method.
+
+#### Option A - Download the ZIP
+
+1. Open
+   [sethiramicrosoft/ai-flight-deck](https://github.com/sethiramicrosoft/ai-flight-deck).
+2. Sign in to GitHub with an account that has access to the repository.
+3. Select **Code**, then **Download ZIP**.
+4. Extract the ZIP to a normal local folder, for example:
+
+   ```text
+   C:\Tools\ai-flight-deck
+   ```
+
+5. Do not run the launcher from inside the compressed ZIP preview.
+
+#### Option B - Clone with Git
+
+Open PowerShell and run:
+
+```powershell
+cd C:\Tools
+git clone https://github.com/sethiramicrosoft/ai-flight-deck.git
+cd .\ai-flight-deck
+```
+
+Because the repository is private, GitHub may ask the user to authenticate.
+
+### Start after setup
+
+For later sessions, open the extracted or cloned `ai-flight-deck` folder and
+double-click:
+
+```text
+Start-AI-Flight-Deck.cmd
+```
+
+Alternatively, start it from PowerShell:
+
+```powershell
+cd C:\Tools\ai-flight-deck
+.\Start-AI-Flight-Deck.cmd
+```
+
+The launcher:
+
+1. Checks that `node.exe` is available.
+2. Starts the localhost control plane on port `8080`.
+3. Opens the following page in the default browser:
+
+   ```text
+   http://127.0.0.1:8080/index.html
+   ```
+
+Keep the launcher window open while using the application. Closing that window
+stops the local service.
+
+### Complete the first live scan
+
+1. On **Set up**, select **Connect and scan tenant**.
+2. If required, Flight Deck installs the
+   `Microsoft.Graph.Authentication` PowerShell module for the current Windows
+   user. PowerShell Gallery may ask whether it can install or trust supporting
+   components.
+3. The browser opens `https://microsoft.com/devicelogin`.
+4. Copy the one-time code displayed in Flight Deck.
+5. Enter the code on Microsoft's sign-in page.
+6. Sign in with the approved Microsoft 365 tenant account.
+7. Review the requested delegated permissions. The scanner requests read-only
+   access and does not request tenant write permissions.
+8. If tenant-wide admin consent is required, ask an authorized administrator
+   to approve the displayed permissions.
+9. Return to Flight Deck and leave the launcher window open until the scan
+   finishes.
+10. Flight Deck opens **Assessment** automatically when the baseline is ready.
+
+The first run may take longer because the Microsoft Graph authentication module
+is installed before sign-in.
+
+## Permissions required
+
+There are two different permission sets: permissions on the Windows computer
+and permissions in the Microsoft 365 tenant.
+
+### Windows computer permissions
+
+The person installing the prototype needs permission to:
+
+- Extract files to a local folder.
+- Run `.cmd` and PowerShell scripts.
+- Install Node.js if it is not already present. Windows may display an
+  elevation prompt depending on the device policy and Node.js installer.
+- Install the `Microsoft.Graph.Authentication` module with
+  `-Scope CurrentUser`. This normally does not require local administrator
+  rights.
+- Open a localhost listener on `127.0.0.1:8080`.
+- Create a desktop shortcut if that option is selected.
+
+If software installation, PowerShell Gallery, Windows Package Manager, or
+script execution is controlled by the organization, IT must approve or perform
+those prerequisite steps.
+
+### Microsoft 365 account requirements
+
+Use a dedicated test-tenant assessment account where possible. The account
+must:
+
+- Be a member of the Microsoft 365 tenant being assessed.
+- Be allowed to complete Microsoft device-code sign-in.
+- Be allowed to request or use the delegated Microsoft Graph permissions below.
+- Have sufficient directory or workload roles to read the requested data.
+- Have access to the licensed services being assessed.
+
+The application uses the Microsoft Graph Command Line Tools client for
+interactive delegated authentication. It does not ask the user to create an app
+registration for the local prototype.
+
+An administrator may need to grant consent before the account can use
+organization-wide delegated permissions. Consent allows the application to
+request a scope; the signed-in user's own role and service access still limit
+what the scan can read.
+
+### Delegated permissions requested by the live scanner
+
+The localhost scanner currently requests these exact Microsoft Graph delegated
+scopes from `server.js`:
+
+| Evidence area | Requested delegated scopes |
+|---|---|
+| Sign-in session | `openid`, `profile`, `offline_access` |
+| Tenant and directory inventory | `Organization.Read.All`, `Directory.Read.All`, `User.Read.All`, `Group.Read.All`, `Application.Read.All` |
+| Identity governance and access | `AccessReview.Read.All`, `AuditLog.Read.All`, `Policy.Read.All`, `IdentityRiskyUser.Read.All`, `RoleManagement.Read.Directory`, `UserAuthenticationMethod.Read.All` |
+| Devices and Microsoft 365 Apps | `DeviceManagementApps.Read.All`, `DeviceManagementConfiguration.Read.All`, `DeviceManagementManagedDevices.Read.All`, `OrgSettings-Microsoft365Install.Read.All` |
+| Service health and operations | `ServiceHealth.Read.All`, `ServiceMessage.Read.All` |
+| Teams, apps, and collaboration inventory | `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `AppCatalog.Read.All` |
+| SharePoint, OneDrive, Search, and connectors | `Sites.Read.All`, `SharePointTenantSettings.Read.All`, `ExternalConnection.Read.All` |
+| Security evidence | `SecurityAlert.Read.All`, `SecurityEvents.Read.All`, `SecurityIncident.Read.All`, `ThreatIndicators.Read.All` |
+| Information protection | `InformationProtectionPolicy.Read` |
+| Usage evidence | `Reports.Read.All` |
+
+All requested Microsoft Graph data permissions are read scopes. The scanner
+does not request Graph write permissions.
+
+The list above is the source of truth for the current local sign-in flow. If
+the code changes, review `GRAPH_SCOPE_LIST` in `server.js` before approving a
+new consent request.
+
+### Roles used across the 13 readiness domains
+
+No single role makes every one of the 77 controls technically available.
+Microsoft Graph, workload administration, licensing, and human governance
+evidence have different access boundaries.
+
+The capability plan identifies these roles for the relevant domain:
+
+| Readiness area | Relevant reader or administrator role |
+|---|---|
+| Licensing and entitlement | License Administrator |
+| Identity and access | Global Reader |
+| Devices and Microsoft 365 Apps | Intune Administrator |
+| Network checks | Network Administrator or approved network operator |
+| Service health | Service Support Administrator |
+| Exchange Online | Exchange Administrator |
+| Microsoft Teams | Teams Administrator |
+| SharePoint and OneDrive | SharePoint Administrator |
+| Microsoft Purview | Compliance Administrator |
+| Microsoft Defender and security | Security Reader |
+| Copilot tenant configuration | Global Reader |
+| Power Platform and Copilot Studio | Power Platform Administrator |
+| Adoption and organizational governance | Named business owner or signed attester |
+
+These roles describe who can provide complete evidence; they are not permission
+to make changes through AI Flight Deck. The current application remains
+read-only.
+
+If the signed-in account lacks a required role, permission, licence, connector,
+or attestation, the affected control returns `Unknown` with the missing
+requirement. That is expected behavior and does not mean the installation
+failed.
+
+### Optional Microsoft report imports
+
+The live scan remains available at all times. To supplement it:
+
+- Select **Import Microsoft readiness** to load the CSV exported from the
+  Microsoft 365 admin center.
+- Select **Import Microsoft assessment** to load the recommendation CSV from
+  Microsoft's open-source automated readiness assessment.
+
+Enter the report's real as-of date before importing it. Flight Deck deliberately
+keeps evidence without a source date non-gating.
+
+### Stop and restart
+
+To stop AI Flight Deck, close the launcher window or press `Ctrl+C` in it.
+
+To restart, double-click `Start-AI-Flight-Deck.cmd` again. Previous local
+artifacts remain available because they are stored outside the repository at:
+
+```text
+%LOCALAPPDATA%\AI Flight Deck\live-test
+```
+
+This folder can contain tenant metadata and should be protected according to
+the organization's data-handling requirements.
+
+### Update an existing installation
+
+For a Git installation:
+
+```powershell
+cd C:\Tools\ai-flight-deck
+git pull origin main
+```
+
+For a ZIP installation, download the latest ZIP and extract it to a new folder.
+Do not copy the local evidence workspace into the repository.
+
+### Installation troubleshooting
+
+| Problem | Resolution |
+|---|---|
+| Guided setup stops on Node.js | Allow the Windows Package Manager installation, or install Node.js LTS manually, reopen setup, and confirm `node --version`. |
+| Windows blocks the downloaded setup file | Open file **Properties**, select **Unblock** if shown, then run `SETUP-AI-Flight-Deck.cmd` again. Follow organizational security policy. |
+| The browser does not open | Manually open `http://127.0.0.1:8080/index.html`. |
+| Port `8080` is already in use | Close the other AI Flight Deck launcher or process using that port, then start again. |
+| Microsoft Graph module installation fails | Open PowerShell as the same Windows user and run `Install-Module Microsoft.Graph.Authentication -Scope CurrentUser`, then restart Flight Deck. |
+| PowerShell Gallery asks to install NuGet or trust PSGallery | Review and accept the prompt if allowed by organizational policy. |
+| Device sign-in requires approval | Ask a tenant administrator to grant the displayed delegated read permissions. |
+| The page says the integrated scanner is unavailable | Start the product with `Start-AI-Flight-Deck.cmd`; do not open `index.html` directly or use a generic static server. |
+| Many controls remain `Unknown` | The installation is working. Those controls require additional workload connectors, permissions, Microsoft reports, or accountable attestations. |
+| A named cohort cannot be created | The Microsoft readiness export contains concealed or mixed identities. Change the Microsoft 365 report privacy setting or use an identified export. |
+
+## Quick start for returning users
 
 Double-click:
 
 ```text
-ai-flight-deck\Start-AI-Flight-Deck.cmd
+Start-AI-Flight-Deck.cmd
 ```
 
 The launcher starts the localhost-only control plane and opens
