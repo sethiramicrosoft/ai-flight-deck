@@ -51,6 +51,7 @@ Flight Deck adds the decision and evidence workflow around them:
 | Honest `Unknown` results | Missing permission, stale data, unavailable connector, concealed identity, or absent attestation never becomes a false pass |
 | Mission gates | Shows whether activation, safe pilot, scale, and assurance missions can advance and identifies the exact blocking controls |
 | Readiness-impact traces | Connects evidence source to control, affected mission, decision impact, and required correction when a full access graph is unavailable |
+| Tenant-wide enablement plan | Produces a `Ready`, `Go with conditions`, or `No-go` recommendation and turns all 77 controls into accountable owners, administration paths, ordered implementation steps, acceptance criteria, and control-specific Microsoft sources |
 | Evidence-bound corrections | Produces administrator action packages tied to the selected controls and signed baseline rather than claiming that changes were applied |
 | Before-and-after proof | Re-scans after remediation and distinguishes verified improvement, no material change, and regression |
 | Provenance and freshness | Retains source artifact hashes, report dates, collector identity, evidence limitations, and conflicts between imported and live evidence |
@@ -59,6 +60,15 @@ Flight Deck adds the decision and evidence workflow around them:
 In one sentence: **Microsoft tools tell you what they observed; AI Flight Deck
 tells you whether a specific pilot can launch, why it cannot, who must act, and
 whether the evidence proves the fix worked.**
+
+The Decision page also provides a complete customer handoff for tenant-wide
+enablement. Customers can filter remaining requirements in the application or
+download a Markdown plan covering licensing, Entra ID, devices, network,
+service health, Exchange, Teams, SharePoint and OneDrive, Purview, Defender,
+Copilot configuration, Power Platform and agents, and adoption governance.
+Every control identifies the responsible roles, administration portal and
+navigation path, ordered implementation procedure, validation condition, and
+relevant authoritative Microsoft documentation.
 
 ## See the product before installing
 
@@ -748,9 +758,3 @@ Check progress at any time:
 - Integration with DSPM for AI and SharePoint Advanced Management.
 - Supported remediation workflows with verification and rollback.
 - Continuous rollout monitoring for Copilot and deployed agents.
-
-## Positioning
-
-> Existing tools tell customers whether controls are configured. AI Flight Deck
-> shows what could actually go wrong, why it can happen, and how to prevent it
-> before AI takes off.

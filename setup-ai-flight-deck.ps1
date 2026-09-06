@@ -152,6 +152,7 @@ try {
         "Start-AI-Flight-Deck.cmd",
         "server.js",
         "index.html",
+        "enablement-playbook.js",
         "scanner\test-live-tenant.ps1"
     )) {
         if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $requiredFile))) {

@@ -74,13 +74,17 @@ preserving approval, least privilege, verification, and rollback boundaries.
 
 ## 6. Make the rollout decision
 
-See whether the estate has conclusive evidence for all mandatory controls,
-review remaining blockers, download the decision record, and compare a later
-scan after approved corrections are implemented.
+Receive a tenant-wide `Ready`, `Go with conditions`, or `No-go`
+recommendation, review the highest-priority blockers, and work through the
+complete 77-control enablement plan. Every requirement identifies the
+responsible roles, administration path, six ordered implementation steps,
+acceptance criterion, evidence source, and authoritative Microsoft guidance.
+The complete customer handoff can be downloaded as Markdown.
 
 **Why use it:** It separates verified improvement in one area from an
-estate-wide readiness decision and prevents incomplete evidence from becoming
-a false approval.
+estate-wide readiness decision, prevents incomplete evidence from becoming a
+false approval, and gives the customer the exact remaining path to enable
+Copilot across Microsoft 365 workloads.
 
 [![Make the rollout decision](screenshots/06-decision.png)](screenshots/06-decision.png)
 
