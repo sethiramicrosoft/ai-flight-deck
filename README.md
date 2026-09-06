@@ -60,6 +60,17 @@ In one sentence: **Microsoft tools tell you what they observed; AI Flight Deck
 tells you whether a specific pilot can launch, why it cannot, who must act, and
 whether the evidence proves the fix worked.**
 
+## See the product before installing
+
+[Open the complete AI Flight Deck visual tour](docs/VISUAL-TOUR.md) to see
+every page, what it provides, and where it fits in the readiness workflow.
+
+[![AI Flight Deck assessment page](docs/screenshots/02-assessment.png)](docs/VISUAL-TOUR.md)
+
+The screenshots use the built-in synthetic Contoso Aviation demonstration
+data. They do not contain tenant data and are intended to show the product
+experience before a live scan is connected.
+
 ## Install AI Flight Deck on a Windows computer
 
 AI Flight Deck is a local Windows application. It runs a web interface on
