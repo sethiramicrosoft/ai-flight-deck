@@ -1,0 +1,11 @@
+{
+  "name": "ai-flight-deck-value-realization-e2e",
+  "private": true,
+  "description": "Isolated, non-shipping Playwright fixture project used only by the e2e-tester persona to validate the uncommitted value-realization diff in ../.. It is not part of the AI Flight Deck product and must never be referenced by product code.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}

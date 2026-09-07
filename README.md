@@ -11,12 +11,13 @@ configuration, Power Platform and agents, and adoption and operational
 governance. A missing domain blocks an estate-wide decision instead of being
 hidden behind an aggregate score.
 
-The current collector suite attempts all 77 controls across all thirteen
-domains. Microsoft Graph and local network probes can evaluate a subset
-directly. Controls that require Exchange, SharePoint administration, Purview,
-Defender, Power Platform, or accountable human evidence return `Unknown` until
-the required workload connection or signed attestation is supplied. The
-product never converts missing evidence into a passing result.
+The collector suite attempts all 77 controls across all thirteen domains.
+Microsoft Graph and local network probes evaluate the directly observable
+subset. The Evidence completion center classifies every unresolved control as
+a missing permission, missing licence, administrator evidence package, Power
+Platform evidence package, signed attestation, expired evidence, or live
+recollection requirement. The product never converts missing evidence into a
+passing result.
 
 ## Microsoft tools used and credited
 
@@ -48,7 +49,8 @@ Flight Deck adds the decision and evidence workflow around them:
 | Cross-source evidence control tower | Combines Microsoft reports, a live Graph scan, workload evidence, and accountable attestations without hiding their source |
 | Named pilot cohort | Converts suggested candidates into an explicitly selected pilot with an accountable owner, then resolves every selected user against Microsoft Entra |
 | 13 domains and 77 controls | Normalizes licensing, identity, devices, network, service health, Exchange, Teams, SharePoint/OneDrive, Purview, security, Copilot configuration, Power Platform/agents, and adoption/governance |
-| Honest `Unknown` results | Missing permission, stale data, unavailable connector, concealed identity, or absent attestation never becomes a false pass |
+| Actionable evidence gaps | Reclassifies unresolved controls as a missing permission, licence, workload package, attestation, or recollection requirement instead of showing bare `Unknown` |
+| Evidence completion center | Shows the current mission and the five highest-priority blockers, then provides supported producer or import paths for every evidence class |
 | Mission gates | Shows whether activation, safe pilot, scale, and assurance missions can advance and identifies the exact blocking controls |
 | Readiness-impact traces | Connects evidence source to control, affected mission, decision impact, and required correction when a full access graph is unavailable |
 | Tenant-wide enablement plan | Produces a `Ready`, `Go with conditions`, or `No-go` recommendation and turns all 77 controls into accountable owners, administration paths, ordered implementation steps, acceptance criteria, and control-specific Microsoft sources |
@@ -223,6 +225,79 @@ stops the local service.
 The first run may take longer because the Microsoft Graph authentication module
 is installed before sign-in.
 
+### Complete evidence the Graph scan cannot collect
+
+The live scan remains the primary authenticated path. Use the **Evidence
+completion center** on **Set up** (the first navigation tab) for controls
+that cross a separate Microsoft 365 administration boundary.
+
+#### Exchange Online, SharePoint Online, and Purview
+
+Install the required Microsoft administration modules for the current Windows
+user:
+
+```powershell
+Install-Module ExchangeOnlineManagement -Scope CurrentUser
+Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser
+```
+
+On **Decision**, select **Create collection challenge**. Then run the shipped
+read-only producer with the tenant ID shown by the live scan, the one-time
+challenge, and the tenant's SharePoint administration URL:
+
+```powershell
+.\scanner\collect-admin-evidence.ps1 `
+  -TenantId "<tenant-guid>" `
+  -WorkspacePath "$env:LOCALAPPDATA\AI Flight Deck\live-test" `
+  -CollectionChallenge "<one-time-challenge>" `
+  -SharePointAdminUrl "https://<tenant>-admin.sharepoint.com"
+```
+
+The challenge is valid for 30 minutes and can be used once. The producer opens
+the workload sign-in experiences, executes the bounded read commands used by
+Flight Deck, records command-level failures, and writes
+`admin-evidence.<timestamp>.json`. Import that file in the Evidence completion
+center. The local service validates its producer identity, one-time challenge,
+schema, verified-baseline tenant, object shape, and 24-hour freshness, then
+seals it before the next scan can consume it.
+
+If an individual administration command fails, the producer continues with the
+remaining commands and records the exact failure in the package's `errors`
+map. Importing a partially collected package is supported: affected controls
+remain evidence gaps with the command failure, while independently collected
+controls can still be evaluated.
+
+#### Power Platform and Copilot Studio
+
+Download
+[`schema/power-platform-evidence.template.v1.json`](schema/power-platform-evidence.template.v1.json),
+select **Create collection challenge** for Power Platform, then replace the
+challenge, tenant, actor, timestamp, and seven evidence arrays with current
+authenticated exports before importing it. The
+required arrays are environments, DLP policies, connectors, agents, agent
+owners, sharing, and lifecycle. Cross-tenant, stale, malformed, or unsealed
+packages are rejected.
+
+#### Accountable governance attestations
+
+For controls whose catalogue automation class is `Attested`, load a locally
+verified baseline for an explicitly approved cohort, then complete the
+attestation form in the Evidence completion center. Flight Deck:
+
+1. Restricts attestations to controls explicitly marked `Attested`.
+2. Derives the attester from the verified scan actor and binds the statement
+   to that identity, the verified tenant, approved cohort, control, supporting
+   data, and evidence references. A different attester must authenticate and
+   produce the verified scan used for the statement.
+3. Caps expiry to the control's catalogue freshness window.
+4. Seals the record with the local workspace integrity key.
+5. Verifies the signature during the next scan before the record can affect a
+   control result.
+
+`NotApplicable` attestations additionally require a named approver, reason, and
+future expiry. Missing expiry or incomplete control coverage cannot satisfy a
+mission gate.
+
 ## Permissions required
 
 There are two different permission sets: permissions on the Windows computer
@@ -320,9 +395,10 @@ to make changes through AI Flight Deck. The current application remains
 read-only.
 
 If the signed-in account lacks a required role, permission, licence, connector,
-or attestation, the affected control returns `Unknown` with the missing
-requirement. That is expected behavior and does not mean the installation
-failed.
+or attestation, the affected control remains technically `Unknown` in the
+evidence contract. The customer interface translates that state into the exact
+next evidence action. That is expected behavior and does not mean the
+installation failed.
 
 ### Optional Microsoft report imports
 

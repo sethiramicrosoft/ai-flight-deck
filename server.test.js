@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { createApp, GRAPH_SCOPE_LIST } = require("./server");
+const catalog = require("./schema/readiness-catalog.v1.json");
 
 async function withServer(workflowRunner, action) {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "flight-deck-test-"));
@@ -56,6 +57,16 @@ test("serves status and rejects cross-origin workflow requests", async () => {
       body: JSON.stringify({ action: "baseline" })
     });
     assert.equal(rejected.status, 403);
+
+    const missingOrigin = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Flight-Deck": "local-ui"
+      },
+      body: JSON.stringify({ action: "baseline" })
+    });
+    assert.equal(missingOrigin.status, 403);
   });
 });
 
@@ -83,7 +94,8 @@ test("runs a fixed baseline job and serves its sealed artifact", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({ action: "baseline" })
     });
@@ -108,7 +120,8 @@ test("runs a fixed baseline job and serves its sealed artifact", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({
         selectedEvidenceIds: ["evidence-1"],
@@ -122,7 +135,8 @@ test("runs a fixed baseline job and serves its sealed artifact", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({
         selectedEvidenceIds: [],
@@ -176,9 +190,211 @@ test("reuses the workspace integrity key and verifies artifacts after restart", 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${first.port}`
       },
       body: JSON.stringify({ action: "baseline" })
+    });
+
+    test("seals workload evidence packages and creates cohort-bound attestations", async () => {
+      const tenantId = "11111111-1111-1111-1111-111111111111";
+      const cohortId = "approved-pilot";
+      const attestedControl = catalog.domains.flatMap(domain => domain.controls)
+        .find(control => control.automation === "Attested");
+      await withServer(async (job, action, signal, workspace) => {
+        fs.writeFileSync(path.join(workspace, "baseline-scan.json"), JSON.stringify({
+          documentType: "tenant-scan",
+          producer: "ai-flight-deck/scan-tenant.ps1",
+          generatedAt: new Date().toISOString(),
+          tenant: { tenantId },
+          estateAssessment: {
+            cohorts: [{ id: cohortId, name: "Approved pilot", approved: true }],
+            controlResults: []
+          },
+          evidenceGraph: {
+            version: 1,
+            minimized: true,
+            tenantId,
+            nodes: [],
+            edges: []
+          }
+        }));
+        return "baseline";
+      }, async ({ port }) => {
+        const started = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({ action: "baseline" })
+        });
+        const { id } = await started.json();
+        await new Promise(resolve => setTimeout(resolve, 20));
+        assert.equal((await (await fetch(
+          `http://127.0.0.1:${port}/api/jobs/${id}`)).json()).status, "completed");
+
+        const challengeResponse = await fetch(
+          `http://127.0.0.1:${port}/api/evidence-challenges`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Flight-Deck": "local-ui",
+              Origin: `http://127.0.0.1:${port}`
+            },
+            body: JSON.stringify({ kind: "admin" })
+          }
+        );
+        assert.equal(challengeResponse.status, 201);
+        const challenge = await challengeResponse.json();
+        const packageDocument = {
+          schema: "ai-flight-deck/admin-evidence",
+          version: "1.0.0",
+          producerId: "ai-flight-deck/admin-evidence-collector",
+          producerVersion: "1.0.0",
+          collectionChallenge: challenge.challenge,
+          tenantId,
+          actorId: "admin@example.test",
+          producedAt: new Date().toISOString(),
+          evidence: { "exchangeOnline:Get-HybridConfiguration": [] },
+          errors: {}
+        };
+        const imported = await fetch(`http://127.0.0.1:${port}/api/evidence-packages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({ kind: "admin", document: packageDocument })
+        });
+        assert.equal(imported.status, 200);
+        assert.equal((await imported.json()).integrityVerified, true);
+
+        const replayed = await fetch(`http://127.0.0.1:${port}/api/evidence-packages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({ kind: "admin", document: packageDocument })
+        });
+        assert.equal(replayed.status, 400);
+        assert.match((await replayed.json()).error, /one-time collection challenge/i);
+
+        const invalidChallengeResponse = await fetch(
+          `http://127.0.0.1:${port}/api/evidence-challenges`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Flight-Deck": "local-ui",
+              Origin: `http://127.0.0.1:${port}`
+            },
+            body: JSON.stringify({ kind: "admin" })
+          }
+        );
+        const invalidChallenge = await invalidChallengeResponse.json();
+        const invalidPackage = {
+          ...packageDocument,
+          collectionChallenge: invalidChallenge.challenge,
+          tenantId: "22222222-2222-2222-2222-222222222222"
+        };
+        const crossTenant = await fetch(`http://127.0.0.1:${port}/api/evidence-packages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({ kind: "admin", document: invalidPackage })
+        });
+        assert.equal(crossTenant.status, 400);
+        assert.match((await crossTenant.json()).error, /tenant/i);
+
+        invalidPackage.tenantId = tenantId;
+        invalidPackage.producedAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+        const futureDated = await fetch(`http://127.0.0.1:${port}/api/evidence-packages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({ kind: "admin", document: invalidPackage })
+        });
+        assert.equal(futureDated.status, 400);
+        assert.match((await futureDated.json()).error, /future/i);
+
+        invalidPackage.producedAt = new Date().toISOString();
+        invalidPackage.evidence = [];
+        const invalidShape = await fetch(`http://127.0.0.1:${port}/api/evidence-packages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({ kind: "admin", document: invalidPackage })
+        });
+        assert.equal(invalidShape.status, 400);
+        assert.match((await invalidShape.json()).error, /evidence.*object/i);
+
+        const wrongKind = await fetch(`http://127.0.0.1:${port}/api/evidence-packages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({
+            kind: "powerPlatform",
+            document: {
+              ...invalidPackage,
+              schema: "ai-flight-deck/power-platform-evidence",
+              producerId: "ai-flight-deck/power-platform-evidence-template",
+              evidence: {}
+            }
+          })
+        });
+        assert.equal(wrongKind.status, 400);
+        assert.match((await wrongKind.json()).error, /one-time collection challenge/i);
+
+        const attestation = await fetch(`http://127.0.0.1:${port}/api/attestations`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui",
+            Origin: `http://127.0.0.1:${port}`
+          },
+          body: JSON.stringify({
+            tenantId,
+            cohortId,
+            controlId: attestedControl.id,
+            decision: "Pass",
+            statement: "The accountable owner reviewed the required control evidence.",
+            attestedBy: "owner@example.test",
+            expiresAt: new Date(Date.now() +
+              Math.min(attestedControl.freshnessHours, 1) * 3600000).toISOString(),
+            evidenceReferences: ["evidence-register:123"],
+            data: { reviewed: true }
+          })
+        });
+        assert.equal(attestation.status, 201);
+        const attestationBody = await attestation.json();
+        assert.equal(attestationBody.controlId, attestedControl.id);
+        assert.equal(attestationBody.attestedBy, "verified-scan-actor");
+        assert.equal(attestationBody.integrityVerified, true);
+        assert.equal(Object.hasOwn(attestationBody, "signature"), false);
+
+        const sources = await fetch(`http://127.0.0.1:${port}/api/evidence-sources`);
+        const sourceBody = await sources.json();
+        assert.equal(sourceBody.adminEvidence, true);
+        assert.equal(sourceBody.attestations, 1);
+      });
     });
     const { id } = await started.json();
     await new Promise(resolve => setTimeout(resolve, 20));
@@ -229,7 +445,8 @@ test("imports Microsoft readiness evidence and saves an approved pilot cohort", 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({ action: "baseline" })
     });
@@ -246,7 +463,8 @@ test("imports Microsoft readiness evidence and saves an approved pilot cohort", 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({
         sourceType: "m365-copilot-readiness",
@@ -271,7 +489,8 @@ test("imports Microsoft readiness evidence and saves an approved pilot cohort", 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({
         name: "Finance pilot",
@@ -325,7 +544,8 @@ test("imports the pinned Microsoft automated assessment and stages unmapped rows
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({ action: "baseline" })
     });
@@ -342,7 +562,8 @@ test("imports the pinned Microsoft automated assessment and stages unmapped rows
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({
         sourceType: "microsoft-automated-readiness-assessment",
@@ -373,7 +594,8 @@ test("rejects arbitrary workflow actions", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({ action: "run-any-command" })
     });
@@ -394,14 +616,18 @@ test("cancels an active workflow and clears authentication state", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Flight-Deck": "local-ui"
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
       },
       body: JSON.stringify({ action: "baseline" })
     });
     const { id } = await started.json();
     const cancelled = await fetch(`http://127.0.0.1:${port}/api/jobs/${id}`, {
       method: "DELETE",
-      headers: { "X-Flight-Deck": "local-ui" }
+      headers: {
+        "X-Flight-Deck": "local-ui",
+        Origin: `http://127.0.0.1:${port}`
+      }
     });
     assert.equal(cancelled.status, 202);
     await new Promise(resolve => setTimeout(resolve, 20));

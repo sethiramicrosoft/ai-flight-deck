@@ -37,33 +37,153 @@ function readEvidenceFile(workspace, fileName) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
-function createAdminCommandAdapter(workspace) {
+function isPlainObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function codedError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function validateEvidencePackage(doc, {
+  schema,
+  tenantId,
+  maximumAgeHours,
+  verifyDocument,
+  fileName
+}) {
+  if (!doc) throw codedError("EVIDENCE_PACKAGE_MISSING", `${fileName} has not been imported.`);
+  if (doc.schema !== schema || doc.version !== "1.0.0") {
+    throw codedError(
+      "EVIDENCE_SCHEMA_UNSUPPORTED",
+      `${fileName} must use ${schema} version 1.0.0.`
+    );
+  }
+  if (typeof doc.tenantId !== "string" || !doc.tenantId) {
+    throw codedError("EVIDENCE_TENANT_MISSING", `${fileName} does not identify its tenant.`);
+  }
+  if (tenantId && doc.tenantId !== tenantId) {
+    throw codedError(
+      "EVIDENCE_TENANT_MISMATCH",
+      `${fileName} belongs to tenant ${doc.tenantId}, not ${tenantId}.`
+    );
+  }
+  if (!isPlainObject(doc.evidence) || !isPlainObject(doc.errors)) {
+    throw codedError(
+      "EVIDENCE_SHAPE_INVALID",
+      `${fileName} must contain object-shaped evidence and errors maps.`
+    );
+  }
+  const producedAt = Date.parse(doc.producedAt);
+  if (!Number.isFinite(producedAt)) {
+    throw codedError("EVIDENCE_TIMESTAMP_INVALID", `${fileName} has an invalid producedAt value.`);
+  }
+  if (producedAt > Date.now() + 5 * 60 * 1000) {
+    throw codedError(
+      "EVIDENCE_TIMESTAMP_IN_FUTURE",
+      `${fileName} cannot be dated more than five minutes in the future.`
+    );
+  }
+  if (Date.now() - producedAt > maximumAgeHours * 3600000) {
+    throw codedError(
+      "EVIDENCE_STALE",
+      `${fileName} is older than the supported ${maximumAgeHours}-hour collection window.`
+    );
+  }
+  if (typeof verifyDocument === "function" && verifyDocument(doc) !== true) {
+    throw codedError("EVIDENCE_INTEGRITY_INVALID", `${fileName} did not pass local integrity verification.`);
+  }
+  return doc;
+}
+
+function createAdminCommandAdapter(workspace, options = {}) {
+  let cache = null;
+  function readPackage() {
+    const filePath = path.join(workspace, "admin-evidence.json");
+    if (!fs.existsSync(filePath)) return null;
+    const modifiedAt = fs.statSync(filePath).mtimeMs;
+    if (!cache || cache.modifiedAt !== modifiedAt) {
+      cache = {
+        modifiedAt,
+        document: JSON.parse(fs.readFileSync(filePath, "utf8"))
+      };
+    }
+    return cache.document;
+  }
   return async request => {
-    const evidence = readEvidenceFile(workspace, "admin-evidence.json");
-    const key = `${request.service}:${request.command}`;
-    if (!evidence || !Object.prototype.hasOwnProperty.call(evidence, key)) {
-      const error = new Error(
+    const evidence = validateEvidencePackage(
+      readPackage(),
+      {
+        schema: "ai-flight-deck/admin-evidence",
+        tenantId: request.tenantId,
+        maximumAgeHours: options.maximumAgeHours || 24,
+        verifyDocument: options.verifyDocument,
+        fileName: "admin-evidence.json"
+      }
+    );
+    const key = request.evidenceKey
+      ? `${request.service}:${request.command}:${request.evidenceKey}`
+      : `${request.service}:${request.command}`;
+    if (evidence.errors?.[key]) {
+      throw codedError(
+        evidence.errors[key].code || "COMMAND_FAILED",
+        evidence.errors[key].message || `${request.command} failed during administrator collection.`
+      );
+    }
+    if (!Object.prototype.hasOwnProperty.call(evidence.evidence || {}, key)) {
+      throw codedError(
+        "COMMAND_UNAVAILABLE",
         `No authenticated ${request.service} administration session supplied evidence for ${request.command}.`
       );
-      error.code = "COMMAND_UNAVAILABLE";
-      throw error;
     }
-    return evidence[key];
+    return evidence.evidence[key];
   };
 }
 
-function createPowerPlatformClient(workspace) {
+function createPowerPlatformClient(workspace, options = {}) {
+  let cache = null;
+  function readPackage() {
+    const filePath = path.join(workspace, "power-platform-evidence.json");
+    if (!fs.existsSync(filePath)) return null;
+    const modifiedAt = fs.statSync(filePath).mtimeMs;
+    if (!cache || cache.modifiedAt !== modifiedAt) {
+      cache = {
+        modifiedAt,
+        document: JSON.parse(fs.readFileSync(filePath, "utf8"))
+      };
+    }
+    return cache.document;
+  }
   return {
     async query(request) {
-      const evidence = readEvidenceFile(workspace, "power-platform-evidence.json");
-      if (!evidence || !Object.prototype.hasOwnProperty.call(evidence, request.resource)) {
-        const error = new Error(
+      const evidence = validateEvidencePackage(
+        readPackage(),
+        {
+          schema: "ai-flight-deck/power-platform-evidence",
+          tenantId: request.tenantId,
+          maximumAgeHours: options.maximumAgeHours || 24,
+          verifyDocument: options.verifyDocument,
+          fileName: "power-platform-evidence.json"
+        }
+      );
+      if (evidence.errors?.[request.resource]) {
+        throw codedError(
+          evidence.errors[request.resource].code || "POWER_PLATFORM_QUERY_FAILED",
+          evidence.errors[request.resource].message ||
+            `Power Platform collection failed for ${request.resource}.`
+        );
+      }
+      if (!Object.prototype.hasOwnProperty.call(evidence.evidence || {}, request.resource)) {
+        throw codedError(
+          "POWER_PLATFORM_AUTH_REQUIRED",
           `No authenticated Power Platform evidence was supplied for ${request.resource}.`
         );
-        error.code = "POWER_PLATFORM_AUTH_REQUIRED";
-        throw error;
       }
-      return evidence[request.resource];
+      return evidence.evidence[request.resource];
     }
   };
 }
@@ -161,10 +281,12 @@ function createNetworkProbe() {
 }
 
 module.exports = {
+  codedError,
   createAdminCommandAdapter,
   createAttestationStore,
   createGraphReportsClient,
   createNetworkProbe,
   createPowerPlatformClient,
-  graphRequest
+  graphRequest,
+  validateEvidencePackage
 };

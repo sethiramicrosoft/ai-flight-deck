@@ -1,0 +1,20 @@
+{
+  "schema": "ai-flight-deck/power-platform-evidence",
+  "version": "1.0.0",
+  "producerId": "ai-flight-deck/power-platform-evidence-template",
+  "producerVersion": "1.0.0",
+  "collectionChallenge": "PASTE_THE_ONE_TIME_CHALLENGE_FROM_AI_FLIGHT_DECK",
+  "tenantId": "00000000-0000-0000-0000-000000000000",
+  "actorId": "power-platform-administrator@example.com",
+  "producedAt": "2026-01-01T00:00:00.000Z",
+  "evidence": {
+    "environments": [],
+    "dlpPolicies": [],
+    "connectors": [],
+    "agents": [],
+    "agentOwners": [],
+    "agentSharing": [],
+    "agentLifecycle": []
+  },
+  "errors": {}
+}

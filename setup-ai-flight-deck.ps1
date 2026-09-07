@@ -153,6 +153,10 @@ try {
         "server.js",
         "index.html",
         "enablement-playbook.js",
+        "evidence-completion.js",
+        "attestation-evidence.js",
+        "scanner\collect-admin-evidence.ps1",
+        "schema\power-platform-evidence.template.v1.json",
         "scanner\test-live-tenant.ps1"
     )) {
         if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $requiredFile))) {

@@ -152,6 +152,25 @@
     return requireCrypto().timingSafeEqual(toBytes(left), toBytes(right));
   }
 
+  function signAttestationRecord(record, key) {
+    if (!isPlainObject(record)) fail("Attestation record is required.", TypeError);
+    const unsigned = withoutProperty(record, "signature");
+    return {
+      ...cloneCanonical(unsigned),
+      signature: hmacSha256(unsigned, key)
+    };
+  }
+
+  function verifyAttestationRecord(record, key) {
+    if (!isPlainObject(record)) fail("Attestation record is required.", TypeError);
+    if (typeof record.signature !== "string") fail("Attestation signature is required.", TypeError);
+    const expected = hmacSha256(withoutProperty(record, "signature"), key);
+    if (!constantTimeHexEqual(record.signature, expected)) {
+      fail("Attestation signature verification failed.");
+    }
+    return true;
+  }
+
   function createEvidenceEnvelope(options) {
     if (!isPlainObject(options)) fail("Evidence envelope options are required.", TypeError);
     const payload = cloneCanonical(options.payload);
@@ -412,7 +431,9 @@
     evidenceEnvelopeDigest,
     sha256Digest,
     signEvidenceEnvelope: createEvidenceEnvelope,
+    signAttestationRecord,
     verifyActionPackageBinding,
+    verifyAttestationRecord,
     verifyControlHistory,
     verifyEvidenceEnvelope
   };

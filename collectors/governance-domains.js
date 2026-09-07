@@ -203,6 +203,7 @@ async function commandResult(adapter, query, budget, signal, limits) {
   const response = await adapter({
     service: query.service,
     command: query.command,
+    evidenceKey: query.key,
     parameters: { ...(query.parameters || {}) },
     signal
   });

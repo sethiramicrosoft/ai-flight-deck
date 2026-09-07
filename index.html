@@ -215,6 +215,17 @@
       font: inherit;
       font-weight: 500;
     }
+    .field textarea, .field select {
+      width: 100%;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      padding: 9px 10px;
+      background: var(--cp-bg-elevated);
+      color: var(--cp-text);
+      font: inherit;
+      font-weight: 500;
+    }
+    .field textarea { min-height: 96px; resize: vertical; }
     .source-status {
       margin-top: 14px;
       padding: 12px;
@@ -226,6 +237,19 @@
       line-height: 1.5;
     }
     .source-status strong { color: var(--cp-text); }
+    .completion-blockers { display: grid; gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+    .completion-blocker {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+    }
+    .completion-blocker small { display: block; color: var(--cp-text-soft); margin-top: 4px; }
+    .completion-blocker-meta { font-weight: 700; }
+    .completion-state { color: var(--cp-accent); font-size: 12px; font-weight: 700; }
     .source-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
     .source-metric { padding: 10px; border: 1px solid var(--cp-border); border-radius: 0.625rem; background: var(--cp-bg-elevated); }
     .source-metric strong { display: block; color: var(--cp-text); font-size: 18px; }
@@ -994,6 +1018,8 @@
       .mission-telemetry { justify-content: flex-start; }
       .mission-lifecycle { grid-template-columns: 1fr 1fr; }
       .field-grid, .source-metrics { grid-template-columns: 1fr; }
+      .completion-blocker { grid-template-columns: 1fr; }
+      .completion-state { justify-self: start; }
       .mission-map-wrap { min-height: auto; padding: 18px; }
       .mission-map {
         position: static;
@@ -1401,6 +1427,104 @@
         </div>
 
         <div class="section-head">
+          <div>
+            <h2>Evidence completion center</h2>
+            <p>See the next mission, resolve the five highest-priority evidence gaps, and supply the workload or accountable evidence the live Graph scan cannot produce.</p>
+          </div>
+        </div>
+        <article class="card">
+          <div class="assurance-grid" id="completion-summary" role="status" aria-live="polite" aria-atomic="true">
+            <div class="assurance-metric"><span>Current mission</span><strong>Loading</strong></div>
+            <div class="assurance-metric"><span>Complete</span><strong>0</strong></div>
+            <div class="assurance-metric"><span>Evidence required</span><strong>77</strong></div>
+            <div class="assurance-metric"><span>Configuration action</span><strong>0</strong></div>
+          </div>
+          <ul class="completion-blockers" id="completion-blockers" role="list" aria-live="polite"></ul>
+        </article>
+        <div class="evidence-source-grid" style="margin-top:16px">
+          <article class="card">
+            <p class="eyebrow">Workload administrators</p>
+            <h3>Import administrator evidence</h3>
+            <p class="subtitle">Run the shipped read-only PowerShell producer for Exchange Online, SharePoint Online, and Purview. Import the resulting schema-versioned package here; the local service seals it and rejects stale or cross-tenant evidence.</p>
+            <label class="field" style="margin-top:12px">Administrator evidence package
+              <input type="file" id="admin-evidence-file" accept=".json,application/json">
+            </label>
+            <div class="actions" style="margin-top:12px">
+              <button class="btn" id="prepare-admin-evidence" type="button">Create collection challenge</button>
+              <button class="btn primary" id="import-admin-evidence" type="button">Import administrator evidence</button>
+              <a class="btn" href="scanner/collect-admin-evidence.ps1" download>Download collector</a>
+            </div>
+            <pre class="service-log" id="admin-evidence-challenge" hidden></pre>
+            <div class="source-status" id="admin-evidence-status" role="status" aria-live="polite">No locally sealed administrator evidence package is available.</div>
+          </article>
+          <article class="card">
+            <p class="eyebrow">Power Platform administrator</p>
+            <h3>Import Power Platform evidence</h3>
+            <p class="subtitle">Populate the seven required resource arrays from authenticated Power Platform and Copilot Studio exports. Import the package before rescanning.</p>
+            <label class="field" style="margin-top:12px">Power Platform evidence package
+              <input type="file" id="power-platform-evidence-file" accept=".json,application/json">
+            </label>
+            <div class="actions" style="margin-top:12px">
+              <button class="btn" id="prepare-power-platform-evidence" type="button">Create collection challenge</button>
+              <button class="btn primary" id="import-power-platform-evidence" type="button">Import Power Platform evidence</button>
+              <a class="btn" href="schema/power-platform-evidence.template.v1.json" download>Download template</a>
+            </div>
+            <pre class="service-log" id="power-platform-evidence-challenge" hidden></pre>
+            <div class="source-status" id="power-platform-evidence-status" role="status" aria-live="polite">No locally sealed Power Platform evidence package is available.</div>
+          </article>
+        </div>
+        <article class="card" style="margin-top:16px">
+          <p class="eyebrow">Accountable human evidence</p>
+          <h3>Create a locally sealed attestation</h3>
+          <p class="subtitle">Use only for controls explicitly classified as Attested. The accountable owner supplies the statement and supporting JSON; AI Flight Deck binds it to the tenant, approved cohort, control, signer, and control-specific expiry window.</p>
+          <div class="field-grid">
+            <label class="field">Attested control
+              <select id="attestation-control"></select>
+            </label>
+            <label class="field">Decision
+              <select id="attestation-decision">
+                <option value="Pass">Pass</option>
+                <option value="Fail">Fail</option>
+                <option value="Warning">Warning</option>
+                <option value="NotApplicable">Not applicable</option>
+              </select>
+            </label>
+            <label class="field">Authenticated attester
+              <input type="text" id="attestation-owner" readonly aria-readonly="true" placeholder="Loaded from the verified scan actor">
+            </label>
+            <label class="field">Expires at
+              <input type="datetime-local" id="attestation-expiry" aria-describedby="attestation-expiry-hint">
+              <small id="attestation-expiry-hint">Select a control to load its maximum evidence lifetime.</small>
+            </label>
+          </div>
+          <label class="field" style="margin-top:12px">Statement
+            <textarea id="attestation-statement" placeholder="State exactly what was reviewed, approved, and for which cohort."></textarea>
+          </label>
+          <label class="field" style="margin-top:12px">Supporting data (JSON object)
+            <textarea id="attestation-data">{}</textarea>
+          </label>
+          <label class="field" style="margin-top:12px">Evidence references (one URL or identifier per line)
+            <textarea id="attestation-references"></textarea>
+          </label>
+          <div id="not-applicable-fields" hidden>
+            <p class="subtitle">Not applicable means this control legitimately does not apply to the approved cohort. It requires a named approver, reason, and bounded expiry.</p>
+            <div class="field-grid">
+              <label class="field">Approved by
+                <input type="text" id="attestation-approved-by" aria-required="true">
+              </label>
+              <label class="field">Reason
+                <input type="text" id="attestation-reason" aria-required="true">
+              </label>
+            </div>
+          </div>
+          <div id="not-applicable-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+          <div class="actions" style="margin-top:12px">
+            <button class="btn primary" id="create-attestation" type="button">Create sealed attestation</button>
+          </div>
+          <div class="source-status" id="attestation-status" role="status" aria-live="polite">Load a live baseline with an approved cohort before creating accountable evidence.</div>
+        </article>
+
+        <div class="section-head">
           <div><h2>Before you begin</h2><p>Use a test tenant or an approved production assessment window.</p></div>
         </div>
         <div class="grid two">
@@ -1555,6 +1679,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script src="enablement-playbook.js"></script>
+  <script src="evidence-completion.js"></script>
   <script src="mission-engine.js"></script>
   <script src="evidence-graph.js"></script>
   <script>
@@ -1563,6 +1688,12 @@
       banner.hidden = false;
       banner.textContent = "The tenant enablement module is missing. Download or extract the complete AI Flight Deck repository, then restart the application.";
       throw new Error("enablement-playbook.js did not load.");
+    }
+    if (!window.FlightDeckEvidenceCompletion) {
+      const banner = document.getElementById("import-error");
+      banner.hidden = false;
+      banner.textContent = "The evidence completion module is missing. Download or extract the complete AI Flight Deck repository, then restart the application.";
+      throw new Error("evidence-completion.js did not load.");
     }
 
     const demoScenarios = [
@@ -2885,6 +3016,255 @@
       return result;
     }
 
+    function activeCohort() {
+      const cohorts = baselineScan?.estateAssessment?.cohorts || [];
+      return cohorts.find(item => item.approved === true) || cohorts[0] || null;
+    }
+
+    function renderEvidenceCompletion() {
+      const summary = document.getElementById("completion-summary");
+      const blockers = document.getElementById("completion-blockers");
+      if (!summary || !blockers || !readinessCatalog) return;
+      const grantedPermissions = (baselineScan?.scope?.grantedScopes || [])
+        .map(scope => String(scope).split("/").pop());
+      const plan = window.FlightDeckEvidenceCompletion.buildEvidenceCompletionPlan({
+        catalog: readinessCatalog,
+        controlResults: baselineScan?.estateAssessment?.controlResults || [],
+        grantedPermissions,
+        availableLicenses: [],
+        cohort: activeCohort(),
+        now: new Date()
+      });
+      const attester = baselineScan?.auth?.actor?.id ||
+        baselineScan?.auth?.actor?.userPrincipalName || "";
+      document.getElementById("attestation-owner").value = attester;
+      summary.replaceChildren();
+      [
+        [plan.currentMission?.name || "All missions complete", "Current mission"],
+        [plan.summary.complete, "Complete"],
+        [plan.summary.evidenceRequired, "Evidence required"],
+        [plan.summary.actionRequired, "Configuration action"]
+      ].forEach(([value, label]) => {
+        const metric = document.createElement("div");
+        metric.className = "assurance-metric";
+        const caption = document.createElement("span");
+        caption.textContent = label;
+        const strong = document.createElement("strong");
+        strong.textContent = String(value);
+        metric.append(caption, strong);
+        summary.appendChild(metric);
+      });
+      blockers.replaceChildren();
+      if (!plan.topBlockers.length) {
+        const complete = document.createElement("div");
+        complete.className = "source-status";
+        complete.textContent = "No unresolved controls remain for the approved cohort.";
+        blockers.appendChild(complete);
+        return;
+      }
+      for (const control of plan.topBlockers) {
+        const row = document.createElement("li");
+        row.className = "completion-blocker";
+        const content = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = `${control.controlId}: ${control.title}`;
+        const detail = document.createElement("small");
+        const missing = [
+          ...control.missingPermissions,
+          ...control.missingLicenses,
+          ...control.limitations.map(item => item.description)
+        ];
+        detail.textContent = missing.length
+          ? missing.join("; ")
+          : control.nextAction;
+        const meta = document.createElement("small");
+        meta.className = "completion-blocker-meta";
+        meta.textContent = `Owner: ${control.owner} · Effort: ${control.effort}`;
+        content.append(title, meta, detail);
+        const state = document.createElement("span");
+        state.className = "completion-state";
+        state.textContent = control.stateLabel;
+        row.append(content, state);
+        blockers.appendChild(row);
+      }
+      const context = document.createElement("li");
+      context.className = "source-status";
+      const unresolved = plan.summary.total - plan.summary.complete;
+      context.textContent = `Showing ${plan.topBlockers.length} of ${unresolved} unresolved controls, prioritized for ${plan.currentMission?.name || "the remaining missions"}.`;
+      blockers.appendChild(context);
+    }
+
+    function populateAttestationControls() {
+      const select = document.getElementById("attestation-control");
+      if (!select || !readinessCatalog) return;
+      const selected = select.value;
+      select.replaceChildren();
+      for (const domain of readinessCatalog.domains) {
+        for (const control of domain.controls.filter(item => item.automation === "Attested")) {
+          const option = document.createElement("option");
+          option.value = control.id;
+          option.textContent = `${control.id} — ${control.title}`;
+          option.dataset.freshnessHours = String(control.freshnessHours);
+          select.appendChild(option);
+        }
+      }
+      if ([...select.options].some(option => option.value === selected)) select.value = selected;
+      updateAttestationExpiry();
+    }
+
+    function updateAttestationExpiry() {
+      const option = document.getElementById("attestation-control")?.selectedOptions?.[0];
+      const expiry = document.getElementById("attestation-expiry");
+      if (!option || !expiry) return;
+      const hours = Math.min(Number(option.dataset.freshnessHours) || 24, 168);
+      const date = new Date(Date.now() + hours * 3600000);
+      date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+      expiry.value = date.toISOString().slice(0, 16);
+      expiry.max = expiry.value;
+      document.getElementById("attestation-expiry-hint").textContent =
+        `Maximum expiry for this control: ${hours} hours from now.`;
+    }
+
+    async function refreshEvidenceSourceStatus() {
+      if (!localServiceAvailable) return;
+      try {
+        const status = await apiJson("/api/evidence-sources");
+        document.getElementById("admin-evidence-status").textContent = status.adminEvidence
+          ? "A locally sealed administrator evidence package is ready for the next scan."
+          : "No locally sealed administrator evidence package is available.";
+        document.getElementById("power-platform-evidence-status").textContent =
+          status.powerPlatformEvidence
+            ? "A locally sealed Power Platform evidence package is ready for the next scan."
+            : "No locally sealed Power Platform evidence package is available.";
+        document.getElementById("attestation-status").textContent = status.attestations
+          ? `${status.attestations} locally sealed attestation${status.attestations === 1 ? "" : "s"} available. Run a new scan to evaluate them.`
+          : "No locally sealed attestations are available.";
+      } catch {
+        document.getElementById("admin-evidence-status").textContent =
+          "Evidence package status requires the current local service.";
+        document.getElementById("power-platform-evidence-status").textContent =
+          "Evidence package status requires the current local service.";
+        document.getElementById("attestation-status").textContent =
+          "Attestation status requires the current local service.";
+      }
+    }
+
+    async function importEvidencePackage(kind) {
+      if (!localServiceAvailable) throw new Error("Start the local AI Flight Deck service before importing evidence.");
+      const input = document.getElementById(
+        kind === "admin" ? "admin-evidence-file" : "power-platform-evidence-file");
+      const [file] = input.files;
+      if (!file) throw new Error("Choose the JSON evidence package first.");
+      const result = await apiJson("/api/evidence-packages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-flight-deck": "local-ui"
+        },
+        body: JSON.stringify({ kind, content: await file.text() })
+      });
+      await refreshEvidenceSourceStatus();
+      showToast(`${result.evidenceItems} ${kind === "admin" ? "administrator" : "Power Platform"} evidence sections imported and sealed`);
+    }
+
+    async function prepareEvidenceChallenge(kind) {
+      if (!localServiceAvailable) {
+        throw new Error("Start the local AI Flight Deck service before creating a collection challenge.");
+      }
+      const result = await apiJson("/api/evidence-challenges", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-flight-deck": "local-ui"
+        },
+        body: JSON.stringify({ kind })
+      });
+      const output = document.getElementById(kind === "admin"
+        ? "admin-evidence-challenge"
+        : "power-platform-evidence-challenge");
+      output.hidden = false;
+      output.textContent = kind === "admin"
+        ? `Collection challenge (valid for 30 minutes):\n${result.challenge}\n\nAdd to the collector command:\n-CollectionChallenge "${result.challenge}"`
+        : `Collection challenge (valid for 30 minutes):\n${result.challenge}\n\nPaste this value into collectionChallenge in the downloaded template.`;
+      showToast(`${kind === "admin" ? "Administrator" : "Power Platform"} collection challenge created`);
+    }
+
+    async function createAttestation() {
+      if (!localServiceAvailable) throw new Error("Start the local AI Flight Deck service before creating an attestation.");
+      const cohort = activeCohort();
+      const tenantId = baselineScan?.tenant?.tenantId || baselineScan?.tenant?.id;
+      if (!tenantId || !cohort || cohort.approved !== true) {
+        throw new Error("Run a live scan for an explicitly approved cohort before creating an attestation.");
+      }
+      let data;
+      try {
+        data = JSON.parse(document.getElementById("attestation-data").value || "{}");
+      } catch {
+        throw new Error("Supporting data must be a valid JSON object.");
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("Supporting data must be a JSON object.");
+      }
+      const decision = document.getElementById("attestation-decision").value;
+      const expiryValue = document.getElementById("attestation-expiry").value;
+      if (!expiryValue) throw new Error("Choose an attestation expiry.");
+      const input = {
+        tenantId,
+        cohortId: cohort.id,
+        controlId: document.getElementById("attestation-control").value,
+        decision,
+        statement: document.getElementById("attestation-statement").value,
+        expiresAt: new Date(expiryValue).toISOString(),
+        evidenceReferences: document.getElementById("attestation-references").value
+          .split(/\r?\n/)
+          .map(value => value.trim())
+          .filter(Boolean),
+        data
+      };
+      if (decision === "NotApplicable") {
+        input.approvedBy = document.getElementById("attestation-approved-by").value.trim();
+        input.reason = document.getElementById("attestation-reason").value.trim();
+        if (!input.approvedBy || !input.reason) {
+          throw new Error(
+            "Enter both Approved by and Reason for a Not applicable decision."
+          );
+        }
+      }
+      await apiJson("/api/attestations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-flight-deck": "local-ui"
+        },
+        body: JSON.stringify(input)
+      });
+      await refreshEvidenceSourceStatus();
+      showToast(`Sealed attestation created for ${input.controlId}; run a new scan to evaluate it`);
+      document.getElementById("attestation-statement").value = "";
+      document.getElementById("attestation-data").value = "{}";
+      document.getElementById("attestation-references").value = "";
+      document.getElementById("attestation-approved-by").value = "";
+      document.getElementById("attestation-reason").value = "";
+      document.getElementById("attestation-decision").value = "Pass";
+      document.getElementById("not-applicable-fields").hidden = true;
+      document.getElementById("not-applicable-live").textContent = "";
+      updateAttestationExpiry();
+    }
+
+    async function runBusyAction(button, busyText, action) {
+      const original = button.textContent;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      button.textContent = busyText;
+      try {
+        await action();
+      } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+        button.textContent = original;
+      }
+    }
+
     function refreshTenantEnablementPlan() {
       if (!readinessCatalog) return null;
       const cohorts = baselineScan?.estateAssessment?.cohorts || [];
@@ -2947,7 +3327,22 @@
         };
         return control.category === categories[filter];
       };
-      const controls = plan.controls.filter(include);
+      const completion = window.FlightDeckEvidenceCompletion.buildEvidenceCompletionPlan({
+        catalog: readinessCatalog,
+        controlResults: baselineScan?.estateAssessment?.controlResults || [],
+        grantedPermissions: (baselineScan?.scope?.grantedScopes || [])
+          .map(scope => String(scope).split("/").pop()),
+        availableLicenses: [],
+        cohort: activeCohort(),
+        now: new Date()
+      });
+      const completionById = new Map(completion.controls.map((control, index) => [
+        control.controlId,
+        { ...control, priority: index }
+      ]));
+      const controls = plan.controls.filter(include).sort((left, right) =>
+        (completionById.get(left.controlId)?.priority ?? 999) -
+        (completionById.get(right.controlId)?.priority ?? 999));
       if (!controls.length) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
@@ -2977,7 +3372,10 @@
           headingWrap.append(id, title);
           const badge = document.createElement("span");
           badge.className = "control-badge";
-          badge.textContent = control.category;
+          const evidenceCompletion = completionById.get(control.controlId);
+          badge.textContent = evidenceCompletion
+            ? evidenceCompletion.stateLabel
+            : control.category;
           controlSummary.append(headingWrap, badge);
 
           const body = document.createElement("div");
@@ -2988,6 +3386,10 @@
           location.textContent = `Where to implement: ${control.portal} > ${control.adminPath}.`;
           const outcome = document.createElement("p");
           outcome.textContent = `Required outcome: ${control.requiredOutcome}`;
+          const evidence = document.createElement("p");
+          evidence.textContent = evidenceCompletion
+            ? `Next evidence step: ${evidenceCompletion.nextAction}`
+            : "Next evidence step: collect fresh evidence after implementation.";
           const stepsHeading = document.createElement("p");
           const stepsStrong = document.createElement("strong");
           stepsStrong.textContent = "Implementation steps";
@@ -3004,7 +3406,7 @@
           source.target = "_blank";
           source.rel = "noopener noreferrer";
           source.textContent = `Authoritative Microsoft source: ${control.sources[0].title}`;
-          body.append(owner, location, outcome, stepsHeading, steps, source);
+          body.append(owner, location, outcome, evidence, stepsHeading, steps, source);
           detail.append(controlSummary, body);
           list.appendChild(detail);
         }
@@ -3109,6 +3511,7 @@
       const open = document.getElementById("clearance-open");
       const users = document.getElementById("clearance-users");
       const icon = document.getElementById("clearance-icon");
+      renderEvidenceCompletion();
       const plan = refreshTenantEnablementPlan();
       const ready = plan?.recommendation === "READY";
       const decisionTitle = plan
@@ -3941,6 +4344,7 @@
         localServiceAvailable = status.service === "ai-flight-deck-local" && status.ready === true;
         if (!localServiceAvailable) throw new Error("Unexpected local service response.");
         await loadUpstreamEvidence();
+        await refreshEvidenceSourceStatus();
         renderCapabilityPlans(await apiJson("/api/capabilities?authMode=local-delegated"));
         if (status.activeJobId) {
           renderServiceState("running", "A tenant workflow is already running.");
@@ -4056,6 +4460,35 @@
     document.getElementById("save-cohort").addEventListener("click", () => {
       savePilotCohort().catch(error => showError(error.message));
     });
+    document.getElementById("import-admin-evidence").addEventListener("click", () => {
+      const button = document.getElementById("import-admin-evidence");
+      runBusyAction(button, "Importing...", () => importEvidencePackage("admin"))
+        .catch(error => showError(error.message));
+    });
+    document.getElementById("import-power-platform-evidence").addEventListener("click", () => {
+      const button = document.getElementById("import-power-platform-evidence");
+      runBusyAction(button, "Importing...", () => importEvidencePackage("powerPlatform"))
+        .catch(error => showError(error.message));
+    });
+    document.getElementById("create-attestation").addEventListener("click", () => {
+      const button = document.getElementById("create-attestation");
+      runBusyAction(button, "Creating...", createAttestation)
+        .catch(error => showError(error.message));
+    });
+    document.getElementById("prepare-admin-evidence").addEventListener("click", () => {
+      prepareEvidenceChallenge("admin").catch(error => showError(error.message));
+    });
+    document.getElementById("prepare-power-platform-evidence").addEventListener("click", () => {
+      prepareEvidenceChallenge("powerPlatform").catch(error => showError(error.message));
+    });
+    document.getElementById("attestation-control").addEventListener("change", updateAttestationExpiry);
+    document.getElementById("attestation-decision").addEventListener("change", event => {
+      const notApplicable = event.target.value === "NotApplicable";
+      document.getElementById("not-applicable-fields").hidden = !notApplicable;
+      document.getElementById("not-applicable-live").textContent = notApplicable
+        ? "Approved by and Reason are now required for a Not applicable decision."
+        : "";
+    });
     document.getElementById("verification-button").addEventListener("click", () => document.getElementById("verification-file").click());
     document.getElementById("verification-file").addEventListener("change", async event => {
       const [file] = event.target.files;
@@ -4160,7 +4593,11 @@
     renderClearance();
     renderJourneyPhase();
     initializeReadinessCatalog()
-      .then(() => initializeLocalService())
+      .then(() => {
+        populateAttestationControls();
+        renderEvidenceCompletion();
+        return initializeLocalService();
+      })
       .catch(error => showError(error.message || "Unable to initialize the readiness catalogue."));
     const requestedPage = new URLSearchParams(window.location.search).get("page");
     if (requestedPage && Object.prototype.hasOwnProperty.call(pageMeta, requestedPage)) {

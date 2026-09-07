@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawn, spawnSync } = require("child_process");
 const crypto = require("crypto");
+const catalog = require("./schema/readiness-catalog.v1.json");
 const { AUTH_MODES, ConsentBroker, buildServicePlans } = require("./consent-broker");
 const { buildCollectorDefinitions } = require("./collector-definitions");
 const { collectEstate } = require("./estate-collector-suite");
@@ -23,6 +24,12 @@ const {
   sha256Digest,
   verifyEvidenceEnvelope
 } = require("./evidence-integrity");
+const {
+  createSignedAttestation,
+  verifySignedAttestation
+} = require("./attestation-evidence");
+const { validateEvidencePackage } = require("./collector-adapters");
+const { buildEvidenceCompletionPlan } = require("./evidence-completion");
 
 const DEFAULT_PORT = 8080;
 const MAX_LOG_LENGTH = 50000;
@@ -238,7 +245,13 @@ function readJwtClaim(token, claim) {
   }
 }
 
-function createWorkflowRunner({ workspace = defaultWorkspace(), executable = resolvePowerShell() } = {}) {
+function createWorkflowRunner({
+  workspace = defaultWorkspace(),
+  executable = resolvePowerShell(),
+  verifyAttestation,
+  verifyEvidencePackage,
+  attestationIntegrity
+} = {}) {
   const workflowScript = path.join(__dirname, "scanner", "test-live-tenant.ps1");
   let cachedToken = null;
   const consentBroker = new ConsentBroker();
@@ -260,7 +273,10 @@ function createWorkflowRunner({ workspace = defaultWorkspace(), executable = res
       rawToken,
       workspace,
       scan,
-      signal
+      signal,
+      verifyAttestation,
+      verifyEvidencePackage,
+      attestationIntegrity
     });
     writeJsonAtomic(artifactPath, enriched);
     appendLog(job,
@@ -358,13 +374,55 @@ function createApp({
   port = DEFAULT_PORT,
   root = __dirname,
   workspace = defaultWorkspace(),
-  workflowRunner = createWorkflowRunner({ workspace })
+  workflowRunner = null
 } = {}) {
   const jobs = new Map();
   const jobControllers = new Map();
+  const evidenceChallenges = new Map();
   const integrityKey = loadOrCreateIntegrityKey(workspace);
   const integrityKeyId =
     `local-workspace-${crypto.createHash("sha256").update(integrityKey).digest("hex").slice(0, 16)}`;
+  const evidencePackagePaths = {
+    admin: path.join(workspace, "admin-evidence.json"),
+    powerPlatform: path.join(workspace, "power-platform-evidence.json")
+  };
+  const evidencePackageEnvelopePaths = {
+    admin: path.join(workspace, "admin-evidence.envelope.json"),
+    powerPlatform: path.join(workspace, "power-platform-evidence.envelope.json")
+  };
+  const attestationsPath = path.join(workspace, "attestations.json");
+
+  function verifyEvidencePackage(kind, document) {
+    const envelopePath = evidencePackageEnvelopePaths[kind];
+    if (!envelopePath || !fs.existsSync(envelopePath)) return false;
+    const envelope = JSON.parse(fs.readFileSync(envelopePath, "utf8"));
+    verifyEvidenceEnvelope(envelope, integrityKey);
+    return sha256Digest(document) === envelope.payloadDigest;
+  }
+
+  function evidencePackageReady(kind) {
+    const documentPath = evidencePackagePaths[kind];
+    if (!fs.existsSync(documentPath)) return false;
+    try {
+      return verifyEvidencePackage(
+        kind,
+        JSON.parse(fs.readFileSync(documentPath, "utf8"))
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  const runWorkflow = workflowRunner || createWorkflowRunner({
+    workspace,
+    verifyAttestation: record => verifySignedAttestation(record, {
+      key: integrityKey,
+      keyId: integrityKeyId,
+      now: new Date()
+    }),
+    verifyEvidencePackage,
+    attestationIntegrity: { key: integrityKey, keyId: integrityKeyId }
+  });
   let activeJobId = null;
   const artifactPaths = {
     baseline: path.join(workspace, "baseline-scan.json"),
@@ -435,9 +493,38 @@ function createApp({
 
   function sameOrigin(req) {
     const origin = req.headers.origin;
-    return !origin ||
-      origin === `http://127.0.0.1:${port}` ||
-      origin === `http://localhost:${port}`;
+    if (!origin) return true;
+    const host = req.headers.host;
+    return typeof host === "string" &&
+      (/^127\.0\.0\.1:\d+$/.test(host) || /^localhost:\d+$/.test(host)) &&
+      origin === `http://${host}`;
+  }
+
+  function trustedUiMutation(req) {
+    const origin = req.headers.origin;
+    const host = req.headers.host;
+    const localHost = typeof host === "string" &&
+      (/^127\.0\.0\.1:\d+$/.test(host) || /^localhost:\d+$/.test(host));
+    return localHost && origin === `http://${host}` &&
+      req.headers["x-flight-deck"] === "local-ui";
+  }
+
+  function requireTrustedUiMutation(req, res) {
+    if (trustedUiMutation(req)) return true;
+    json(res, 403, {
+      error: "State-changing requests require the trusted local UI origin."
+    });
+    return false;
+  }
+
+  function verifiedBaselineContext() {
+    if (!fs.existsSync(artifactPaths.baseline) || !fs.existsSync(envelopePaths.baseline)) {
+      throw new Error("A locally verified live baseline is required.");
+    }
+    const baseline = readVerifiedArtifact("baseline");
+    const tenantId = baseline.tenant?.tenantId || baseline.tenant?.id;
+    if (!tenantId) throw new Error("The verified baseline does not identify its tenant.");
+    return { baseline, tenantId };
   }
 
   async function startJob(action) {
@@ -467,7 +554,7 @@ function createApp({
     jobControllers.set(id, controller);
     activeJobId = id;
     Promise.resolve()
-      .then(() => workflowRunner(job, action, controller.signal))
+      .then(() => runWorkflow(job, action, controller.signal))
       .then(result => {
         sealArtifact(result);
         job.status = "completed";
@@ -504,8 +591,152 @@ function createApp({
             activeJobId,
             artifacts: {
               baseline: fs.existsSync(artifactPaths.baseline),
-              report: fs.existsSync(artifactPaths.report)
+              report: fs.existsSync(artifactPaths.report),
+              adminEvidence: evidencePackageReady("admin"),
+              powerPlatformEvidence: evidencePackageReady("powerPlatform"),
+              attestations: fs.existsSync(attestationsPath)
             }
+          });
+          return;
+        }
+        if (req.method === "GET" && pathname === "/api/evidence-sources") {
+          const attestations = fs.existsSync(attestationsPath)
+            ? JSON.parse(fs.readFileSync(attestationsPath, "utf8"))
+            : { attestations: [] };
+          json(res, 200, {
+            adminEvidence: fs.existsSync(evidencePackagePaths.admin),
+            powerPlatformEvidence: fs.existsSync(evidencePackagePaths.powerPlatform),
+            attestations: Array.isArray(attestations)
+              ? attestations.length
+              : (attestations.attestations || []).length,
+            maximumPackageAgeHours: 24
+          });
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/evidence-challenges") {
+          if (!requireTrustedUiMutation(req, res)) return;
+          const input = await readJsonBody(req, 4096);
+          if (!["admin", "powerPlatform"].includes(input.kind)) {
+            throw new Error("Evidence challenge kind must be admin or powerPlatform.");
+          }
+          const { tenantId } = verifiedBaselineContext();
+          const challenge = crypto.randomBytes(32).toString("base64url");
+          const record = {
+            challenge,
+            kind: input.kind,
+            tenantId,
+            expiresAt: Date.now() + 30 * 60 * 1000
+          };
+          evidenceChallenges.set(challenge, record);
+          json(res, 201, {
+            kind: record.kind,
+            tenantId: record.tenantId,
+            challenge: record.challenge,
+            expiresAt: new Date(record.expiresAt).toISOString()
+          });
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/evidence-packages") {
+          if (!requireTrustedUiMutation(req, res)) return;
+          const input = await readJsonBody(req, 12 * 1024 * 1024);
+          if (!["admin", "powerPlatform"].includes(input.kind)) {
+            throw new Error("Evidence package kind must be admin or powerPlatform.");
+          }
+          const document = typeof input.content === "string"
+            ? JSON.parse(input.content)
+            : input.document;
+          const schema = input.kind === "admin"
+            ? "ai-flight-deck/admin-evidence"
+            : "ai-flight-deck/power-platform-evidence";
+          const expectedProducer = input.kind === "admin"
+            ? "ai-flight-deck/admin-evidence-collector"
+            : "ai-flight-deck/power-platform-evidence-template";
+          const { tenantId } = verifiedBaselineContext();
+          const challenge = evidenceChallenges.get(document?.collectionChallenge);
+          if (!challenge ||
+              challenge.kind !== input.kind ||
+              challenge.tenantId !== tenantId ||
+              challenge.expiresAt <= Date.now()) {
+            throw new Error(
+              "The evidence package does not contain a current one-time collection challenge."
+            );
+          }
+          if (document.producerId !== expectedProducer ||
+              document.producerVersion !== "1.0.0") {
+            throw new Error("The evidence package producer identity is not supported.");
+          }
+          validateEvidencePackage(document, {
+            schema,
+            tenantId,
+            maximumAgeHours: 24,
+            fileName: `${input.kind} evidence package`
+          });
+          writeJsonAtomic(evidencePackagePaths[input.kind], document);
+          const envelope = createEvidenceEnvelope({
+            tenant: document.tenantId,
+            producer: `ai-flight-deck/${input.kind}-evidence-import`,
+            generatedAt: document.producedAt,
+            payload: document,
+            keyId: integrityKeyId,
+            key: integrityKey
+          });
+          writeJsonAtomic(evidencePackageEnvelopePaths[input.kind], envelope);
+          evidenceChallenges.delete(document.collectionChallenge);
+          json(res, 200, {
+            kind: input.kind,
+            tenantId: document.tenantId,
+            producedAt: document.producedAt,
+            evidenceItems: Object.keys(document.evidence || {}).length,
+            errors: Object.keys(document.errors || {}).length,
+            integrityVerified: true
+          });
+          return;
+        }
+        if (req.method === "GET" && pathname === "/api/attestations") {
+          const document = fs.existsSync(attestationsPath)
+            ? JSON.parse(fs.readFileSync(attestationsPath, "utf8"))
+            : { schema: "ai-flight-deck/attestations", version: "1.0.0", attestations: [] };
+          json(res, 200, document);
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/attestations") {
+          if (!requireTrustedUiMutation(req, res)) return;
+          const input = await readJsonBody(req, 1024 * 1024);
+          const { baseline, tenantId: baselineTenantId } = verifiedBaselineContext();
+          const cohort = (baseline.estateAssessment?.cohorts || [])
+            .find(item => item.id === input.cohortId);
+          if (baselineTenantId !== input.tenantId) {
+            throw new Error("The attestation tenant does not match the verified live baseline.");
+          }
+          if (!cohort || cohort.approved !== true) {
+            throw new Error("The attestation must target an explicitly approved baseline cohort.");
+          }
+          const record = createSignedAttestation({
+            catalog,
+            input: {
+              ...input,
+              attestedBy: baseline.auth?.actor?.id ||
+                baseline.auth?.actor?.userPrincipalName ||
+                "verified-scan-actor"
+            },
+            key: integrityKey,
+            keyId: integrityKeyId,
+            now: new Date()
+          });
+          const document = fs.existsSync(attestationsPath)
+            ? JSON.parse(fs.readFileSync(attestationsPath, "utf8"))
+            : { schema: "ai-flight-deck/attestations", version: "1.0.0", attestations: [] };
+          const records = Array.isArray(document) ? document : document.attestations;
+          const next = {
+            schema: "ai-flight-deck/attestations",
+            version: "1.0.0",
+            attestations: [...(records || []), record]
+          };
+          writeJsonAtomic(attestationsPath, next);
+          json(res, 201, {
+            ...record,
+            signature: undefined,
+            integrityVerified: true
           });
           return;
         }
@@ -522,7 +753,15 @@ function createApp({
           json(res, 200, {
             authMode,
             inventoryStatus: "Pre-authentication requirements only",
-            plans
+            plans,
+            controlPlan: buildEvidenceCompletionPlan({
+              catalog,
+              grantedPermissions: GRAPH_SCOPES.split(" ")
+                .filter(scope => scope.startsWith("https://graph.microsoft.com/"))
+                .map(scope => scope.replace("https://graph.microsoft.com/", "")),
+              availableLicenses: [],
+              now: new Date()
+            }).controls
           });
           return;
         }
@@ -552,10 +791,7 @@ function createApp({
           return;
         }
         if (req.method === "POST" && pathname === "/api/upstream-evidence") {
-          if (req.headers["x-flight-deck"] !== "local-ui") {
-            json(res, 403, { error: "Missing local UI request header." });
-            return;
-          }
+          if (!requireTrustedUiMutation(req, res)) return;
           const input = await readJsonBody(req, 12 * 1024 * 1024);
           if (!["m365-copilot-readiness", "microsoft-automated-readiness-assessment"]
             .includes(input.sourceType)) {
@@ -611,10 +847,7 @@ function createApp({
           return;
         }
         if (req.method === "POST" && pathname === "/api/cohorts") {
-          if (req.headers["x-flight-deck"] !== "local-ui") {
-            json(res, 403, { error: "Missing local UI request header." });
-            return;
-          }
+          if (!requireTrustedUiMutation(req, res)) return;
           if (!fs.existsSync(artifactPaths.readinessImport)) {
             throw new Error("Import the Microsoft Copilot Readiness CSV before creating a pilot cohort.");
           }
@@ -632,10 +865,7 @@ function createApp({
           return;
         }
         if (req.method === "POST" && pathname === "/api/action-bindings") {
-          if (req.headers["x-flight-deck"] !== "local-ui") {
-            json(res, 403, { error: "Missing local UI request header." });
-            return;
-          }
+          if (!requireTrustedUiMutation(req, res)) return;
           const input = await readJsonBody(req, 1048576);
           const baselineEnvelope = JSON.parse(fs.readFileSync(envelopePaths.baseline, "utf8"));
           verifyEvidenceEnvelope(baselineEnvelope, integrityKey);
@@ -649,10 +879,7 @@ function createApp({
           return;
         }
         if (req.method === "POST" && pathname === "/api/jobs") {
-          if (req.headers["x-flight-deck"] !== "local-ui") {
-            json(res, 403, { error: "Missing local UI request header." });
-            return;
-          }
+          if (!requireTrustedUiMutation(req, res)) return;
           const input = await readJsonBody(req, 4096);
           const job = await startJob(input.action);
           json(res, 202, { id: job.id, status: job.status });
@@ -660,10 +887,7 @@ function createApp({
         }
         const jobMatch = pathname.match(/^\/api\/jobs\/([0-9a-f-]+)$/i);
         if (req.method === "DELETE" && jobMatch) {
-          if (req.headers["x-flight-deck"] !== "local-ui") {
-            json(res, 403, { error: "Missing local UI request header." });
-            return;
-          }
+          if (!requireTrustedUiMutation(req, res)) return;
           const job = jobs.get(jobMatch[1]);
           const controller = jobControllers.get(jobMatch[1]);
           if (!job || !controller) {

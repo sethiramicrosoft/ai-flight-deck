@@ -16,19 +16,30 @@ const { createLicensingCollector } = require("./collectors/licensing");
 const { createGraphDomainCollectors } = require("./collectors/graph-domains");
 const { createGovernanceDomainCollectors } = require("./collectors/governance-domains");
 const { createOperationalDomainCollectors } = require("./collectors/operational-domains");
+const { applyGenericAttestations } = require("./attestation-evidence");
 
-function buildEstateCollectors({ rawToken, workspace, verifyAttestation, adapters = {} }) {
+function buildEstateCollectors({
+  rawToken,
+  workspace,
+  verifyAttestation,
+  verifyEvidencePackage,
+  adapters = {}
+}) {
   const request = adapters.graphRequest || graphRequest(rawToken);
   return [
     createLicensingCollector({ request }),
     ...createGraphDomainCollectors({ request }),
     ...createGovernanceDomainCollectors({
       graphRequest: request,
-      adminCommand: adapters.adminCommand || createAdminCommandAdapter(workspace)
+      adminCommand: adapters.adminCommand || createAdminCommandAdapter(workspace, {
+        verifyDocument: doc => verifyEvidencePackage?.("admin", doc) ?? true
+      })
     }),
     ...createOperationalDomainCollectors({
       networkProbe: adapters.networkProbe || createNetworkProbe(),
-      powerPlatformClient: adapters.powerPlatformClient || createPowerPlatformClient(workspace),
+      powerPlatformClient: adapters.powerPlatformClient || createPowerPlatformClient(workspace, {
+        verifyDocument: doc => verifyEvidencePackage?.("powerPlatform", doc) ?? true
+      }),
       graphReportsClient: adapters.graphReportsClient || createGraphReportsClient(rawToken),
       attestationStore: adapters.attestationStore ||
         createAttestationStore(workspace, verifyAttestation)
@@ -206,6 +217,8 @@ async function collectEstate({
   scan,
   signal,
   verifyAttestation,
+  verifyEvidencePackage,
+  attestationIntegrity,
   adapters
 }) {
   const collectorAdapters = adapters || {};
@@ -214,6 +227,7 @@ async function collectEstate({
     rawToken,
     workspace,
     verifyAttestation,
+    verifyEvidencePackage,
     adapters: { ...collectorAdapters, graphRequest: request }
   });
   const savedCohort = loadConfiguredCohort(workspace);
@@ -242,6 +256,22 @@ async function collectEstate({
     maxConcurrency: 4,
     timeoutMs: 120000
   });
+  if (attestationIntegrity?.key && attestationIntegrity?.keyId) {
+    const attestationPath = path.join(workspace, "attestations.json");
+    const document = fs.existsSync(attestationPath)
+      ? JSON.parse(fs.readFileSync(attestationPath, "utf8"))
+      : { attestations: [] };
+    collection.controlResults = applyGenericAttestations({
+      catalog,
+      controlResults: collection.controlResults,
+      attestations: Array.isArray(document) ? document : document.attestations,
+      tenantId: context.tenantId,
+      cohortId: context.cohort.id,
+      key: attestationIntegrity.key,
+      keyId: attestationIntegrity.keyId,
+      now: new Date(context.observedAt)
+    });
+  }
   return updateEstateAssessment(scan, collection);
 }
 

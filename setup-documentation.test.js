@@ -18,6 +18,10 @@ test("guided setup includes every first-run prerequisite and launch step", () =>
   assert.match(setup, /OpenJS\.NodeJS\.LTS/);
   assert.match(setup, /Microsoft\.Graph\.Authentication/);
   assert.match(setup, /enablement-playbook\.js/);
+  assert.match(setup, /evidence-completion\.js/);
+  assert.match(setup, /attestation-evidence\.js/);
+  assert.match(setup, /collect-admin-evidence\.ps1/);
+  assert.match(setup, /power-platform-evidence\.template\.v1\.json/);
   assert.match(setup, /Install-PackageProvider NuGet/);
   assert.match(setup, /Get-NetTCPConnection/);
   assert.match(setup, /AI Flight Deck\.lnk/);

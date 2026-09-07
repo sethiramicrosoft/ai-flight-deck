@@ -91,7 +91,38 @@
           ],
           "format": "date-time"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "applies": {
+                "const": false
+              }
+            },
+            "required": [
+              "applies"
+            ]
+          },
+          "then": {
+            "required": [
+              "approvedBy",
+              "expiresAt"
+            ],
+            "properties": {
+              "approvedBy": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ]
     },
     "observedValue": {},
     "expectedValue": {},

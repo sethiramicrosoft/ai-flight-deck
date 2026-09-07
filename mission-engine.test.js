@@ -14,6 +14,7 @@ function result(controlId, status = "Pass", overrides = {}) {
     cohortId: "pilot",
     status,
     freshUntil: "2026-07-18T12:00:00Z",
+    coverage: { population: 1, evaluated: 1, complete: true },
     applicability: { applies: true, reason: "Applies" },
     ...overrides
   };
@@ -78,6 +79,29 @@ test("expired evidence reopens a previously eligible mission", () => {
   const [{ missions }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
   assert.equal(missions[0].status, "EvidenceExpired");
   assert.equal(missions[0].satisfied, false);
+});
+
+test("pass with incomplete coverage does not satisfy a mission", () => {
+  const controlResults = resultsForMission("activation");
+  controlResults[0].coverage.complete = false;
+  const [{ missions }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
+  assert.equal(missions[0].status, "Blocked");
+  assert.equal(missions[0].blockers[0].reason, "IncompleteCoverage");
+});
+
+test("not-applicable without a future expiry never satisfies a mission", () => {
+  const controlResults = resultsForMission("activation");
+  controlResults[0] = result(controlResults[0].controlId, "NotApplicable", {
+    applicability: {
+      applies: false,
+      reason: "Owner decision",
+      approvedBy: "security-owner",
+      expiresAt: null
+    }
+  });
+  const [{ missions }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
+  assert.equal(missions[0].status, "Blocked");
+  assert.equal(missions[0].blockers[0].reason, "UnapprovedNotApplicable");
 });
 
 test("duplicate cohort-control results are rejected", () => {

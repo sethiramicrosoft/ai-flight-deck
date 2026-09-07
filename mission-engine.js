@@ -10,7 +10,8 @@
   function approvedNotApplicable(result, now) {
     if (result.status !== "NotApplicable" || result.applicability?.applies !== false) return false;
     if (typeof result.applicability.approvedBy !== "string" || !result.applicability.approvedBy.trim()) return false;
-    if (!result.applicability.expiresAt) return true;
+    if (!result.applicability.expiresAt ||
+        Number.isNaN(Date.parse(result.applicability.expiresAt))) return false;
     return Date.parse(result.applicability.expiresAt) > now.getTime();
   }
 
@@ -22,8 +23,11 @@
     if (Date.parse(result.freshUntil) <= now.getTime()) {
       return { satisfied: false, reason: "Expired", status: result.status };
     }
-    if (SATISFIED.has(result.status)) {
+    if (SATISFIED.has(result.status) && result.coverage?.complete === true) {
       return { satisfied: true, reason: "Pass", status: result.status };
+    }
+    if (SATISFIED.has(result.status)) {
+      return { satisfied: false, reason: "IncompleteCoverage", status: result.status };
     }
     if (approvedNotApplicable(result, now)) {
       return { satisfied: true, reason: "ApprovedNotApplicable", status: result.status };
