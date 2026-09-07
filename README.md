@@ -78,7 +78,7 @@ relevant authoritative Microsoft documentation.
 all four workflow stages, what each provides, and how evidence moves from
 collection to a cohort-specific decision.
 
-[![AI Flight Deck evidence completion center](docs/screenshots/01-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
+[![AI Flight Deck evidence completion center](docs/screenshots/02-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
 
 The screenshots use the built-in synthetic Contoso Aviation demonstration
 data. They do not contain tenant data and are intended to show the product

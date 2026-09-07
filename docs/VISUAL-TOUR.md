@@ -2,105 +2,172 @@
 
 AI Flight Deck turns Microsoft 365 Copilot readiness evidence into a four-stage
 workflow: set up the evidence, assess the estate, prepare corrections, and make
-a cohort-specific rollout decision. The screenshots below use the built-in
-synthetic demonstration data and contain no live tenant information.
+a cohort-specific rollout decision. This tour follows the complete customer
+journey and uses only the built-in synthetic demonstration data.
 
 [Return to the README](../README.md)
 
-## 1. Set up the assessment and complete missing evidence
+## 1. Set up the assessment
+
+### Choose the evidence path
 
 Start a read-only tenant scan, import an existing AI Flight Deck artifact, or
-add evidence from Microsoft readiness reports. The Set up page explains the
-permissions, collection boundaries, assessment domains, and operating
-workflow.
+bring in evidence from the Microsoft 365 Copilot Readiness report and
+Microsoft's automated readiness assessment.
+
+The opening view identifies who uses the tool and keeps the collection boundary
+visible. AI Flight Deck reads the evidence required by enabled collectors; it
+does not enable Copilot or silently change tenant configuration.
+
+[![Choose the assessment evidence path](screenshots/01-setup-overview.png)](screenshots/01-setup-overview.png)
+
+### Prioritize incomplete evidence
 
 The Evidence completion center identifies the current rollout mission and the
-five highest-priority unresolved controls. Each blocker shows its evidence
-state, accountable owner, estimated effort, missing requirement, and next
-action.
+five highest-priority unresolved controls. Each blocker shows:
 
-Evidence that Microsoft Graph cannot collect can be supplied through
-challenge-bound administrator packages, the Power Platform evidence contract,
-or a locally sealed accountable attestation. Imported packages are checked for
-tenant, producer, structure, freshness, and one-time challenge validity before
-they can affect a control result.
+- the control and evidence state;
+- the accountable owner;
+- estimated effort;
+- the missing requirement; and
+- the next action.
 
-**Why use it:** It provides one starting point for connecting the tenant,
-understanding what evidence is missing, and routing each gap to the correct
-administrator or accountable owner.
+An unresolved result is therefore presented as a specific missing permission,
+licence, administrator package, Power Platform package, accountable
+attestation, configuration action, owner review, or recollection requirement.
 
-[![Set up and complete evidence](screenshots/01-setup-evidence-center.png)](screenshots/01-setup-evidence-center.png)
+[![Prioritize missing evidence](screenshots/02-setup-evidence-center.png)](screenshots/02-setup-evidence-center.png)
+
+### Collect workload evidence
+
+Some controls cross administration boundaries that Microsoft Graph cannot
+cover by itself.
+
+For Exchange Online, SharePoint Online, and Purview, create a tenant-bound,
+one-time challenge and run the supplied read-only PowerShell collector. For
+Power Platform and Copilot Studio, populate the versioned evidence contract
+from authenticated administrative exports.
+
+The local service rejects stale, malformed, cross-tenant, replayed, or
+unsupported packages before they can affect a control result.
+
+[![Collect administrator and Power Platform evidence](screenshots/03-setup-workload-evidence.png)](screenshots/03-setup-workload-evidence.png)
+
+### Create accountable human evidence
+
+Controls explicitly classified as `Attested` can use a locally sealed
+attestation. The record includes the statement, supporting JSON, evidence
+references, and bounded expiry.
+
+The attester is derived from the verified scan actor. The record is bound to
+the tenant, approved cohort, control, signer, and freshness window.
+`NotApplicable` additionally requires a named approver and reason.
+
+[![Create accountable attestations](screenshots/04-setup-attestation.png)](screenshots/04-setup-attestation.png)
+
+### Follow the complete operating workflow
+
+The lower part of Set up documents the operating sequence: connect, capture a
+baseline, assess, prepare approved corrections, implement changes through
+normal administration, rescan, and compare the result.
+
+A forecast is never treated as proof. Only fresh collected evidence can close
+a control and advance a rollout mission.
+
+[![Follow the operating workflow](screenshots/05-setup-operating-workflow.png)](screenshots/05-setup-operating-workflow.png)
 
 ## 2. Assess the estate
 
-Review readiness across 13 domains and 77 controls. The Assessment page keeps
-incomplete, degraded, and unscanned areas visible rather than hiding them
-behind a single score.
+### Review the control plane
 
-Open a domain or control to inspect its current status, evidence source,
-collection time, coverage, limitations, ownership, and remediation guidance.
-Evidence imported or attested on Set up is evaluated during the next scan and
-then appears in these control-level results.
+Assessment maps 13 readiness domains and 77 controls across Activation, Safe
+pilot, Scale, and Assure. Online, degraded, and unscanned domains remain
+visible rather than being hidden behind a single score.
 
-Assessment also includes evidence-backed findings and deterministic
-readiness-impact traces. When an effective-access graph is available, the tool
-can trace an access path. When it is unavailable, the tool explains how an
-evidence gap affects a control, mission gate, decision, and required
-correction.
+Select a domain to inspect its controls, evidence state, collection coverage,
+limitations, recommended next action, and Microsoft guidance. Evidence added
+on Set up is evaluated during the next scan and then appears here.
 
-**Why use it:** It shows what is known, what remains unproven, and which
-controls block Activation, Safe pilot, Scale, or Assure for the approved
-cohort.
+[![Review the readiness control plane](screenshots/06-assessment-control-plane.png)](screenshots/06-assessment-control-plane.png)
 
-[![Assess the estate](screenshots/02-assessment.png)](screenshots/02-assessment.png)
+### Trace readiness and access impact
+
+The risk simulator uses effective identity, membership, permission,
+sensitivity, AI-surface, and policy evidence when those graph elements are
+available. It does not submit prompts to a production AI system.
+
+When the effective-access graph is unavailable, AI Flight Deck produces a
+deterministic readiness-impact trace that connects the missing evidence to the
+affected control, mission, decision, and required correction.
+
+[![Trace readiness and access impact](screenshots/07-assessment-readiness-trace.png)](screenshots/07-assessment-readiness-trace.png)
+
+### Review evidence-backed findings
+
+Findings expose the concrete evidence behind sharing and access risks. Filter
+the list by severity and move a selected finding into correction planning.
+
+This view keeps the technical signal, affected resource or population, and
+expected Copilot exposure outcome together for security, compliance, identity,
+SharePoint, and program owners.
+
+[![Review evidence-backed findings](screenshots/08-assessment-findings.png)](screenshots/08-assessment-findings.png)
 
 ## 3. Prepare corrections
 
-Review evidence-linked technical corrections and model their expected effect
-before exporting an action package. Selecting a correction creates a forecast
-only; AI Flight Deck does not modify Microsoft 365 configuration.
+Corrections presents evidence-linked technical changes for administrator
+review. Selecting a correction updates only the demonstration forecast and can
+produce an approval package; it does not modify the tenant.
 
-Administrators implement approved changes through their normal Microsoft 365
-administration and change-control processes. A new scan is then required to
-prove the resulting state.
+Administrators implement approved changes through normal Microsoft 365
+administration and change-control processes. A new scan is required to prove
+the resulting state. Evidence-collection tasks remain prioritized in the
+Evidence completion center, while this page focuses on technical remediation.
 
-Evidence-collection tasks are prioritized in the Evidence completion center,
-while this page focuses on technical configuration changes and remediation
-forecasting.
-
-**Why use it:** It separates a proposed change from verified evidence that the
-change was implemented successfully.
-
-[![Prepare corrections](screenshots/03-corrections.png)](screenshots/03-corrections.png)
+[![Prepare technical corrections](screenshots/09-corrections.png)](screenshots/09-corrections.png)
 
 ## 4. Make the rollout decision
 
-Review whether the explicitly approved cohort can proceed to its next rollout
+### Review the cohort-specific outcome
+
+Decision shows whether the explicitly approved cohort can proceed to its next
 mission. Missing permissions, incomplete coverage, stale evidence, invalid
-exemptions, or unsupported evidence keep the relevant mission blocked.
+exemptions, or unsupported packages keep the relevant mission blocked.
 
-The tenant enablement plan orders unresolved controls using the same evidence
-priorities as the Evidence completion center. Every requirement provides
-responsible roles, prerequisites, required outcome, implementation steps,
-acceptance criteria, the next evidence action, and authoritative Microsoft
-guidance.
+The summary separates a bounded sharing signal from the complete estate
+decision and lists the mandatory gates that still prevent progression.
 
-The complete customer handoff can be downloaded as Markdown. After
-administrators implement the required work, run another scan and return here
-to evaluate the new evidence.
+[![Review the rollout decision](screenshots/10-decision-summary.png)](screenshots/10-decision-summary.png)
 
-**Why use it:** It turns the assessment into a defensible, cohort-specific
-decision and gives the customer an exact path from blocker to implementation
-and proof of closure.
+### Follow the tenant enablement plan
 
-[![Make the rollout decision](screenshots/04-decision-evidence-plan.png)](screenshots/04-decision-evidence-plan.png)
+The enablement plan covers all 77 controls and orders unresolved work using the
+same evidence priorities as the Evidence completion center.
+
+Each control provides the responsible roles, administration path,
+prerequisites, required outcome, implementation steps, acceptance criteria,
+next evidence action, and authoritative Microsoft sources. The complete
+customer handoff can be downloaded as Markdown.
+
+[![Follow the tenant enablement plan](screenshots/11-decision-enablement-plan.png)](screenshots/11-decision-enablement-plan.png)
+
+### Verify and preserve the decision trail
+
+After administrators complete approved work, run a new scan and return to
+Decision. The evidence trail distinguishes the baseline, imported sources,
+forecast actions, verification evidence, and final cohort decision.
+
+Evidence expiry, drift, or newly opened risk can reopen a previously satisfied
+gate. The product therefore supports a repeatable evidence cycle rather than a
+one-time readiness score.
+
+[![Verify the decision evidence trail](screenshots/12-decision-evidence-trail.png)](screenshots/12-decision-evidence-trail.png)
 
 ## How the stages connect
 
 1. **Set up:** Connect or import evidence, identify the current mission, and
    complete missing evidence.
-2. **Assessment:** Inspect detailed domain, control, trace, and finding
-   results.
+2. **Assessment:** Inspect domain, control, trace, and finding results.
 3. **Corrections:** Review proposed technical changes without modifying the
    tenant.
 4. **Decision:** Follow the enablement plan, rescan, and determine whether the
