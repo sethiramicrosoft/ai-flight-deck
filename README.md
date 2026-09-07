@@ -75,9 +75,10 @@ relevant authoritative Microsoft documentation.
 ## See the product before installing
 
 [Open the complete AI Flight Deck visual tour](docs/VISUAL-TOUR.md) to see
-every page, what it provides, and where it fits in the readiness workflow.
+all four workflow stages, what each provides, and how evidence moves from
+collection to a cohort-specific decision.
 
-[![AI Flight Deck assessment page](docs/screenshots/02-assessment.png)](docs/VISUAL-TOUR.md)
+[![AI Flight Deck evidence completion center](docs/screenshots/01-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
 
 The screenshots use the built-in synthetic Contoso Aviation demonstration
 data. They do not contain tenant data and are intended to show the product
@@ -241,7 +242,8 @@ Install-Module ExchangeOnlineManagement -Scope CurrentUser
 Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser
 ```
 
-On **Decision**, select **Create collection challenge**. Then run the shipped
+On **Set up**, in the Evidence completion center, select **Create collection
+challenge**. Then run the shipped
 read-only producer with the tenant ID shown by the live scan, the one-time
 challenge, and the tenant's SharePoint administration URL:
 
