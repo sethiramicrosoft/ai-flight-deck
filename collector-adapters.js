@@ -17,6 +17,7 @@ function graphRequest(rawToken) {
       method: "GET",
       headers: {
         Accept: "application/json",
+        "Accept-Language": "en-US",
         Authorization: `Bearer ${rawToken}`
       },
       signal: request.signal

@@ -17,6 +17,7 @@ const { createGraphDomainCollectors } = require("./collectors/graph-domains");
 const { createGovernanceDomainCollectors } = require("./collectors/governance-domains");
 const { createOperationalDomainCollectors } = require("./collectors/operational-domains");
 const { applyGenericAttestations } = require("./attestation-evidence");
+const { buildEvidenceGraph } = require("./evidence-graph-builder");
 
 function buildEstateCollectors({
   rawToken,
@@ -272,7 +273,9 @@ async function collectEstate({
       now: new Date(context.observedAt)
     });
   }
-  return updateEstateAssessment(scan, collection);
+  const updated = updateEstateAssessment(scan, collection);
+  updated.evidenceGraph = buildEvidenceGraph(updated);
+  return updated;
 }
 
 module.exports = {

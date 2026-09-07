@@ -415,6 +415,8 @@ function Get-FdPermissionIdentityData {
 
     $claims = [System.Collections.Generic.List[string]]::new()
     $displayNames = [System.Collections.Generic.List[string]]::new()
+    $principalIds = [System.Collections.Generic.List[string]]::new()
+    $principalTypes = [System.Collections.Generic.List[string]]::new()
     $identities = [System.Collections.Generic.List[object]]::new()
 
     $single = Get-FdPropertyValue -Object $Permission -Name "grantedToV2"
@@ -428,16 +430,20 @@ function Get-FdPermissionIdentityData {
     }
 
     foreach ($identity in $identities) {
-        foreach ($kind in @("user", "siteGroup", "group")) {
+        foreach ($kind in @("user", "siteGroup", "group", "application")) {
             $principal = Get-FdPropertyValue -Object $identity -Name $kind
             if ($null -eq $principal) {
                 continue
             }
+            $principalTypes.Add($kind)
 
-            foreach ($claimName in @("loginName", "id")) {
+            foreach ($claimName in @("loginName", "id", "email")) {
                 $claim = Get-FdPropertyValue -Object $principal -Name $claimName
                 if ($claim -is [string] -and $claim.Trim().Length -gt 0) {
                     $claims.Add($claim.Trim())
+                    if ($claimName -eq "id") {
+                        $principalIds.Add($claim.Trim())
+                    }
                 }
             }
 
@@ -449,8 +455,10 @@ function Get-FdPermissionIdentityData {
     }
 
     return [pscustomobject][ordered]@{
-        claims       = @($claims | Sort-Object -Unique)
-        displayNames = @($displayNames | Sort-Object -Unique)
+        claims        = @($claims | Sort-Object -Unique)
+        displayNames  = @($displayNames | Sort-Object -Unique)
+        principalIds  = @($principalIds | Sort-Object -Unique)
+        principalTypes = @($principalTypes | Sort-Object -Unique)
     }
 }
 
@@ -517,23 +525,95 @@ function Get-FdPermissionStableProjection {
     }
 }
 
+function Get-FdPermissionAccessType {
+    param(
+        [Parameter(Mandatory)]
+        $Permission,
+
+        [Parameter(Mandatory)]
+        $IdentityData,
+
+        [Parameter(Mandatory)]
+        $GuestDirectoryIds
+    )
+
+    $link = Get-FdPropertyValue -Object $Permission -Name "link"
+    $linkScope = Get-FdPropertyValue -Object $link -Name "scope"
+    $normalizedLinkScope = if ($linkScope -is [string]) {
+        $linkScope.Trim().ToLowerInvariant()
+    }
+    else {
+        ""
+    }
+    $principalTypes = @($IdentityData.principalTypes)
+    $guestPrincipalCount = @(
+        $IdentityData.principalIds |
+            Where-Object { $GuestDirectoryIds.Contains([string]$_) }
+    ).Count
+    $inherited = $null -ne (Get-FdPropertyValue -Object $Permission -Name "inheritedFrom")
+    $accessType = if ($normalizedLinkScope -eq "anonymous") {
+        "anonymous-link"
+    }
+    elseif ($normalizedLinkScope -eq "organization") {
+        "organization-link"
+    }
+    elseif ($normalizedLinkScope -eq "users") {
+        "specific-people-link"
+    }
+    elseif (Test-FdBroadIdentity -IdentityData $IdentityData) {
+        "broad-identity-grant"
+    }
+    elseif ($principalTypes -contains "application") {
+        "application-grant"
+    }
+    elseif ($principalTypes -contains "group" -or $principalTypes -contains "siteGroup") {
+        "group-direct-grant"
+    }
+    elseif ($guestPrincipalCount -gt 0) {
+        "guest-direct-grant"
+    }
+    elseif ($principalTypes -contains "user") {
+        "user-direct-grant"
+    }
+    elseif ($inherited) {
+        "inherited-permission"
+    }
+    else {
+        "unclassified-permission"
+    }
+
+    return [pscustomobject][ordered]@{
+        accessType          = $accessType
+        linkScope           = $normalizedLinkScope
+        guestPrincipalCount = $guestPrincipalCount
+        inherited           = $inherited
+    }
+}
+
 function Get-FdPermissionEvidenceId {
     param(
         [Parameter(Mandatory)]
         [string]$SiteId,
 
         [Parameter(Mandatory)]
+        [string]$ResourceId,
+
+        [Parameter(Mandatory)]
         $Permission
     )
 
     $permissionId = Get-FdPropertyValue -Object $Permission -Name "id"
+    $resourceHash = (Get-FdSha256Hex -Text $ResourceId).Substring(0, 20)
     if ($permissionId -is [string] -and $permissionId.Trim().Length -gt 0) {
-        return "permission:$SiteId`:$($permissionId.Trim())"
+        return "permission:v2:$SiteId`:$resourceHash`:$($permissionId.Trim())"
     }
 
     $projection = Get-FdPermissionStableProjection -Permission $Permission
-    $hash = Get-FdSha256Hex -Text (ConvertTo-FdCanonicalJson -Value $projection)
-    return "permission-derived:v1:$SiteId`:$hash"
+    $hash = Get-FdSha256Hex -Text (ConvertTo-FdCanonicalJson -Value ([ordered]@{
+        resource = $ResourceId
+        permission = $projection
+    }))
+    return "permission-derived:v2:$SiteId`:$resourceHash`:$hash"
 }
 
 function Test-FdBroadIdentity {
@@ -1033,11 +1113,22 @@ function Invoke-FdTenantScan {
             -DiscoveryComplete (-not $sitesResult.failed -and -not $sitesResult.truncated)
         $sites = @($siteSelection.sites)
         $guestUserIds = [System.Collections.Generic.List[string]]::new()
+        $guestDirectoryIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $memberUserCount = 0
+        $enabledMemberUserCount = 0
         foreach ($user in $users) {
-            if ((Get-FdPropertyValue -Object $user -Name "userType") -eq "Guest") {
+            $userType = Get-FdPropertyValue -Object $user -Name "userType"
+            if ($userType -eq "Guest") {
                 $userId = Get-FdPropertyValue -Object $user -Name "id"
                 if ($userId -is [string] -and $userId.Length -gt 0) {
                     $guestUserIds.Add("user:$userId")
+                    $null = $guestDirectoryIds.Add($userId.Trim())
+                }
+            }
+            else {
+                $memberUserCount++
+                if ((Get-FdPropertyValue -Object $user -Name "accountEnabled") -eq $true) {
+                    $enabledMemberUserCount++
                 }
             }
         }
@@ -1047,6 +1138,11 @@ function Invoke-FdTenantScan {
         $broadAccessSiteIds = [System.Collections.Generic.List[string]]::new()
         $broadAccessDetails = [System.Collections.Generic.List[object]]::new()
         $sharedItemIds = [System.Collections.Generic.List[string]]::new()
+        $sharedItemDetails = [System.Collections.Generic.List[object]]::new()
+        $permissionPathDetails = [System.Collections.Generic.List[object]]::new()
+        $publicGroupSitesAttempted = 0
+        $publicGroupSitesResolved = 0
+        $publicGroupSitesFailed = 0
         foreach ($group in $groups) {
             $visibility = Get-FdPropertyValue -Object $group -Name "visibility"
             $groupTypes = @(Get-FdPropertyValue -Object $group -Name "groupTypes")
@@ -1058,12 +1154,47 @@ function Invoke-FdTenantScan {
                     if ($groupName -isnot [string] -or $groupName.Trim().Length -eq 0) {
                         $groupName = "Unnamed Microsoft 365 group"
                     }
+                    $publicGroupSitesAttempted++
+                    $connectedSite = $null
+                    try {
+                        $encodedGroupId = [uri]::EscapeDataString($groupId.Trim())
+                        $connectedSite = Invoke-GraphGetWithRetry `
+                            -Uri "https://graph.microsoft.com/v1.0/groups/$encodedGroupId/sites/root?`$select=id,displayName,webUrl" `
+                            @collectionArguments
+                        $connectedSiteId = Get-FdPropertyValue -Object $connectedSite -Name "id"
+                        if ($connectedSiteId -is [string] -and $connectedSiteId.Trim()) {
+                            $publicGroupSitesResolved++
+                        }
+                        else {
+                            $connectedSite = $null
+                            $publicGroupSitesFailed++
+                        }
+                    }
+                    catch {
+                        $connectedSite = $null
+                        $publicGroupSitesFailed++
+                    }
+                    $connectedSiteName = Get-FdPropertyValue -Object $connectedSite -Name "displayName"
+                    if ($connectedSiteName -isnot [string] -or -not $connectedSiteName.Trim()) {
+                        $connectedSiteName = $groupName.Trim()
+                    }
                     $broadAccessSiteIds.Add($evidenceId)
                     $broadAccessDetails.Add([ordered]@{
                         evidenceId = $evidenceId
-                        displayName = $groupName.Trim()
-                        reason = "The Microsoft 365 group is Public, so organization users can access or join its connected collaboration workspace."
-                        recommendedAction = "Ask the group owner to confirm that Public visibility is intentional. If not, change the group to Private and run verification again."
+                        displayName = $connectedSiteName.Trim()
+                        resourceType = if ($null -ne $connectedSite) { "SharePoint site" } else { "Microsoft 365 group" }
+                        siteResolved = $null -ne $connectedSite
+                        siteId = Get-FdPropertyValue -Object $connectedSite -Name "id"
+                        siteWebUrl = Get-FdPropertyValue -Object $connectedSite -Name "webUrl"
+                        groupId = $groupId.Trim()
+                        groupDisplayName = $groupName.Trim()
+                        reason = if ($null -ne $connectedSite) {
+                            "This SharePoint site is connected to a public Microsoft 365 group, so organization users may be able to discover, access, or join the collaboration space."
+                        }
+                        else {
+                            "The Microsoft 365 group is Public, but the connected SharePoint site could not be resolved in this scan."
+                        }
+                        recommendedAction = "Ask the group and site owners to confirm that Public visibility is intentional. If not, change the group to Private and run verification again."
                     })
                 }
             }
@@ -1089,12 +1220,19 @@ function Invoke-FdTenantScan {
         $drivesFailed = 0
         $drivesTruncated = 0
         $sampledItems = 0
+        $permissionPages = 0
+        $permissionRequests = 0
+        $permissionsInspected = 0
+        $permissionItemsAttempted = 0
+        $permissionItemsFailed = 0
+        $permissionItemsTruncated = 0
 
         foreach ($site in $sites) {
             $siteId = Get-FdPropertyValue -Object $site -Name "id"
             $siteDisplayName = Get-FdPropertyValue -Object $site -Name "displayName"
             $siteId = $siteId.Trim()
             $encodedSiteId = [uri]::EscapeDataString($siteId)
+            $sitePermissionCount = 0
 
             $driveSitesAttempted++
             $drivePageSize = [math]::Min(100, $MaxDrivesPerSite)
@@ -1123,6 +1261,10 @@ function Invoke-FdTenantScan {
             foreach ($drive in @($drivesResult.items)) {
                 $drivesAttempted++
                 $driveId = Get-FdPropertyValue -Object $drive -Name "id"
+                $driveDisplayName = Get-FdPropertyValue -Object $drive -Name "name"
+                if ($driveDisplayName -isnot [string] -or $driveDisplayName.Trim().Length -eq 0) {
+                    $driveDisplayName = "Document library"
+                }
                 if ($driveId -isnot [string] -or $driveId.Trim().Length -eq 0) {
                     $drivesFailed++
                     $failedSites.Add((New-FdFailureDetail `
@@ -1167,6 +1309,27 @@ function Invoke-FdTenantScan {
                         continue
                     }
 
+                    $itemId = $itemId.Trim()
+                    $encodedItemId = [uri]::EscapeDataString($itemId)
+                    $itemName = Get-FdPropertyValue -Object $item -Name "name"
+                    if ($itemName -isnot [string] -or $itemName.Trim().Length -eq 0) {
+                        $itemName = "Unnamed SharePoint item"
+                    }
+                    $itemType = if ($null -ne (Get-FdPropertyValue -Object $item -Name "folder")) {
+                        "Folder"
+                    }
+                    elseif ($null -ne (Get-FdPropertyValue -Object $item -Name "file")) {
+                        "File"
+                    }
+                    else {
+                        "Drive item"
+                    }
+                    $normalizedSiteDisplayName = if ($siteDisplayName -is [string] -and $siteDisplayName.Trim()) {
+                        $siteDisplayName.Trim()
+                    }
+                    else {
+                        "Unnamed SharePoint site"
+                    }
                     $shared = Get-FdPropertyValue -Object $item -Name "shared"
                     $sharedScope = Get-FdPropertyValue -Object $shared -Name "scope"
                     $normalizedSharedScope = if ($sharedScope -is [string]) {
@@ -1175,14 +1338,135 @@ function Invoke-FdTenantScan {
                     else {
                         ""
                     }
-                    $itemEvidenceId = "item:$driveId`:$($itemId.Trim())"
+                    $itemEvidenceId = "item:$driveId`:$itemId"
+                    $permissionEvidenceId = $null
                     if ($normalizedSharedScope -eq "anonymous") {
-                        $anonymousPermissionIds.Add("item-sharing:$driveId`:$($itemId.Trim()):anonymous")
+                        $permissionEvidenceId = "item-sharing:$driveId`:$itemId`:anonymous"
+                        $anonymousPermissionIds.Add($permissionEvidenceId)
                         $sharedItemIds.Add($itemEvidenceId)
                     }
                     elseif ($normalizedSharedScope -eq "organization") {
-                        $organizationPermissionIds.Add("item-sharing:$driveId`:$($itemId.Trim()):organization")
+                        $permissionEvidenceId = "item-sharing:$driveId`:$itemId`:organization"
+                        $organizationPermissionIds.Add($permissionEvidenceId)
                         $sharedItemIds.Add($itemEvidenceId)
+                    }
+                    if ($null -ne $permissionEvidenceId) {
+                        $scopeLabel = if ($normalizedSharedScope -eq "anonymous") {
+                            "Anyone link"
+                        }
+                        else {
+                            "Organization-wide link"
+                        }
+                        $sharedItemDetails.Add([ordered]@{
+                            evidenceId        = $permissionEvidenceId
+                            itemEvidenceId    = $itemEvidenceId
+                            siteId             = $siteId
+                            driveId            = $driveId
+                            itemId             = $itemId
+                            sharingScope      = $normalizedSharedScope
+                            itemType          = $itemType
+                            displayName       = $itemName.Trim()
+                            siteDisplayName   = $normalizedSiteDisplayName
+                            driveDisplayName  = $driveDisplayName.Trim()
+                            webUrl             = Get-FdPropertyValue -Object $item -Name "webUrl"
+                            reason            = "$scopeLabel access was observed on this sampled SharePoint $($itemType.ToLowerInvariant())."
+                            recommendedAction = if ($normalizedSharedScope -eq "anonymous") {
+                                "Remove the Anyone link unless unauthenticated access is explicitly required, then review access logs and rescan."
+                            }
+                            else {
+                                "Confirm that organization-wide link access is intentional. Replace it with specific people or group access when broad sharing is unnecessary, then rescan."
+                            }
+                        })
+                    }
+
+                    if ($null -ne $shared) {
+                        $permissionItemsAttempted++
+                        $remainingPermissions = [math]::Max(0, $MaxPermissionsPerSite - $sitePermissionCount)
+                        if ($remainingPermissions -eq 0) {
+                            $permissionItemsTruncated++
+                            continue
+                        }
+                        $permissionPageSize = [math]::Min(100, $remainingPermissions)
+                        $permissionsResult = Invoke-GraphCollection `
+                            -Uri "https://graph.microsoft.com/v1.0/drives/$encodedDriveId/items/$encodedItemId/permissions?`$top=$permissionPageSize" `
+                            -Maximum $remainingPermissions @collectionArguments
+                        $permissionPages += $permissionsResult.pages
+                        $permissionRequests += $permissionsResult.requests
+                        $permissionsInspected += $permissionsResult.collected
+                        $sitePermissionCount += $permissionsResult.collected
+                        if ($permissionsResult.failed) {
+                            $permissionItemsFailed++
+                        }
+                        if ($permissionsResult.truncated) {
+                            $permissionItemsTruncated++
+                        }
+
+                        foreach ($permission in @($permissionsResult.items)) {
+                            $identityData = Get-FdPermissionIdentityData -Permission $permission
+                            $link = Get-FdPropertyValue -Object $permission -Name "link"
+                            $principalTypes = @($identityData.principalTypes)
+                            $classification = Get-FdPermissionAccessType `
+                                -Permission $permission `
+                                -IdentityData $identityData `
+                                -GuestDirectoryIds $guestDirectoryIds
+                            $permissionId = Get-FdPermissionEvidenceId `
+                                -SiteId $siteId `
+                                -ResourceId $itemEvidenceId `
+                                -Permission $permission
+                            $roles = @(
+                                Get-FdPropertyValue -Object $permission -Name "roles" |
+                                    Where-Object { $_ -is [string] -and $_.Trim() } |
+                                    ForEach-Object { $_.Trim().ToLowerInvariant() } |
+                                    Sort-Object -Unique
+                            )
+                            $expiration = Get-FdPropertyValue -Object $permission -Name "expirationDateTime"
+                            $inheritedFrom = Get-FdPropertyValue -Object $permission -Name "inheritedFrom"
+                            $principalSourceValues = if (@($identityData.principalIds).Count -gt 0) {
+                                @($identityData.principalIds)
+                            }
+                            else {
+                                @($identityData.claims)
+                            }
+                            $principalRefs = @(
+                                $principalSourceValues |
+                                    Where-Object { $_ -is [string] -and $_.Trim() } |
+                                    ForEach-Object { "principal-sha256:$(Get-FdSha256Hex -Text $_.Trim().ToLowerInvariant())" } |
+                                    Sort-Object -Unique
+                            )
+                            $permissionPathDetails.Add([ordered]@{
+                                evidenceId         = $permissionId
+                                itemEvidenceId     = $itemEvidenceId
+                                siteId              = $siteId
+                                driveId             = $driveId
+                                itemId              = $itemId
+                                accessType         = $classification.accessType
+                                linkScope          = $classification.linkScope
+                                linkType           = Get-FdPropertyValue -Object $link -Name "type"
+                                roles              = $roles
+                                inherited          = $classification.inherited
+                                inheritedFrom      = if ($null -ne $inheritedFrom) {
+                                    [ordered]@{
+                                        driveId = Get-FdPropertyValue -Object $inheritedFrom -Name "driveId"
+                                        id      = Get-FdPropertyValue -Object $inheritedFrom -Name "id"
+                                        path    = Get-FdPropertyValue -Object $inheritedFrom -Name "path"
+                                    }
+                                }
+                                else {
+                                    $null
+                                }
+                                expirationDateTime = $expiration
+                                principalCount     = [math]::Max(@($identityData.principalIds).Count, @($identityData.displayNames).Count)
+                                principalRefs      = $principalRefs
+                                principalTypes     = $principalTypes
+                                principalNames     = @($identityData.displayNames | Select-Object -First 20)
+                                guestPrincipalCount = $classification.guestPrincipalCount
+                                itemType           = $itemType
+                                displayName        = $itemName.Trim()
+                                siteDisplayName    = $normalizedSiteDisplayName
+                                driveDisplayName   = $driveDisplayName.Trim()
+                                webUrl              = Get-FdPropertyValue -Object $item -Name "webUrl"
+                            })
+                        }
                     }
                 }
             }
@@ -1192,6 +1476,7 @@ function Invoke-FdTenantScan {
         $organizationSet = Get-FdSortedSet -Values $organizationPermissionIds
         $broadSiteSet = Get-FdSortedSet -Values $broadAccessSiteIds
         $sharedItemSet = Get-FdSortedSet -Values $sharedItemIds
+        $permissionPathSet = Get-FdSortedSet -Values @($permissionPathDetails | ForEach-Object { $_.evidenceId })
         $guestSet = Get-FdSortedSet -Values $guestUserIds
         $criticalSet = Get-FdSortedSet -Values $anonymousSet
 
@@ -1235,6 +1520,12 @@ function Invoke-FdTenantScan {
                 truncated = $groupsResult.truncated
                 failed    = $groupsResult.failed
                 failure   = $groupsResult.failure
+            }
+            publicGroupSites = [ordered]@{
+                required  = $false
+                attempted = $publicGroupSitesAttempted
+                resolved  = $publicGroupSitesResolved
+                failed    = $publicGroupSitesFailed
             }
             sites = [ordered]@{
                 required  = $true
@@ -1284,6 +1575,18 @@ function Invoke-FdTenantScan {
                 organization   = $organizationPermissionIds.Count
                 truncated      = $drivesTruncated -gt 0
                 failed         = $drivesFailed -gt 0
+            }
+            permissionDetails = [ordered]@{
+                required       = $false
+                limitPerSite   = $MaxPermissionsPerSite
+                itemsAttempted = $permissionItemsAttempted
+                collected      = $permissionsInspected
+                failedCount    = $permissionItemsFailed
+                truncatedCount = $permissionItemsTruncated
+                pages          = $permissionPages
+                requests       = $permissionRequests
+                truncated      = $permissionItemsTruncated -gt 0
+                failed         = $permissionItemsFailed -gt 0
             }
         }
 
@@ -1367,9 +1670,9 @@ function Invoke-FdTenantScan {
             $findings.Add((New-FdFinding `
                 -RuleKey (Get-FdPropertyValue $rule "ruleKey") `
                 -Severity (Get-FdPropertyValue $rule "severity") `
-                -Title "Public Microsoft 365 collaboration workspaces require owner validation" `
-                -Detail "$($broadSiteSet.Count) Microsoft 365 groups are Public. Public visibility is not automatically unsafe, but owners should confirm that organization-wide discoverability and joinability are intentional." `
-                -Impact "$($broadSiteSet.Count) workspaces" `
+                -Title "Public Microsoft 365 groups require SharePoint access validation" `
+                -Detail "$($broadSiteSet.Count) Microsoft 365 groups are Public; $publicGroupSitesResolved connected SharePoint sites were resolved and $publicGroupSitesFailed require site resolution. Public visibility is not automatically unsafe, but owners should confirm that organization-wide discoverability and joinability are intentional." `
+                -Impact "$($broadSiteSet.Count) public groups" `
                 -SourceNode "graph.groups.visibility" `
                 -EvidenceIds $broadSiteSet))
         }
@@ -1383,6 +1686,34 @@ function Invoke-FdTenantScan {
                 -Impact "$($guestSet.Count) guests" `
                 -SourceNode "graph.users.guests" `
                 -EvidenceIds $guestSet))
+        }
+        $permissionFindingDefinitions = @(
+            [ordered]@{ accessType = "specific-people-link"; rule = "specificPeopleLinks"; title = "Specific-people SharePoint links require recipient validation" },
+            [ordered]@{ accessType = "broad-identity-grant"; rule = "broadIdentityPermissions"; title = "Everyone-style SharePoint permissions require validation" },
+            [ordered]@{ accessType = "guest-direct-grant"; rule = "guestDirectPermissions"; title = "Direct guest SharePoint permissions require validation" },
+            [ordered]@{ accessType = "group-direct-grant"; rule = "groupDirectPermissions"; title = "Direct SharePoint group permissions require membership review" },
+            [ordered]@{ accessType = "user-direct-grant"; rule = "userDirectPermissions"; title = "Direct SharePoint user permissions require business-owner review" },
+            [ordered]@{ accessType = "application-grant"; rule = "applicationPermissions"; title = "SharePoint application or agent permissions require governance review" },
+            [ordered]@{ accessType = "inherited-permission"; rule = "inheritedPermissions"; title = "Inherited SharePoint permissions require parent-access review" },
+            [ordered]@{ accessType = "unclassified-permission"; rule = "unclassifiedPermissions"; title = "Unclassified SharePoint permissions require investigation" }
+        )
+        foreach ($definition in $permissionFindingDefinitions) {
+            $matchingDetails = @(
+                $permissionPathDetails |
+                    Where-Object { $_.accessType -eq $definition.accessType }
+            )
+            if ($matchingDetails.Count -eq 0) {
+                continue
+            }
+            $rule = Get-FdPropertyValue $rules $definition.rule
+            $findings.Add((New-FdFinding `
+                -RuleKey (Get-FdPropertyValue $rule "ruleKey") `
+                -Severity (Get-FdPropertyValue $rule "severity") `
+                -Title $definition.title `
+                -Detail "$($matchingDetails.Count) bounded permission entries of type '$($definition.accessType)' were observed on sampled shared items. This is access metadata, not proof of sensitive-content exposure." `
+                -Impact "$($matchingDetails.Count) sampled permissions" `
+                -SourceNode "graph.drive-items.permissions" `
+                -EvidenceIds @($matchingDetails | ForEach-Object { $_.evidenceId })))
         }
         if (-not $requiredEvidenceComplete) {
             $rule = Get-FdPropertyValue $rules "incompleteEvidence"
@@ -1641,7 +1972,9 @@ function Invoke-FdTenantScan {
                 readinessSaturated      = if ($requiredEvidenceComplete) { $readiness.saturated } else { $false }
                 criticalExposures       = $criticalSet.Count
                 users                   = $users.Count
-                guests                  = $guestSet.Count
+                memberUsers            = $memberUserCount
+                enabledMemberUsers     = $enabledMemberUserCount
+                guests                 = $guestSet.Count
                 groups                  = $groups.Count
                 sitesDiscovered         = $coverage.sitesDiscovered
                 sitesScanned            = $coverage.sitesScanned
@@ -1650,6 +1983,7 @@ function Invoke-FdTenantScan {
                 organizationLinks       = $organizationSet.Count
                 sampledItems            = $sampledItems
                 exposedItems            = $sharedItemSet.Count
+                permissionPaths         = $permissionPathSet.Count
                 graphRequests           = [int]$requestState.Count
             }
             scoringInputs   = [ordered]@{
@@ -1665,16 +1999,20 @@ function Invoke-FdTenantScan {
                 organizationPermissionIds = $organizationSet
                 broadAccessSiteIds      = $broadSiteSet
                 sharedItemIds           = $sharedItemSet
+                permissionPathIds       = $permissionPathSet
                 guestUserIds            = $guestSet
                 criticalEvidenceIds     = $criticalSet
             }
             evidenceDetails = [ordered]@{
                 broadAccessSites = @($broadAccessDetails | Sort-Object -Property displayName, evidenceId)
+                sharedItems = @($sharedItemDetails | Sort-Object -Property sharingScope, siteDisplayName, driveDisplayName, displayName, evidenceId)
+                permissionPaths = @($permissionPathDetails | Sort-Object -Property accessType, siteDisplayName, driveDisplayName, displayName, evidenceId)
             }
             limitations     = @(
                 "The scanner reads metadata and permissions only. It does not retrieve document content.",
                 "Drive item collection is limited to root children and does not recursively inspect every file.",
                 "Exposed item evidence includes sampled root items whose Graph shared scope is anonymous or organization-wide.",
+                "Detailed permissions are collected only for sampled root items that Graph marks as shared, remain bounded per site, and do not expand nested group membership.",
                 "Public Microsoft 365 groups are review signals, not automatic security defects.",
                 "This collector contributes only partial identity and data-sharing evidence to an estate-wide Copilot readiness assessment.",
                 "A configured collection limit makes required evidence incomplete and prevents a verified readiness score.",

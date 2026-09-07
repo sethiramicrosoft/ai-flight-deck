@@ -334,7 +334,7 @@ test("missing usage report is a precise Unknown rather than a measurement warnin
   assert.equal(result.limitations[0].code, "COPILOT_USAGE_REPORT_MISSING");
 });
 
-test("operation timeout and cancellation are bounded by collector runtime", async () => {
+test("operation timeout is isolated while cancellation stops the collector", async () => {
   const timeoutCollector = createNetworkConnectivityCollector({
     networkProbe: { probe: async () => new Promise(() => {}) },
     operationTimeoutMs: 5
@@ -342,8 +342,11 @@ test("operation timeout and cancellation are bounded by collector runtime", asyn
   const timeoutRegistry = new CollectorRegistry();
   timeoutRegistry.register(timeoutCollector);
   const [timedOut] = await timeoutRegistry.run({ context, timeoutMs: 100 });
-  assert.equal(timedOut.status, "Failed");
-  assert.equal(timedOut.error.code, "COLLECTOR_OPERATION_TIMEOUT");
+  assert.equal(timedOut.status, "Completed");
+  assert.equal(timedOut.controlResults.length, 5);
+  assert.equal(timedOut.controlResults.every(result => result.status === "Unknown"), true);
+  assert.equal(timedOut.controlResults.some(result =>
+    result.limitations.some(item => item.code.endsWith("_EVIDENCE_MISSING"))), true);
 
   const controller = new AbortController();
   const cancelCollector = createNetworkConnectivityCollector({

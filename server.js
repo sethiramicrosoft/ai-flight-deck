@@ -47,6 +47,7 @@ const GRAPH_SCOPE_LIST = [
   "https://graph.microsoft.com/DeviceManagementApps.Read.All",
   "https://graph.microsoft.com/DeviceManagementConfiguration.Read.All",
   "https://graph.microsoft.com/DeviceManagementManagedDevices.Read.All",
+  "https://graph.microsoft.com/DeviceManagementServiceConfig.Read.All",
   "https://graph.microsoft.com/Organization.Read.All",
   "https://graph.microsoft.com/Directory.Read.All",
   "https://graph.microsoft.com/ExternalConnection.Read.All",

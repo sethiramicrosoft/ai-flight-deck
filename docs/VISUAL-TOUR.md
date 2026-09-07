@@ -90,17 +90,49 @@ on Set up is evaluated during the next scan and then appears here.
 
 [![Review the readiness control plane](screenshots/06-assessment-control-plane.png)](screenshots/06-assessment-control-plane.png)
 
-### Trace readiness and access impact
+### Review SharePoint access and sharing evidence
 
-The risk simulator uses effective identity, membership, permission,
-sensitivity, AI-surface, and policy evidence when those graph elements are
-available. It does not submit prompts to a production AI system.
+The live assessment names the resources it discovered instead of presenting
+generic “access-path scenarios.” It can identify:
 
-When the effective-access graph is unavailable, AI Flight Deck produces a
-deterministic readiness-impact trace that connects the missing evidence to the
-affected control, mission, decision, and required correction.
+- SharePoint sites connected to public Microsoft 365 groups;
+- sampled files and folders with Anyone links;
+- sampled files and folders with organization-wide links;
+- specific-people links and direct user, guest, group, application, or agent
+  permissions when Graph returns bounded permission detail;
+- inherited permissions on sampled shared items;
+- guest-identity context that still requires a separate resource-access
+  review; and
+- the bounded collector coverage that remains unverified.
 
-[![Trace readiness and access impact](screenshots/07-assessment-readiness-trace.png)](screenshots/07-assessment-readiness-trace.png)
+For each item, AI Flight Deck explains what was observed, why the sharing
+configuration matters, the potential audience, what the scan did not prove,
+and the administrator action required. Public sites are shown as SharePoint
+sites. Files, folders, and sharing links retain their actual resource type.
+
+The audience is deliberately bounded. A public site or organization-wide link
+shows up to the inventoried tenant-user population; an Anyone link shows an
+unbounded audience. The product does not label that estimate as “affected
+users” because exact effective access requires per-resource permission
+evaluation, nested-group expansion, guest mapping, inherited permissions, and
+link-use context.
+
+[![Review SharePoint access and sharing evidence](screenshots/07-assessment-sharing-review.png)](screenshots/07-assessment-sharing-review.png)
+
+### Inspect the evidence-backed action
+
+Selecting an item traces the potential audience, access mechanism, exact
+SharePoint resource, location, content-inspection boundary, Copilot relevance,
+and required validation. The result distinguishes confirmed sharing
+configuration from unproven sensitive-content exposure.
+
+If no public site or broad sharing link is found, the review reports that no
+broad path was observed in the sampled scope and continues to show the
+remaining collection boundary. When no sealed access graph is available, the
+product falls back to a deterministic readiness-impact trace connecting
+missing evidence to its control, mission, decision, and correction.
+
+[![Inspect a SharePoint access review result](screenshots/08-assessment-sharing-result.png)](screenshots/08-assessment-sharing-result.png)
 
 ### Review evidence-backed findings
 
@@ -111,7 +143,7 @@ This view keeps the technical signal, affected resource or population, and
 expected Copilot exposure outcome together for security, compliance, identity,
 SharePoint, and program owners.
 
-[![Review evidence-backed findings](screenshots/08-assessment-findings.png)](screenshots/08-assessment-findings.png)
+[![Review evidence-backed findings](screenshots/09-assessment-findings.png)](screenshots/09-assessment-findings.png)
 
 ## 3. Prepare corrections
 
@@ -124,7 +156,7 @@ administration and change-control processes. A new scan is required to prove
 the resulting state. Evidence-collection tasks remain prioritized in the
 Evidence completion center, while this page focuses on technical remediation.
 
-[![Prepare technical corrections](screenshots/09-corrections.png)](screenshots/09-corrections.png)
+[![Prepare technical corrections](screenshots/10-corrections.png)](screenshots/10-corrections.png)
 
 ## 4. Make the rollout decision
 
@@ -137,7 +169,7 @@ exemptions, or unsupported packages keep the relevant mission blocked.
 The summary separates a bounded sharing signal from the complete estate
 decision and lists the mandatory gates that still prevent progression.
 
-[![Review the rollout decision](screenshots/10-decision-summary.png)](screenshots/10-decision-summary.png)
+[![Review the rollout decision](screenshots/11-decision-summary.png)](screenshots/11-decision-summary.png)
 
 ### Follow the tenant enablement plan
 
@@ -149,7 +181,7 @@ prerequisites, required outcome, implementation steps, acceptance criteria,
 next evidence action, and authoritative Microsoft sources. The complete
 customer handoff can be downloaded as Markdown.
 
-[![Follow the tenant enablement plan](screenshots/11-decision-enablement-plan.png)](screenshots/11-decision-enablement-plan.png)
+[![Follow the tenant enablement plan](screenshots/12-decision-enablement-plan.png)](screenshots/12-decision-enablement-plan.png)
 
 ### Verify and preserve the decision trail
 
@@ -161,7 +193,7 @@ Evidence expiry, drift, or newly opened risk can reopen a previously satisfied
 gate. The product therefore supports a repeatable evidence cycle rather than a
 one-time readiness score.
 
-[![Verify the decision evidence trail](screenshots/12-decision-evidence-trail.png)](screenshots/12-decision-evidence-trail.png)
+[![Verify the decision evidence trail](screenshots/13-decision-evidence-trail.png)](screenshots/13-decision-evidence-trail.png)
 
 ## How the stages connect
 

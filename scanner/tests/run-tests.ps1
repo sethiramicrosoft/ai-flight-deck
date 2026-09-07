@@ -319,6 +319,7 @@ function New-TestScan {
             organizationLinks      = $organization.Count
             sampledItems           = 5
             exposedItems           = $shared.Count
+            permissionPaths        = 0
             graphRequests          = 7
         }
         scoringInputs   = [ordered]@{}
@@ -328,6 +329,7 @@ function New-TestScan {
             organizationPermissionIds = $organization
             broadAccessSiteIds         = $broad
             sharedItemIds              = $shared
+            permissionPathIds          = @()
             guestUserIds               = $guests
             criticalEvidenceIds        = $critical
         }
@@ -374,6 +376,8 @@ try {
         Assert-Equal $contract.scoringVersion "1.3.0" "Unexpected scoring version."
         Assert-Equal $contract.scopeContract.siteSelection "graph-search-star-candidate-sort-id" "Unexpected site-selection contract."
         Assert-True $contract.coverageContract.positiveDecisionRequiresComplete "Coverage must gate positive decisions."
+        Assert-True ($null -ne $contract.evidenceDetails.sharedItems) "The contract must describe sampled shared-item details."
+        Assert-True ($null -ne $contract.evidenceDetails.permissionPaths) "The contract must describe bounded permission-path details."
     }
 
     Invoke-Test "Readiness catalog defines complete domains controls and missions" {
@@ -458,6 +462,9 @@ try {
         Assert-Equal (Get-FdNestedValue $permission @("link", "scope")) $null "Missing link scope was not null."
         $identityData = Get-FdPermissionIdentityData $permission
         Assert-Equal @($identityData.displayNames).Count 1 "Identity data was not collected."
+        Assert-Equal @($identityData.principalIds).Count 1 "Principal IDs were not collected."
+        Assert-Equal @($identityData.principalTypes).Count 1 "Principal types were not collected."
+        Assert-Equal $identityData.principalTypes[0] "siteGroup" "The permission principal type is wrong."
     }
 
     Invoke-Test "Permission fallback evidence IDs use a stable projection" {
@@ -496,10 +503,73 @@ try {
             roles = @("read", "write")
         }
 
-        $firstId = Get-FdPermissionEvidenceId -SiteId "site-one" -Permission $permissionOne
-        $secondId = Get-FdPermissionEvidenceId -SiteId "site-one" -Permission $permissionTwo
+        $firstId = Get-FdPermissionEvidenceId -SiteId "site-one" -ResourceId "item:drive-one:item-one" -Permission $permissionOne
+        $secondId = Get-FdPermissionEvidenceId -SiteId "site-one" -ResourceId "item:drive-one:item-one" -Permission $permissionTwo
+        $differentResourceId = Get-FdPermissionEvidenceId -SiteId "site-one" -ResourceId "item:drive-one:item-two" -Permission $permissionTwo
         Assert-Equal $firstId $secondId "Permission fallback identity changed with property order or volatile fields."
-        Assert-True ($firstId -match '^permission-derived:v1:site-one:[a-f0-9]{64}$') "Derived permission evidence namespace is invalid."
+        Assert-True ($firstId -match '^permission-derived:v2:site-one:[a-f0-9]{20}:[a-f0-9]{64}$') "Derived permission evidence namespace is invalid."
+        Assert-True ($firstId -ne $differentResourceId) "Permission evidence IDs collided across different SharePoint items."
+    }
+
+    Invoke-Test "Permission detail classification distinguishes links principals and inheritance" {
+        $guestIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        $null = $guestIds.Add("guest-one")
+        $cases = @(
+            [pscustomobject]@{
+                permission = [pscustomobject]@{ link = [pscustomobject]@{ scope = "anonymous" } }
+                expected = "anonymous-link"
+            },
+            [pscustomobject]@{
+                permission = [pscustomobject]@{ link = [pscustomobject]@{ scope = "organization" } }
+                expected = "organization-link"
+            },
+            [pscustomobject]@{
+                permission = [pscustomobject]@{ link = [pscustomobject]@{ scope = "users" } }
+                expected = "specific-people-link"
+            },
+            [pscustomobject]@{
+                permission = [pscustomobject]@{
+                    grantedToV2 = [pscustomobject]@{ user = [pscustomobject]@{ id = "guest-one" } }
+                }
+                expected = "guest-direct-grant"
+            },
+            [pscustomobject]@{
+                permission = [pscustomobject]@{
+                    grantedToV2 = [pscustomobject]@{ group = [pscustomobject]@{ id = "group-one" } }
+                }
+                expected = "group-direct-grant"
+            },
+            [pscustomobject]@{
+                permission = [pscustomobject]@{
+                    grantedToV2 = [pscustomobject]@{
+                        siteGroup = [pscustomobject]@{
+                            id = "everyone"
+                            displayName = "Everyone except external users"
+                        }
+                    }
+                }
+                expected = "broad-identity-grant"
+            },
+            [pscustomobject]@{
+                permission = [pscustomobject]@{
+                    grantedToV2 = [pscustomobject]@{ application = [pscustomobject]@{ id = "app-one" } }
+                }
+                expected = "application-grant"
+            },
+            [pscustomobject]@{
+                permission = [pscustomobject]@{ inheritedFrom = [pscustomobject]@{ id = "parent-one" } }
+                expected = "inherited-permission"
+            }
+        )
+
+        foreach ($case in $cases) {
+            $identityData = Get-FdPermissionIdentityData -Permission $case.permission
+            $classification = Get-FdPermissionAccessType `
+                -Permission $case.permission `
+                -IdentityData $identityData `
+                -GuestDirectoryIds $guestIds
+            Assert-Equal $classification.accessType $case.expected "Permission access type was classified incorrectly."
+        }
     }
 
     Invoke-Test "Bounded site selection is ordinal and coverage-aware" {

@@ -33,6 +33,10 @@ test("requests the delegated information protection scope supported by device au
     GRAPH_SCOPE_LIST.includes("https://graph.microsoft.com/InformationProtectionPolicy.Read.All"),
     false
   );
+  assert.equal(
+    GRAPH_SCOPE_LIST.includes("https://graph.microsoft.com/DeviceManagementServiceConfig.Read.All"),
+    true
+  );
 });
 
 test("serves status and rejects cross-origin workflow requests", async () => {

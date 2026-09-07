@@ -7,7 +7,8 @@ const path = require("node:path");
 const test = require("node:test");
 const {
   createAdminCommandAdapter,
-  createPowerPlatformClient
+  createPowerPlatformClient,
+  graphRequest
 } = require("./collector-adapters");
 
 async function withWorkspace(action) {
@@ -98,4 +99,27 @@ test("Power Platform adapter reads all resources from a versioned package", asyn
       resource: "environments"
     }), [{ id: "environment-1" }]);
   });
+});
+
+test("Graph requests pin a supported locale for locale-sensitive beta endpoints", async () => {
+  const originalFetch = global.fetch;
+  let observed;
+  global.fetch = async (_url, options) => {
+    observed = options;
+    return {
+      ok: true,
+      async json() {
+        return { value: [] };
+      }
+    };
+  };
+  try {
+    await graphRequest("test-token")({
+      url: "https://graph.microsoft.com/beta/policies/roleManagementPolicyAssignments",
+      signal: new AbortController().signal
+    });
+    assert.equal(observed.headers["Accept-Language"], "en-US");
+  } finally {
+    global.fetch = originalFetch;
+  }
 });

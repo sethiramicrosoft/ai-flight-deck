@@ -660,21 +660,20 @@
     .exposure-summary strong { display: block; margin-bottom: 5px; }
     .exposure-summary p { margin-bottom: 0; color: var(--cp-text-muted); font-size: 13px; line-height: 1.5; }
     .path {
-      display: flex;
-      align-items: stretch;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
-      overflow-x: auto;
       padding: 6px 0 12px;
     }
     .path-node {
-      min-width: 132px;
+      min-width: 0;
       padding: 12px;
       border: 1px solid var(--cp-border);
       border-radius: 0.625rem;
       background: var(--cp-surface);
     }
     .path-node small { color: var(--cp-text-muted); }
-    .path-arrow { align-self: center; color: var(--cp-accent); font-weight: 900; }
+    .path-arrow { display: none; }
     .finding-list { display: grid; gap: 10px; }
     .finding {
       display: grid;
@@ -1057,6 +1056,7 @@
       .grid.metrics { grid-template-columns: 1fr 1fr; }
       .card { padding: 16px; }
       .metric-value { font-size: 24px; }
+      .path { grid-template-columns: 1fr; }
       .finding { grid-template-columns: 7px 1fr; }
       .finding-meta { grid-column: 2; text-align: left; }
       .remediation { grid-template-columns: auto 1fr; }
@@ -1134,7 +1134,7 @@
             <div class="metric-note" id="exposure-note">Across 17 collaboration sites</div>
           </article>
           <article class="card">
-            <div class="metric-label">Affected users</div>
+            <div class="metric-label" id="blast-radius-label">Potential audience</div>
             <div class="metric-value" id="blast-radius-users">4,218</div>
             <div class="metric-note" id="blast-radius-note">31% of tenant population</div>
           </article>
@@ -1192,7 +1192,7 @@
             </article>
             <article class="card result-panel" id="simulation-result">
               <div class="exposure-summary">
-                <strong id="result-title">Critical exposure confirmed</strong>
+                <strong id="result-title">Access review required</strong>
                 <p id="result-copy"></p>
               </div>
               <h3 style="margin-top:20px" id="result-path-title">Permission attack path</h3>
@@ -1503,6 +1503,9 @@
           <label class="field" style="margin-top:12px">Supporting data (JSON object)
             <textarea id="attestation-data">{}</textarea>
           </label>
+          <div class="source-status" id="attestation-guidance" role="note">
+            Select a control to see the evidence required to clear it.
+          </div>
           <label class="field" style="margin-top:12px">Evidence references (one URL or identifier per line)
             <textarea id="attestation-references"></textarea>
           </label>
@@ -1698,31 +1701,82 @@
 
     const demoScenarios = [
       {
-        id: "ma",
-        title: "Confidential acquisition",
-        description: "Can a Sales user discover restricted acquisition plans through broad SharePoint permissions?",
-        prompt: "Summarize any planned acquisitions, including target companies, expected dates, and executive sponsors.",
+        id: "anonymous-link",
+        sequence: 1,
+        mode: "access",
+        title: "Acquisition Briefing.docx",
+        description: "SharePoint file with an Anyone link — access is possible without tenant authentication.",
+        prompt: "Why must the Anyone link for Acquisition Briefing.docx be reviewed before Copilot rollout?",
         severity: "Critical",
-        exposure: "The request could surface Project Northstar acquisition materials from the Strategy workspace. 38 confidential files are discoverable by 4,218 users.",
-        path: [["User", "Adele Vance"], ["Group", "All Employees"], ["Site", "Strategy Hub"], ["Library", "Project Northstar"], ["Files", "38 confidential"]]
+        badgeText: "Urgent link review",
+        resultTitle: "Urgent link review: Acquisition Briefing.docx",
+        exposure: "An Anyone link permits unauthenticated access to this synthetic SharePoint file. This is a confirmed sharing configuration and an exposure concern independently of Copilot. Remove the link unless anonymous access is explicitly approved.",
+        path: [["Potential audience", "Unbounded — anyone with the link"], ["Access basis", "Anyone sharing link"], ["File", "Acquisition Briefing.docx"], ["SharePoint location", "Strategy Hub / Project Northstar"], ["Copilot relevance", "External exposure exists independently of Copilot"], ["Required validation", "Remove or explicitly approve the link"]]
       },
       {
-        id: "hr",
-        title: "Employee compensation",
-        description: "Could Copilot summarize salary-planning documents exposed through inherited membership?",
-        prompt: "Summarize proposed salary adjustments for the next review cycle and identify employees receiving the largest increases.",
-        severity: "Critical",
-        exposure: "Compensation planning files inherit access from a legacy HR collaboration group containing 327 non-HR members.",
-        path: [["User", "Diego Siciliani"], ["Group", "HR Project Alumni"], ["Site", "People Planning"], ["Folder", "FY27 Rewards"], ["Files", "114 sensitive"]]
+        id: "public-site",
+        sequence: 2,
+        mode: "access",
+        title: "Strategy Hub",
+        description: "SharePoint site connected to a public Microsoft 365 group — tenant-wide access may be broader than intended.",
+        prompt: "Why does the public Strategy Hub SharePoint site require owner validation?",
+        severity: "High",
+        badgeText: "Owner validation required",
+        resultTitle: "Owner validation required: Strategy Hub",
+        exposure: "The synthetic Strategy Hub site is connected to a public Microsoft 365 group. Up to 4,218 tenant users may be able to discover and access its content. Confirm that public visibility is intentional and review owners, permissions, links, and content.",
+        path: [["Potential audience", "Up to 4,218 tenant users"], ["Access basis", "Public Microsoft 365 group"], ["SharePoint site", "Strategy Hub"], ["Content signal", "38 confidential files in synthetic evidence"], ["Copilot relevance", "Potential grounding through existing access"], ["Required validation", "Confirm or restrict public visibility"]]
+      },
+      {
+        id: "organization-link",
+        sequence: 3,
+        mode: "access",
+        title: "Launch Assets",
+        description: "SharePoint folder with an organization-wide link — any tenant user who receives the link may use it.",
+        prompt: "Why must the organization-wide link for Launch Assets be reviewed?",
+        severity: "High",
+        badgeText: "Broad link review",
+        resultTitle: "Broad link review: Launch Assets",
+        exposure: "An organization-wide link was observed on this synthetic SharePoint folder. Its existence does not prove tenant-wide search or Copilot discoverability, but anyone in the tenant who receives the link may use it.",
+        path: [["Potential audience", "Up to 4,218 tenant users"], ["Access basis", "Organization-wide sharing link"], ["Folder", "Launch Assets"], ["SharePoint location", "Marketing / Shared Documents"], ["Copilot relevance", "Broad link access observed; discovery not proven"], ["Required validation", "Replace with named access if broad sharing is unnecessary"]]
+      },
+      {
+        id: "inherited-group",
+        sequence: 4,
+        mode: "access",
+        title: "FY27 Rewards",
+        description: "SharePoint folder inherits access from a legacy group containing users outside the intended HR audience.",
+        prompt: "Which inherited membership must be corrected for the FY27 Rewards folder?",
+        severity: "High",
+        badgeText: "Membership review",
+        resultTitle: "Inherited group access: FY27 Rewards",
+        exposure: "Synthetic effective-access evidence shows that 327 non-HR users inherit access through HR Project Alumni. Remove stale membership or replace inherited access with an approved HR group.",
+        path: [["Affected users", "327 non-HR members"], ["Access basis", "Inherited legacy-group permission"], ["Folder", "FY27 Rewards"], ["SharePoint site", "People Planning"], ["Copilot relevance", "Grounding follows the user's existing access"], ["Required validation", "Remove stale members and verify inheritance"]]
+      },
+      {
+        id: "guest-access",
+        sequence: 5,
+        mode: "access",
+        title: "Supplier Due Diligence",
+        description: "External guest access remains on a SharePoint site after the original collaboration period.",
+        prompt: "Which guest access should be revalidated for Supplier Due Diligence?",
+        severity: "Medium",
+        badgeText: "Guest access review",
+        resultTitle: "Guest access review: Supplier Due Diligence",
+        exposure: "Synthetic evidence identifies 63 guest identities requiring sponsor and resource-access review. Guest presence alone is not an exposure; validate active sponsorship, group membership, direct grants, and sharing links.",
+        path: [["Observed identities", "63 guest accounts"], ["Access basis", "Guest and external-sharing permissions"], ["SharePoint site", "Supplier Due Diligence"], ["Lifecycle signal", "Review overdue by more than 180 days"], ["Copilot relevance", "External access must be governed separately"], ["Required validation", "Renew sponsorship or remove stale access"]]
       },
       {
         id: "agent",
-        title: "Finance agent expansion",
-        description: "What sensitive information becomes reachable if a procurement agent receives Finance site access?",
-        prompt: "Grant the Procurement Assistant access to Finance and summarize supplier negotiations and payment exceptions.",
+        sequence: 6,
+        mode: "access",
+        title: "Finance Operations",
+        description: "A proposed agent permission would expand access to seven SharePoint libraries.",
+        prompt: "What SharePoint content becomes reachable if the Procurement Assistant receives Finance visitor access?",
         severity: "High",
-        exposure: "The proposed permission expands the agent's reach by 1,132 files, including 246 labelled Highly Confidential.",
-        path: [["Agent", "Procurement Assistant"], ["Role", "Finance visitor"], ["Site", "Finance Operations"], ["Libraries", "7 connected"], ["Files", "1,132 reachable"]]
+        badgeText: "Agent access review",
+        resultTitle: "Agent access expansion: Finance Operations",
+        exposure: "The synthetic proposed permission would expand the Procurement Assistant's reach by 1,132 files, including 246 labelled Highly Confidential. Keep the permission unapproved until the resource scope and policy controls are validated.",
+        path: [["Principal", "Procurement Assistant"], ["Access basis", "Proposed Finance visitor role"], ["SharePoint site", "Finance Operations"], ["Libraries", "7 connected"], ["Content signal", "246 Highly Confidential files"], ["Required validation", "Reduce scope and verify policy enforcement"]]
       }
     ];
 
@@ -1754,7 +1808,7 @@
     const MAX_SCAN_FILE_BYTES = 50 * 1024 * 1024;
     const MAX_FINDINGS = 100;
     const MAX_FINDING_FIELD_LENGTH = 4096;
-    const SUPPORTED_PRODUCER_VERSION = "1.5.0";
+    const SUPPORTED_PRODUCER_VERSIONS = new Set(["1.5.0", "1.6.0"]);
     const SUPPORTED_SCORING_VERSION = "1.3.0";
     const ALLOWED_SEVERITIES = new Set(["critical", "high", "medium", "low"]);
     const REQUIRED_EVIDENCE_SETS = [
@@ -1784,8 +1838,8 @@
       },
       "AFD-SP-BROAD-001": {
         id: "restrict-broad-sites",
-        title: "Review public Microsoft 365 workspaces",
-        copy: "Ask each workspace owner whether Public visibility is intentional. Change unjustified groups to Private through the normal Microsoft 365 administration process, then run verification again.",
+        title: "Review public SharePoint sites",
+        copy: "Ask each SharePoint site owner whether the connected Microsoft 365 group's Public visibility is intentional. Change unjustified groups to Private through the normal Microsoft 365 administration process, then run verification again.",
         effort: "Group owner and administrator review",
         critical: 1,
         users: 0
@@ -1825,12 +1879,28 @@
     };
 
     function scenarioCard(scenario, selected = false) {
-      return `<article class="card scenario-card ${selected ? "selected" : ""}" data-scenario="${scenario.id}" tabindex="0" role="button" aria-pressed="${selected}" aria-label="Select scenario: ${scenario.title}">
-        <div class="scenario-number">${String(scenario.sequence || 1).padStart(2, "0")}</div>
-        <h3>${scenario.title}</h3>
-        <p>${scenario.description}</p>
-        <span class="badge ${scenario.severity === "Critical" ? "high" : "medium"}">${scenario.severity} scenario</span>
-      </article>`;
+      const badgeText = scenario.mode === "access"
+        ? (scenario.badgeText || "Owner validation required")
+        : `${scenario.severity} scenario`;
+      const article = document.createElement("article");
+      article.className = `card scenario-card ${selected ? "selected" : ""}`;
+      article.dataset.scenario = scenario.id;
+      article.tabIndex = 0;
+      article.setAttribute("role", "button");
+      article.setAttribute("aria-pressed", String(selected));
+      article.setAttribute("aria-label", `Select scenario: ${scenario.title}`);
+      const number = document.createElement("div");
+      number.className = "scenario-number";
+      number.textContent = String(scenario.sequence || 1).padStart(2, "0");
+      const title = document.createElement("h3");
+      title.textContent = scenario.title;
+      const description = document.createElement("p");
+      description.textContent = scenario.description;
+      const badge = document.createElement("span");
+      badge.className = `badge ${scenario.severity === "Critical" || scenario.severity === "High" ? "high" : "medium"}`;
+      badge.textContent = badgeText;
+      article.append(number, title, description, badge);
+      return article;
     }
 
     function renderScenarios() {
@@ -1838,36 +1908,39 @@
       const simulator = document.getElementById("simulator-scenarios");
       const runButton = document.getElementById("run-simulation");
       const readinessMode = scenarios[0]?.mode === "readiness";
+      pageMeta.simulator = readinessMode
+        ? ["Readiness blocker trace", "Understand what is blocking the rollout decision and the evidence required to clear it."]
+        : ["SharePoint access and sharing review", "Review evidence-backed public sites, broad sharing links, identity context, and scan coverage before enabling Microsoft 365 Copilot."];
       document.getElementById("scenario-section-title").textContent = readinessMode
         ? "Priority readiness blockers"
-        : "Priority access-path scenarios";
+        : "SharePoint access and sharing evidence";
       document.getElementById("scenario-section-copy").textContent = readinessMode
         ? "Trace how the strongest failed, warning, and unknown controls affect mission progression."
-        : "Test realistic questions against effective permissions and policy controls.";
+        : "Review public SharePoint sites, Anyone links, organization-wide links, guest-account context, and collection boundaries. Each item explains what was observed, why it matters, what remains unproven, and the required administrator action.";
       document.getElementById("open-simulator").textContent = readinessMode
         ? "Trace blocker impact"
-        : "Open simulator";
+        : "Review SharePoint evidence";
       document.getElementById("simulator-heading").textContent = readinessMode
         ? "Choose a readiness blocker"
-        : "Choose an adversarial scenario";
+        : "Choose an access or sharing finding";
       document.getElementById("simulator-copy").textContent = readinessMode
         ? "This deterministic trace uses collected control evidence. It does not pretend that an effective-access graph exists."
-        : "Simulations are read-only and use effective access metadata.";
+        : "The review uses sealed sharing metadata. It distinguishes confirmed sharing configuration, potential audience, collection limitations, and unproven sensitive-content exposure.";
       document.getElementById("simulation-prompt-label").textContent = readinessMode
         ? "Decision question"
-        : "Simulated Copilot request";
+        : "Review question";
       document.getElementById("simulation-mode-title").textContent = readinessMode
         ? "Control-impact trace"
         : "Pre-deployment";
       document.getElementById("simulation-mode-copy").textContent = readinessMode
         ? "Flight Deck traces an actual control result into its affected mission and required correction."
-        : "No prompts are submitted to a production AI system. AI Flight Deck models discoverability from metadata and policy state.";
+        : "No prompts are submitted to a production AI system. AI Flight Deck explains each observed sharing path and the administrator validation required before Copilot rollout.";
       document.getElementById("result-path-title").textContent = readinessMode
         ? "Evidence-to-decision path"
-        : "Permission attack path";
+        : "Evidence-backed review path";
       const stepLabels = readinessMode
         ? ["Read the collected evidence", "Resolve the readiness control", "Evaluate affected mission gates", "Identify the required correction"]
-        : ["Resolve requesting user's effective identity", "Traverse groups, sites and inherited permissions", "Match discoverable content to sensitivity signals", "Evaluate policy controls and calculate affected audience"];
+        : ["Identify the sharing configuration", "Determine the potential audience", "Separate observed facts from unverified exposure", "Apply the required validation or restriction"];
       document.querySelectorAll("#simulation-steps .step-copy").forEach((element, index) => {
         element.textContent = stepLabels[index];
       });
@@ -1879,11 +1952,11 @@
         runButton.disabled = true;
         return;
       }
-      overview.innerHTML = scenarios.map(s => scenarioCard(s)).join("");
-      simulator.innerHTML = scenarios.map(s => scenarioCard(s, s.id === selectedScenario.id)).join("");
+      overview.replaceChildren(...scenarios.map(s => scenarioCard(s)));
+      simulator.replaceChildren(...scenarios.map(s => scenarioCard(s, s.id === selectedScenario.id)));
       document.getElementById("simulation-prompt").textContent = selectedScenario.prompt;
       runButton.disabled = false;
-      runButton.textContent = readinessMode ? "Trace readiness impact" : "Run risk simulation";
+      runButton.textContent = readinessMode ? "Trace readiness impact" : "Review selected evidence";
     }
 
     function buildReadinessScenarios(scan) {
@@ -1937,36 +2010,222 @@
         cohortId: scan.estateAssessment?.cohorts?.[0]?.id || "tenant-wide",
         sensitiveLevels: ["internal", "confidential", "highly-confidential"]
       });
-      const accessScenarios = simulation.sensitiveMatches.slice(0, 6).map((match, index) => {
+      const graphPayload = scan.evidenceGraphEnvelope.payload || {};
+      const graphNodes = new Map((graphPayload.nodes || []).map(node => [node.id, node]));
+      const displayName = id => graphNodes.get(id)?.attributes?.displayName || id;
+      const accessScenarios = simulation.sensitiveMatches.map((match, index) => {
         const reachability = simulation.reachableResources.find(item => item.resourceId === match.resourceId);
-        const audience = match.principalIds.includes("principal:tenant-users")
-          ? `${scan.summary.users} inventoried tenant users`
+        const resourceNode = graphNodes.get(match.resourceId);
+        const attributes = resourceNode?.attributes || {};
+        const resourceName = displayName(match.resourceId);
+        const scenarioType = attributes.scenarioType ||
+          (String(attributes.evidenceId || "").startsWith("site-via-public-group:")
+            ? "public-site"
+            : "sharing-path");
+        const observedPrincipalCount = Number.isInteger(attributes.principalCount)
+          ? attributes.principalCount
+          : match.principalIds.length;
+        const audience = scenarioType === "guest-direct-grant"
+          ? `${attributes.guestPrincipalCount || observedPrincipalCount} directly granted guest principal(s)`
+          : scenarioType === "broad-identity-grant"
+            ? `up to ${potentialTenantAudience} enabled tenant members through an Everyone-style principal`
+          : scenarioType === "group-direct-grant"
+            ? `${observedPrincipalCount} directly granted group principal(s); group membership was not expanded`
+            : scenarioType === "application-grant"
+              ? `${observedPrincipalCount || 1} application or agent principal(s)`
+              : scenarioType === "inherited-permission"
+                ? "an inherited permission audience; nested membership was not expanded"
+                : ["specific-people-link", "user-direct-grant"].includes(scenarioType)
+                  ? `${observedPrincipalCount} directly named principal(s)`
+                  : match.principalIds.includes("principal:anyone-with-link")
+          ? "an unbounded audience because anyone possessing the link can use it"
+          : match.principalIds.includes("principal:tenant-users")
+          ? `up to ${potentialTenantAudience} enabled tenant members`
           : match.principalIds.includes("principal:broad-sharing-audience")
             ? "a broad sharing audience"
             : `${match.principalIds.length} observed principals`;
         const missing = simulation.missingEvidence.length
           ? ` ${simulation.missingEvidence.length} evidence link(s) are missing, so the result is incomplete.`
           : "";
+        const permissionScenario = {
+          "specific-people-link": {
+            label: "Specific-people link",
+            description: "Specific-people link on a sampled SharePoint item — validate the named recipients, role, and expiry.",
+            badgeText: "Named-link review",
+            relevance: "Potential grounding after a named recipient uses the link"
+          },
+          "broad-identity-grant": {
+            label: "Broad identity permission",
+            description: "An Everyone-style SharePoint permission was observed on a sampled item.",
+            badgeText: "Broad identity review",
+            relevance: "Potential tenant-wide Copilot grounding through the existing SharePoint permission"
+          },
+          "guest-direct-grant": {
+            label: "Guest direct access",
+            description: "A sampled SharePoint item has a direct grant to one or more guest principals.",
+            badgeText: "Guest access review",
+            relevance: "External access must be governed separately from internal Copilot rollout"
+          },
+          "group-direct-grant": {
+            label: "Group direct access",
+            description: "A sampled SharePoint item has a direct group permission; nested membership was not expanded.",
+            badgeText: "Group membership review",
+            relevance: "Copilot follows each group member's resulting SharePoint access"
+          },
+          "user-direct-grant": {
+            label: "User direct access",
+            description: "A sampled SharePoint item has a direct user permission that should be checked against current business need.",
+            badgeText: "Direct access review",
+            relevance: "Copilot follows the directly granted user's existing access"
+          },
+          "application-grant": {
+            label: "Application or agent access",
+            description: "A sampled SharePoint item has a permission granted to an application or agent principal.",
+            badgeText: "Agent access review",
+            relevance: "Application and agent permissions require workload-specific governance"
+          },
+          "inherited-permission": {
+            label: "Inherited permission",
+            description: "A sampled SharePoint item inherits access from a parent resource; the complete downstream audience was not expanded.",
+            badgeText: "Inheritance review",
+            relevance: "Copilot follows the effective access created by inherited permissions"
+          },
+          "unclassified-permission": {
+            label: "Unclassified permission",
+            description: "A sampled SharePoint permission could not be classified from the available Graph metadata.",
+            badgeText: "Permission review",
+            relevance: "Copilot relevance remains unknown until the permission is classified"
+          }
+        }[scenarioType];
+        const scenarioCopy = scenarioType === "anonymous-link"
+          ? {
+              description: `Anyone link on a sampled SharePoint ${String(attributes.resourceType || "item").toLowerCase()} — access is possible without tenant authentication.`,
+              prompt: `Why must the Anyone link for "${resourceName}" be reviewed, and what action is required?`,
+              exposure: `${resourceName} is a SharePoint ${String(attributes.resourceType || "item").toLowerCase()} with an observed Anyone link. ${audience}. This is confirmed sharing configuration and is a data-exposure concern independently of Copilot. The scan did not retrieve the content, so it does not claim that the item contains sensitive information.`,
+              severity: "Critical",
+              badgeText: "Urgent link review",
+              relevance: "External sharing exposure; Copilot grounding is not asserted"
+            }
+          : scenarioType === "organization-link"
+            ? {
+                description: `Organization-wide link on a sampled SharePoint ${String(attributes.resourceType || "item").toLowerCase()} — anyone in the tenant who receives the link may use it.`,
+                prompt: `Why must the organization-wide link for "${resourceName}" be reviewed, and what action is required?`,
+                exposure: `${resourceName} is a SharePoint ${String(attributes.resourceType || "item").toLowerCase()} with an observed organization-wide link. ${audience} may be able to use the link if it is distributed. This does not prove that every tenant user can discover the item through search or Copilot, and the item content was not retrieved.`,
+                severity: "High",
+                badgeText: "Broad link review",
+                relevance: "Broad link access observed; Copilot discoverability not proven"
+              }
+            : scenarioType === "public-group-unresolved"
+              ? {
+                  description: "Public Microsoft 365 group — the connected SharePoint site was not resolved by this scan.",
+                  prompt: `Why must the public Microsoft 365 group "${resourceName}" be resolved and validated?`,
+                  exposure: `${resourceName} is a public Microsoft 365 group. ${audience} may be able to discover or join the collaboration space, but this artifact does not contain a resolved connected SharePoint site. Do not treat it as site-level access proof.`,
+                  severity: "Medium",
+                  badgeText: "Site resolution required",
+                  relevance: "Copilot relevance cannot be determined until the connected SharePoint site is resolved"
+                }
+              : permissionScenario
+              ? {
+                  description: permissionScenario.description,
+                  prompt: `Why must the ${permissionScenario.label.toLowerCase()} for "${resourceName}" be reviewed?`,
+                  exposure: `${resourceName} has an observed ${permissionScenario.label.toLowerCase()}. The potential audience is ${audience}. Roles: ${(attributes.roles || []).join(", ") || "not reported"}. Inherited: ${attributes.inherited ? "yes" : "no"}. Expiry: ${attributes.expirationDateTime || "not reported"}. Document content and nested group membership were not retrieved.`,
+                  severity: scenarioType === "guest-direct-grant" || scenarioType === "application-grant" ? "High" : "Medium",
+                  badgeText: permissionScenario.badgeText,
+                  relevance: permissionScenario.relevance
+                }
+              : {
+                description: "Public SharePoint site — tenant-wide access may be broader than intended. Review its owners, permissions, sharing links, and content.",
+                prompt: `Why does the public SharePoint site "${resourceName}" require validation before Microsoft 365 Copilot rollout?`,
+                exposure: `${resourceName} is a SharePoint site connected to a public Microsoft 365 group. ${audience} may be able to discover and access its content. Confirm that public visibility is intentional and review the site's owners, permissions, sharing links, and content. This is not proof that sensitive content is exposed because document content was not retrieved.`,
+                severity: "High",
+                badgeText: "Owner validation required",
+                relevance: "Potential Microsoft 365 Copilot grounding through existing access"
+              };
         return {
           id: `live-${index + 1}`,
           sequence: index + 1,
           mode: "access",
-          title: `Evidence path ${index + 1}`,
-          description: `Trace the observed access path to ${match.resourceId}.`,
-          prompt: `Evaluate whether the selected cohort can reach ${match.resourceId} through the collected membership and policy evidence.`,
-          severity: match.blockedByPolicyIds.length ? "Medium" : "High",
-          exposure: `${audience} can reach ${match.resourceId} through the collected graph. Confidence is ${simulation.confidenceLevel.toLowerCase()} (${Math.round(simulation.confidence * 100)}%).${missing}`,
+          title: resourceName,
+          description: scenarioCopy.description,
+          prompt: scenarioCopy.prompt,
+          severity: scenarioCopy.severity,
+          badgeText: scenarioCopy.badgeText,
+          resultTitle: `${scenarioCopy.badgeText}: ${resourceName}`,
+          exposure: `${scenarioCopy.exposure} Required action: ${attributes.recommendedAction || "Validate the access path with the resource owner and restrict it if broad access is unnecessary."} Review confidence is ${simulation.confidenceLevel.toLowerCase()} (${Math.round(simulation.confidence * 100)}%) because content classification and complete effective access were not collected.${missing}`,
           path: [
-            ["Principal", match.principalIds.join(", ") || "Missing"],
-            ["Membership", reachability?.membershipIds.join(", ") || "Missing"],
-            ["Resource", match.resourceId],
-            ["Content signal", `${match.signalId} / ${match.sensitivity}`],
-            ["AI surface", match.aiSurfaceIds.join(", ") || "Missing"],
-            ["Policy", match.blockedByPolicyIds.join(", ") || "No blocking policy observed"]
+            ["Potential audience", audience],
+            ["Access basis", (reachability?.membershipIds || []).map(displayName).join(", ") || "Missing"],
+            [attributes.resourceType || "SharePoint resource", resourceName],
+            ["SharePoint location", [attributes.siteDisplayName, attributes.driveDisplayName].filter(Boolean).join(" / ") || "Site-level evidence"],
+            ["Content inspection", `Not performed; no sensitivity classification was collected for this ${String(attributes.resourceType || "SharePoint resource").toLowerCase()}`],
+            ["Copilot relevance", scenarioCopy.relevance],
+            ["Required validation", attributes.recommendedAction || match.blockedByPolicyIds.map(displayName).join(", ") || "Validate or restrict access"]
           ]
         };
       });
-      return accessScenarios.length ? accessScenarios : buildReadinessScenarios(scan);
+      if (scan.summary.guests > 0) {
+        accessScenarios.push({
+          id: "guest-identity-review",
+          sequence: accessScenarios.length + 1,
+          mode: "access",
+          title: `${scan.summary.guests.toLocaleString()} guest identities require access review`,
+          description: "Guest accounts exist in the tenant. Their presence is not itself an exposure, but this bounded scan does not map each guest to SharePoint resources.",
+          prompt: "What must be reviewed for guest identities before Microsoft 365 Copilot rollout?",
+          severity: "Medium",
+          badgeText: "Identity review",
+          resultTitle: "Guest access requires separate validation",
+          exposure: `${scan.summary.guests.toLocaleString()} guest identities were observed. The scan does not claim that they can access the flagged SharePoint resources. Review guest lifecycle, group membership, direct sharing, and external-sharing policy, then remove stale access.`,
+          path: [
+            ["Observed fact", `${scan.summary.guests.toLocaleString()} guest identities`],
+            ["Resource access", "Not mapped by the bounded collector"],
+            ["Risk", "Stale or unnecessary external access may persist"],
+            ["Required validation", "Review guest lifecycle, memberships, and SharePoint sharing"]
+          ]
+        });
+      }
+      const rootOnly = (scan.limitations || []).some(item =>
+        /root children|does not recursively inspect/i.test(String(item)));
+      if (rootOnly) {
+        accessScenarios.push({
+          id: "nested-content-coverage",
+          sequence: accessScenarios.length + 1,
+          mode: "access",
+          title: "Nested SharePoint content is outside this scan boundary",
+          description: "The bounded scan samples root-level items and does not recursively enumerate every folder, file, permission, or sharing link.",
+          prompt: "What does the bounded SharePoint scan leave unverified?",
+          severity: "Medium",
+          badgeText: "Coverage boundary",
+          resultTitle: "Deeper SharePoint access remains unverified",
+          exposure: "A clean sampled result is not proof that every nested file and folder is correctly permissioned. Use SharePoint administration, Data Access Governance, Restricted Content Discovery, sensitivity labels, and targeted site-owner reviews for deeper assurance.",
+          path: [
+            ["Collected", `${scan.summary.sitesScanned.toLocaleString()} SharePoint sites and ${Number(scan.summary.sampledItems || 0).toLocaleString()} root-level items`],
+            ["Not collected", "Recursive item permissions and every sharing link"],
+            ["Decision impact", "Do not interpret zero sampled findings as zero estate risk"],
+            ["Required validation", "Complete deeper governance evidence for priority sites"]
+          ]
+        });
+      }
+      if (!accessScenarios.length) {
+        accessScenarios.push({
+          id: "no-broad-paths-observed",
+          sequence: 1,
+          mode: "access",
+          title: "No broad SharePoint sharing path detected in the sampled scope",
+          description: "The completed bounded scan found no public-group site, Anyone link, or organization-wide link in the sampled evidence.",
+          prompt: "What does a clean bounded SharePoint sharing result prove?",
+          severity: "Low",
+          badgeText: "Bounded result",
+          resultTitle: "No broad path observed in the sampled scope",
+          exposure: "The scan found no broad sharing path in the evidence it collected. This is not a guarantee that every nested item, direct grant, guest permission, or inherited permission is safe.",
+          path: [
+            ["Observed fact", "No public-site, Anyone-link, or organization-link evidence"],
+            ["Coverage", `${scan.summary.sitesScanned.toLocaleString()} scanned SharePoint sites`],
+            ["Not proven", "Complete per-user effective access across every item"],
+            ["Next step", "Complete deeper evidence only where policy or risk requires it"]
+          ]
+        });
+      }
+      return accessScenarios;
     }
 
     function renderFindings(filter = "all") {
@@ -2473,10 +2732,10 @@
       const live = document.getElementById("simulation-live");
       button.setAttribute("aria-busy", "true");
       button.disabled = true;
-      button.textContent = selectedScenario.mode === "readiness" ? "Tracing impact" : "Simulation running";
+      button.textContent = selectedScenario.mode === "readiness" ? "Tracing impact" : "Review running";
       live.textContent = selectedScenario.mode === "readiness"
         ? "Tracing readiness impact."
-        : "Running risk simulation.";
+        : "Reviewing the selected evidence.";
       result.classList.remove("visible");
       steps.forEach(step => {
         step.className = "step";
@@ -2493,8 +2752,8 @@
       }
       document.getElementById("result-copy").textContent = selectedScenario.exposure;
       document.getElementById("result-title").textContent = selectedScenario.mode === "readiness"
-        ? `${selectedScenario.severity} readiness blocker`
-        : `${selectedScenario.severity} exposure confirmed`;
+        ? `${selectedScenario.title} requires evidence`
+        : (selectedScenario.resultTitle || `${selectedScenario.severity} access review`);
       const path = document.getElementById("result-path");
       path.replaceChildren();
       selectedScenario.path.forEach((node, index) => {
@@ -2517,11 +2776,11 @@
       result.classList.add("visible");
       button.disabled = false;
       button.removeAttribute("aria-busy");
-      button.textContent = selectedScenario.mode === "readiness" ? "Trace again" : "Run again";
+      button.textContent = selectedScenario.mode === "readiness" ? "Trace again" : "Review again";
       button.focus();
       live.textContent = selectedScenario.mode === "readiness"
         ? `${selectedScenario.severity} readiness impact traced. Review the evidence-to-decision path.`
-        : `${selectedScenario.severity} exposure confirmed. Review the permission path.`;
+        : "Evidence review complete. Observed sharing configuration, potential audience, limitations, and required action are shown without claiming unverified sensitive-content exposure.";
     }
 
     function downloadFile(name, payload, type) {
@@ -2762,7 +3021,7 @@
           throw new Error(`The scan field '${field}' is required.`);
         }
       }
-      if (scan.producerVersion !== SUPPORTED_PRODUCER_VERSION || scan.scoringVersion !== SUPPORTED_SCORING_VERSION) {
+      if (!SUPPORTED_PRODUCER_VERSIONS.has(scan.producerVersion) || scan.scoringVersion !== SUPPORTED_SCORING_VERSION) {
         throw new Error("The scan uses an unsupported producer or scoring version.");
       }
       if (!/^[a-f0-9]{64}$/i.test(scan.policyHash) || !/^[a-f0-9]{64}$/i.test(scan.configHash)) {
@@ -2887,7 +3146,10 @@
       if (scan.coverage.complete !== expectedCoverageComplete) {
         throw new Error("The scan coverage metadata is internally inconsistent.");
       }
-      for (const setName of REQUIRED_EVIDENCE_SETS) {
+      const requiredEvidenceSets = scan.producerVersion === "1.6.0"
+        ? [...REQUIRED_EVIDENCE_SETS, "permissionPathIds"]
+        : REQUIRED_EVIDENCE_SETS;
+      for (const setName of requiredEvidenceSets) {
         const values = scan.evidenceSets[setName];
         if (!Array.isArray(values)) {
           throw new Error(`The scan evidence set '${setName}' is invalid.`);
@@ -2900,6 +3162,86 @@
           throw new Error(`The scan evidence set '${setName}' contains duplicate identifiers.`);
         }
         scan.evidenceSets[setName] = normalized;
+      }
+      if (scan.evidenceDetails !== undefined &&
+          (!scan.evidenceDetails || typeof scan.evidenceDetails !== "object" || Array.isArray(scan.evidenceDetails))) {
+        throw new Error("The scan evidence details must be an object.");
+      }
+      const evidenceDetails = scan.evidenceDetails || {};
+      const detailArray = name => {
+        const values = evidenceDetails[name] ?? [];
+        if (!Array.isArray(values) || values.length > 100000) {
+          throw new Error(`The scan evidence detail '${name}' is invalid.`);
+        }
+        if (values.some(value => !value || typeof value !== "object" || Array.isArray(value))) {
+          throw new Error(`The scan evidence detail '${name}' contains an invalid item.`);
+        }
+        return values;
+      };
+      const requireDetailText = (value, field) => {
+        if (typeof value !== "string" || !value.trim() || value.length > MAX_FINDING_FIELD_LENGTH) {
+          throw new Error(`The scan evidence detail field '${field}' is invalid.`);
+        }
+        return value.trim();
+      };
+      const broadEvidenceIds = new Set(scan.evidenceSets.broadAccessSiteIds);
+      for (const detail of detailArray("broadAccessSites")) {
+        const evidenceId = requireDetailText(detail.evidenceId, "broadAccessSites.evidenceId");
+        if (!broadEvidenceIds.has(evidenceId)) {
+          throw new Error("A broad-access detail does not reference broad-access evidence.");
+        }
+        requireDetailText(detail.displayName, "broadAccessSites.displayName");
+        requireDetailText(detail.reason, "broadAccessSites.reason");
+        requireDetailText(detail.recommendedAction, "broadAccessSites.recommendedAction");
+      }
+      const anonymousEvidenceIds = new Set(scan.evidenceSets.anonymousPermissionIds);
+      const organizationEvidenceIds = new Set(scan.evidenceSets.organizationPermissionIds);
+      const sharedEvidenceIds = new Set(scan.evidenceSets.sharedItemIds);
+      for (const detail of detailArray("sharedItems")) {
+        const evidenceId = requireDetailText(detail.evidenceId, "sharedItems.evidenceId");
+        const itemEvidenceId = requireDetailText(detail.itemEvidenceId, "sharedItems.itemEvidenceId");
+        if ((!anonymousEvidenceIds.has(evidenceId) && !organizationEvidenceIds.has(evidenceId)) ||
+            !sharedEvidenceIds.has(itemEvidenceId) ||
+            !["anonymous", "organization"].includes(detail.sharingScope)) {
+          throw new Error("A shared-item detail is inconsistent with the scan evidence sets.");
+        }
+        requireDetailText(detail.displayName, "sharedItems.displayName");
+        requireDetailText(detail.itemType, "sharedItems.itemType");
+      }
+      const allowedAccessTypes = new Set([
+        "anonymous-link",
+        "organization-link",
+        "specific-people-link",
+        "broad-identity-grant",
+        "guest-direct-grant",
+        "group-direct-grant",
+        "user-direct-grant",
+        "application-grant",
+        "inherited-permission",
+        "unclassified-permission"
+      ]);
+      const permissionDetailIds = new Set();
+      for (const detail of detailArray("permissionPaths")) {
+        const evidenceId = requireDetailText(detail.evidenceId, "permissionPaths.evidenceId");
+        if (permissionDetailIds.has(evidenceId) || !allowedAccessTypes.has(detail.accessType)) {
+          throw new Error("A permission-path detail has a duplicate identifier or unsupported access type.");
+        }
+        permissionDetailIds.add(evidenceId);
+        requireDetailText(detail.itemEvidenceId, "permissionPaths.itemEvidenceId");
+        requireDetailText(detail.displayName, "permissionPaths.displayName");
+        requireDetailText(detail.itemType, "permissionPaths.itemType");
+        if (detail.principalRefs !== undefined &&
+            (!Array.isArray(detail.principalRefs) ||
+             detail.principalRefs.some(ref => typeof ref !== "string" || !/^principal-sha256:[a-f0-9]{64}$/i.test(ref)))) {
+          throw new Error("A permission-path detail contains invalid principal references.");
+        }
+      }
+      if (scan.producerVersion === "1.6.0") {
+        const permissionPathIds = new Set(scan.evidenceSets.permissionPathIds);
+        if (permissionPathIds.size !== permissionDetailIds.size ||
+            [...permissionDetailIds].some(evidenceId => !permissionPathIds.has(evidenceId))) {
+          throw new Error("The permission-path details do not match their evidence identifiers.");
+        }
       }
       if (scan.findings.length > MAX_FINDINGS) {
         throw new Error(`The scan contains more than ${MAX_FINDINGS} findings.`);
@@ -2927,17 +3269,41 @@
       scan.summary.exposedItems = parseBoundedInteger(scan.summary.exposedItems, "summary.exposedItems", 0, 100000000);
       scan.summary.users = parseBoundedInteger(scan.summary.users, "summary.users", 0, 100000000);
       scan.summary.guests = parseBoundedInteger(scan.summary.guests ?? 0, "summary.guests", 0, 100000000);
+      scan.summary.memberUsers = parseBoundedInteger(
+        scan.summary.memberUsers ?? Math.max(0, scan.summary.users - scan.summary.guests),
+        "summary.memberUsers",
+        0,
+        100000000
+      );
+      scan.summary.enabledMemberUsers = parseBoundedInteger(
+        scan.summary.enabledMemberUsers ?? scan.summary.memberUsers,
+        "summary.enabledMemberUsers",
+        0,
+        100000000
+      );
+      if (scan.summary.memberUsers + scan.summary.guests > scan.summary.users ||
+          scan.summary.enabledMemberUsers > scan.summary.memberUsers) {
+        throw new Error("The scan user audience counts are inconsistent.");
+      }
       scan.summary.sitesScanned = parseBoundedInteger(scan.summary.sitesScanned ?? 0, "summary.sitesScanned", 0, 1000000);
       scan.summary.sitesDiscovered = parseBoundedInteger(scan.summary.sitesDiscovered ?? 0, "summary.sitesDiscovered", 0, 1000000);
       scan.summary.anonymousLinks = parseBoundedInteger(scan.summary.anonymousLinks, "summary.anonymousLinks", 0, 100000000);
       scan.summary.organizationLinks = parseBoundedInteger(scan.summary.organizationLinks, "summary.organizationLinks", 0, 100000000);
       scan.summary.broadAccessSites = parseBoundedInteger(scan.summary.broadAccessSites, "summary.broadAccessSites", 0, 1000000);
+      scan.summary.permissionPaths = parseBoundedInteger(
+        scan.summary.permissionPaths ?? 0,
+        "summary.permissionPaths",
+        0,
+        100000000
+      );
       if (scan.summary.criticalExposures !== scan.evidenceSets.criticalEvidenceIds.length ||
           scan.summary.exposedItems !== scan.evidenceSets.sharedItemIds.length ||
           scan.summary.guests !== scan.evidenceSets.guestUserIds.length ||
           scan.summary.anonymousLinks !== scan.evidenceSets.anonymousPermissionIds.length ||
           scan.summary.organizationLinks !== scan.evidenceSets.organizationPermissionIds.length ||
-          scan.summary.broadAccessSites !== scan.evidenceSets.broadAccessSiteIds.length) {
+          scan.summary.broadAccessSites !== scan.evidenceSets.broadAccessSiteIds.length ||
+          (scan.producerVersion === "1.6.0" &&
+           scan.summary.permissionPaths !== scan.evidenceSets.permissionPathIds.length)) {
         throw new Error("The scan summary does not match its evidence identifiers.");
       }
       if (scan.summary.sitesDiscovered !== scan.coverage.sitesDiscovered ||
@@ -3116,6 +3482,10 @@
       const option = document.getElementById("attestation-control")?.selectedOptions?.[0];
       const expiry = document.getElementById("attestation-expiry");
       if (!option || !expiry) return;
+      const controlId = option.value;
+      const control = readinessCatalog.domains
+        .flatMap(domain => domain.controls)
+        .find(item => item.id === controlId);
       const hours = Math.min(Number(option.dataset.freshnessHours) || 24, 168);
       const date = new Date(Date.now() + hours * 3600000);
       date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
@@ -3123,6 +3493,22 @@
       expiry.max = expiry.value;
       document.getElementById("attestation-expiry-hint").textContent =
         `Maximum expiry for this control: ${hours} hours from now.`;
+      const guidance = document.getElementById("attestation-guidance");
+      guidance.textContent = control
+        ? `${control.title}: ${control.passCondition} Evidence source: ${control.evidenceSources.join(", ")}.`
+        : "Select a control to see the evidence required to clear it.";
+      const data = document.getElementById("attestation-data");
+      if (controlId === "AFD-ADOPT-001" && (!data.value.trim() || data.value.trim() === "{}")) {
+        data.value = JSON.stringify({
+          useCases: [1, 2, 3].map(index => ({
+            id: `use-case-${index}`,
+            owner: "",
+            targetCohort: "",
+            expectedOutcome: "",
+            successMetric: ""
+          }))
+        }, null, 2);
+      }
     }
 
     async function refreshEvidenceSourceStatus() {
@@ -3477,7 +3863,7 @@
         } else {
           const estate = baselineScan?.estateAssessment;
           title.textContent = "Microsoft 365 Copilot estate readiness cannot be determined yet";
-          reason.textContent = `The current connector collected partial evidence for ${estate?.partialDomains ?? 0} of ${estate?.requiredDomains ?? 13} required systems. Its sharing signal is ${activeTenant.baselineScore}; ${baselineScan?.summary?.broadAccessSites ?? 0} public workspaces require owner validation. Complete the missing missions before making a rollout decision.`;
+          reason.textContent = `The current connector collected partial evidence for ${estate?.partialDomains ?? 0} of ${estate?.requiredDomains ?? 13} required systems. Its sharing signal is ${activeTenant.baselineScore}; ${baselineScan?.summary?.broadAccessSites ?? 0} public SharePoint sites require owner validation. Complete the missing missions before making a rollout decision.`;
           actionText = "Review readiness coverage";
           nextPage = "overview";
           phase = 2;
@@ -3624,6 +4010,18 @@
     function applyTenantScan(scan) {
       validateScan(scan);
       const summary = scan.summary;
+      const potentialTenantAudience = summary.enabledMemberUsers;
+      const activePermissionPaths = (Array.isArray(scan.evidenceDetails?.permissionPaths)
+        ? scan.evidenceDetails.permissionPaths
+        : []).filter(detail =>
+        !detail.expirationDateTime || Date.parse(detail.expirationDateTime) > Date.parse(scan.generatedAt));
+      const hasBroadIdentityPermission = activePermissionPaths.some(detail =>
+        detail.accessType === "broad-identity-grant");
+      const directPrincipalRefs = new Set(activePermissionPaths.flatMap(detail =>
+        Array.isArray(detail.principalRefs) ? detail.principalRefs : []));
+      const observedDirectPrincipalCount = directPrincipalRefs.size ||
+        activePermissionPaths.reduce((sum, detail) =>
+          sum + (Number.isInteger(detail.principalCount) ? detail.principalCount : 0), 0);
       activeTenant = {
         name: normalizeText(scan.tenant.displayName, "Microsoft 365 tenant"),
         source: scan.producer,
@@ -3638,22 +4036,43 @@
       currentJourneyPhase = 2;
       document.getElementById("export-controls-csv").disabled = false;
       document.getElementById("decision-export-csv").disabled = false;
-      findings = scan.findings.map(item => ({
-        ruleKey: normalizeText(item.ruleKey, "UNSPECIFIED"),
-        evidenceIds: Array.isArray(item.evidenceIds) ? item.evidenceIds.slice(0, 100) : [],
-        severity: normalizeSeverity(item.severity),
-        title: normalizeText(item.title, "Untitled finding"),
-        detail: normalizeText(item.detail, "No detail supplied."),
-        source: normalizeText(item.source, "Tenant scan"),
-        impact: normalizeText(item.impact, "Review required"),
-        evidenceDetails: item.ruleKey === "AFD-SP-BROAD-001"
-          ? (scan.evidenceDetails?.broadAccessSites || []).map(detail => ({
-              displayName: normalizeText(detail.displayName, "Unnamed workspace"),
-              reason: normalizeText(detail.reason, "Public visibility detected."),
-              recommendedAction: normalizeText(detail.recommendedAction, "Confirm whether public access is required.")
-            }))
-          : []
-      }));
+      findings = scan.findings.map(item => {
+        const findingEvidenceIds = new Set(Array.isArray(item.evidenceIds) ? item.evidenceIds : []);
+        const permissionDetailSource = (Array.isArray(scan.evidenceDetails?.permissionPaths)
+          ? scan.evidenceDetails.permissionPaths
+          : []).filter(detail => findingEvidenceIds.has(detail.evidenceId));
+        const detailSource = permissionDetailSource.length
+          ? permissionDetailSource
+          : item.ruleKey === "AFD-SP-BROAD-001"
+          ? (scan.evidenceDetails?.broadAccessSites || [])
+          : item.ruleKey === "AFD-SP-ANONYMOUS-001"
+            ? (scan.evidenceDetails?.sharedItems || []).filter(detail => detail.sharingScope === "anonymous")
+            : item.ruleKey === "AFD-SP-ORGANIZATION-001"
+              ? (scan.evidenceDetails?.sharedItems || []).filter(detail => detail.sharingScope === "organization")
+              : [];
+        return {
+          ruleKey: normalizeText(item.ruleKey, "UNSPECIFIED"),
+          evidenceIds: Array.isArray(item.evidenceIds) ? item.evidenceIds.slice(0, 100) : [],
+          severity: normalizeSeverity(item.severity),
+          title: normalizeText(item.title, "Untitled finding"),
+          detail: normalizeText(item.detail, "No detail supplied."),
+          source: normalizeText(item.source, "Tenant scan"),
+          impact: normalizeText(item.impact, "Review required"),
+          evidenceDetails: detailSource.map(detail => ({
+            displayName: normalizeText(
+              [detail.siteDisplayName, detail.driveDisplayName, detail.displayName]
+                .filter(Boolean)
+                .join(" / "),
+              "Unnamed SharePoint resource"
+            ),
+            reason: normalizeText(detail.reason, "Broad SharePoint access was detected."),
+            recommendedAction: normalizeText(
+              detail.recommendedAction,
+              "Confirm whether this sharing path is required, restrict it when unnecessary, and rescan."
+            )
+          }))
+        };
+      });
       scenarios = buildLiveScenarios(scan);
       remediations = buildLiveRemediations(scan);
       applied.clear();
@@ -3677,14 +4096,43 @@
         : `100 minus ${totalPenalty} sharing-risk penalty points; this is not an estate-readiness score`;
       document.getElementById("critical-count").textContent = activeTenant.criticalExposures;
       document.getElementById("critical-label").textContent = "Critical sharing evidence";
-      document.getElementById("critical-note").textContent = `${summary.broadAccessSites} public workspaces require owner validation`;
+      const publicGroupDetails = scan.evidenceDetails?.broadAccessSites || [];
+      const resolvedPublicSites = publicGroupDetails.filter(detail => detail.siteResolved === true).length;
+      const unresolvedPublicGroups = Math.max(0, summary.broadAccessSites - resolvedPublicSites);
+      document.getElementById("critical-note").textContent = unresolvedPublicGroups
+        ? `${resolvedPublicSites} public SharePoint sites resolved; ${unresolvedPublicGroups} public groups require site resolution`
+        : `${resolvedPublicSites} public SharePoint sites require owner validation`;
       document.getElementById("exposure-label").textContent = "Sampled exposed items";
       document.getElementById("exposed-files").textContent = activeTenant.exposedFiles.toLocaleString();
       document.getElementById("exposure-note").textContent = `Across ${summary.sitesScanned} scanned sites`;
-      document.getElementById("blast-radius-users").textContent = activeTenant.blastRadiusUsers == null ? "Not computed" : activeTenant.blastRadiusUsers.toLocaleString();
-      document.getElementById("blast-radius-note").textContent = activeTenant.blastRadiusUsers == null
-        ? "Effective reachability is not produced by this collector"
-        : `${summary.guests.toLocaleString()} guest accounts detected`;
+      const blastRadiusLabel = document.getElementById("blast-radius-label");
+      const blastRadiusValue = document.getElementById("blast-radius-users");
+      const blastRadiusNote = document.getElementById("blast-radius-note");
+      if (activeTenant.blastRadiusUsers != null) {
+        blastRadiusLabel.textContent = "Affected users";
+        blastRadiusValue.textContent = activeTenant.blastRadiusUsers.toLocaleString();
+        blastRadiusNote.textContent = `${summary.guests.toLocaleString()} guest accounts detected`;
+      } else if (summary.anonymousLinks > 0) {
+        blastRadiusLabel.textContent = "Potential audience";
+        blastRadiusValue.textContent = "Unbounded";
+        blastRadiusNote.textContent = `${summary.anonymousLinks.toLocaleString()} anonymous sharing links cannot be mapped to named users`;
+      } else if (summary.broadAccessSites > 0 || summary.organizationLinks > 0 || hasBroadIdentityPermission) {
+        blastRadiusLabel.textContent = "Potential tenant audience";
+        blastRadiusValue.textContent = `Up to ${potentialTenantAudience.toLocaleString()} users`;
+        blastRadiusNote.textContent = unresolvedPublicGroups
+          ? `${summary.broadAccessSites} public collaboration groups may be tenant-accessible; ${unresolvedPublicGroups} connected sites are unresolved`
+          : hasBroadIdentityPermission
+            ? "An Everyone-style SharePoint permission was observed; effective access is not verified"
+            : `${resolvedPublicSites} public SharePoint sites may be tenant-accessible; effective access is not verified`;
+      } else if (observedDirectPrincipalCount > 0) {
+        blastRadiusLabel.textContent = "Observed direct principals";
+        blastRadiusValue.textContent = observedDirectPrincipalCount.toLocaleString();
+        blastRadiusNote.textContent = `${activePermissionPaths.length.toLocaleString()} sampled permission paths; group membership and effective access are not expanded`;
+      } else {
+        blastRadiusLabel.textContent = "Potential audience";
+        blastRadiusValue.textContent = "No broad path";
+        blastRadiusNote.textContent = "No tenant-wide or anonymous sharing path was observed in the bounded scan";
+      }
       renderAppliedUpstreamSources(scan);
       renderEstateDomains(scan);
       document.getElementById("baseline-evidence").textContent = `${scan.generatedAt ? new Date(scan.generatedAt).toLocaleString() : "Imported scan"}, ${summary.sitesScanned} sites, read-only metadata.`;

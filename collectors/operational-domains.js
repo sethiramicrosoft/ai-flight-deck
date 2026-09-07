@@ -409,7 +409,7 @@ function normalizeNetwork({ observations, context }) {
 function createNetworkConnectivityCollector({
   networkProbe,
   operationConcurrency = 4,
-  operationTimeoutMs = 10000,
+  operationTimeoutMs = 20000,
   maximumLocations = 16
 }) {
   if (!networkProbe || typeof networkProbe !== "object") {
@@ -450,11 +450,12 @@ function createNetworkConnectivityCollector({
           });
           return { ...assertObject(response, `network ${request.kind} response`), ...request };
         } catch (error) {
-          if (signal?.aborted || error?.code === "COLLECTOR_OPERATION_TIMEOUT") throw error;
+          if (signal?.aborted) throw error;
           return {
             ...request,
             unavailable: true,
-            reason: String(error?.message || error)
+            reason: String(error?.message || error),
+            errorCode: String(error?.code || "NETWORK_PROBE_FAILED")
           };
         }
       }, signal);

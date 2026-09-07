@@ -53,6 +53,7 @@ Flight Deck adds the decision and evidence workflow around them:
 | Evidence completion center | Shows the current mission and the five highest-priority blockers, then provides supported producer or import paths for every evidence class |
 | Mission gates | Shows whether activation, safe pilot, scale, and assurance missions can advance and identifies the exact blocking controls |
 | Readiness-impact traces | Connects evidence source to control, affected mission, decision impact, and required correction when a full access graph is unavailable |
+| SharePoint access and sharing review | Converts public SharePoint sites and sampled Anyone or organization-wide sharing links into named, evidence-backed validation scenarios with bounded audience estimates, explicit limitations, and administrator actions |
 | Tenant-wide enablement plan | Produces a `Ready`, `Go with conditions`, or `No-go` recommendation and turns all 77 controls into accountable owners, administration paths, ordered implementation steps, acceptance criteria, and control-specific Microsoft sources |
 | Evidence-bound corrections | Produces administrator action packages tied to the selected controls and signed baseline rather than claiming that changes were applied |
 | Before-and-after proof | Re-scans after remediation and distinguishes verified improvement, no material change, and regression |
@@ -62,6 +63,55 @@ Flight Deck adds the decision and evidence workflow around them:
 In one sentence: **Microsoft tools tell you what they observed; AI Flight Deck
 tells you whether a specific pilot can launch, why it cannot, who must act, and
 whether the evidence proves the fix worked.**
+
+## How the SharePoint access and sharing review works
+
+The Assessment page does not treat every sharing signal as confirmed sensitive
+data exposure. It separates four questions:
+
+1. **What resource was observed?** A public SharePoint site, sampled file,
+   sampled folder, or sharing link.
+2. **Why was it selected?** The site is connected to a public Microsoft 365
+   group, or the sampled item has an Anyone or organization-wide sharing scope.
+3. **Who might be able to use the path?** The product reports a bounded
+   potential audience, not a fabricated exact affected-user count.
+4. **What must the administrator do?** Confirm ownership and business need,
+   inspect permissions and content, restrict unnecessary access, and rescan.
+
+The live review currently produces these evidence-backed scenario types:
+
+| Scenario | What the scan proves | Audience treatment | Required review |
+|---|---|---|---|
+| Public SharePoint site | Its connected Microsoft 365 group is Public | Up to the enabled member-account population inventoried by the scan | Confirm public visibility, site owners, permissions, sharing links, and content |
+| Anyone link on a sampled item | Anonymous link scope exists on the sampled file or folder | Unbounded because recipients are not identifiable | Remove the link unless unauthenticated access is explicitly approved |
+| Organization-wide link on a sampled item | Organization link scope exists on the sampled file or folder | Up to the enabled member-account population inventoried by the scan | Replace broad link access with named people or groups when it is unnecessary |
+| Specific-people link | A bounded permission detail names the link recipient set | Named principals observed on the permission | Validate recipients, role, expiry, and continued business need |
+| Direct user or guest grant | A sampled item permission names user or guest principals | Directly named principals only | Confirm sponsorship and business need; remove stale access |
+| Direct group grant | A sampled item permission names a group or SharePoint site group | Group principals are known; nested members are not expanded | Review group ownership and membership before relying on the audience estimate |
+| Application or agent grant | A sampled item permission names an application principal | Application principals observed on the permission | Validate workload identity, resource scope, and agent governance |
+| Inherited permission | The sampled item reports inheritance from a parent resource | Complete downstream audience is not expanded | Review the parent permission and break or narrow inheritance when necessary |
+| Guest identity context | Guest accounts exist in the bounded directory inventory | No resource-level claim is made | Review sponsorship, lifecycle, group membership, and external sharing |
+| Collection boundary | Root-level sampling does not recursively inspect every nested item or effective permission | Not calculated | Complete deeper SharePoint governance evidence for priority sites |
+
+**Potential audience is not the same as affected users.** For example, a
+public site can create a tenant-wide potential audience, while an Anyone link
+has an unbounded audience. An exact affected-user count would require
+resource-by-resource effective-permission evaluation, nested group expansion,
+guest mapping, inherited permissions, and link-use context. AI Flight Deck
+shows the supported upper bound and the missing evidence instead of presenting
+an unsupported precise number.
+
+For sampled root items that Microsoft Graph marks as shared, the scanner also
+performs a bounded, best-effort permission-detail pass. This can distinguish
+specific-people links, direct user, guest, group, application or agent grants,
+and inherited permissions. It records roles and expiration when Graph returns
+them. It does not recursively enumerate every item or expand nested group
+membership.
+
+The scanner reads metadata and permissions only. It does not retrieve document
+contents, and therefore does not claim that a flagged resource contains
+sensitive information. A scenario identifies a sharing configuration that
+requires validation before rollout; it is not proof of a Copilot data leak.
 
 The Decision page also provides a complete customer handoff for tenant-wide
 enablement. Customers can filter remaining requirements in the application or
@@ -353,7 +403,7 @@ scopes from `server.js`:
 | Sign-in session | `openid`, `profile`, `offline_access` |
 | Tenant and directory inventory | `Organization.Read.All`, `Directory.Read.All`, `User.Read.All`, `Group.Read.All`, `Application.Read.All` |
 | Identity governance and access | `AccessReview.Read.All`, `AuditLog.Read.All`, `Policy.Read.All`, `IdentityRiskyUser.Read.All`, `RoleManagement.Read.Directory`, `UserAuthenticationMethod.Read.All` |
-| Devices and Microsoft 365 Apps | `DeviceManagementApps.Read.All`, `DeviceManagementConfiguration.Read.All`, `DeviceManagementManagedDevices.Read.All`, `OrgSettings-Microsoft365Install.Read.All` |
+| Devices and Microsoft 365 Apps | `DeviceManagementApps.Read.All`, `DeviceManagementConfiguration.Read.All`, `DeviceManagementManagedDevices.Read.All`, `DeviceManagementServiceConfig.Read.All`, `OrgSettings-Microsoft365Install.Read.All` |
 | Service health and operations | `ServiceHealth.Read.All`, `ServiceMessage.Read.All` |
 | Teams, apps, and collaboration inventory | `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `AppCatalog.Read.All` |
 | SharePoint, OneDrive, Search, and connectors | `Sites.Read.All`, `SharePointTenantSettings.Read.All`, `ExternalConnection.Read.All` |
@@ -569,12 +619,18 @@ The collector suite is deliberately bounded:
   the required evidence.
 - Runs deterministic DNS, HTTPS, TLS, reachability, and latency probes from the
   scanner host.
-- Detects anonymous and organization-wide item sharing scopes plus public
-  Microsoft 365 collaboration workspaces.
+- Detects anonymous and organization-wide item sharing scopes plus SharePoint
+  sites connected to public Microsoft 365 groups.
+- For sampled root items that Graph marks as shared, performs a separately
+  bounded, best-effort drive-item permission pass to classify specific-people
+  links, direct user, guest, group, application or agent grants, roles,
+  inheritance, and expiration metadata.
 - Does not call the Graph site ACL endpoint because Microsoft requires the
   write-capable `Sites.FullControl.All` permission even for that GET request.
 - Deterministically selects sites by stable site identifier and samples
   root-level drive items.
+- Does not recursively enumerate every nested item or expand nested group
+  membership; those limitations remain visible in the access review.
 - Reports discovered, selected, and scanned site coverage explicitly.
 - Counts only risk-qualified sampled items as exposed evidence.
 - Bounds users, groups, sites, drives, items, and total Graph requests.

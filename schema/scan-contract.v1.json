@@ -2,9 +2,9 @@
   "schemaVersion": "1.0",
   "documentType": "tenant-scan",
   "producer": "ai-flight-deck/scan-tenant.ps1",
-  "producerVersion": "1.5.0",
+  "producerVersion": "1.6.0",
   "scoringVersion": "1.3.0",
-  "policyVersion": "1.5.0",
+  "policyVersion": "1.6.0",
   "assessmentType": "microsoft-365-copilot-estate-readiness",
   "readinessCatalog": {
     "path": "schema/readiness-catalog.v1.json",
@@ -60,21 +60,32 @@
     "organizationPermissionIds",
     "broadAccessSiteIds",
     "sharedItemIds",
+    "permissionPathIds",
     "guestUserIds",
     "criticalEvidenceIds"
   ],
   "evidenceDefinitions": {
+    "potentialTenantAudience": {
+      "meaning": "A bounded upper estimate of enabled member accounts that may be in scope for tenant-wide sharing paths.",
+      "predicate": "The user is a Member account and accountEnabled is true. This is not a per-resource effective-access calculation."
+    },
     "sharedItemIds": {
       "meaning": "Risk-qualified exposed items from the bounded root-item sample.",
       "predicate": "The item has a Graph shared facet whose scope is anonymous or organization."
     },
+    "permissionPathIds": {
+      "meaning": "Stable permission identifiers for the bounded, best-effort detail pass over sampled shared items.",
+      "predicate": "The permission was returned by /drives/{driveId}/items/{itemId}/permissions and is bound to the site and item identity."
+    },
     "broadAccessSiteIds": {
-      "meaning": "Public Microsoft 365 collaboration workspaces identified from Unified group visibility.",
-      "predicate": "The Microsoft 365 group has visibility Public and groupTypes contains Unified."
+      "meaning": "Public Microsoft 365 groups that require validation of their connected SharePoint collaboration site.",
+      "predicate": "The Microsoft 365 group has visibility Public and groupTypes contains Unified; the scanner separately attempts to resolve /groups/{id}/sites/root."
     }
   },
   "evidenceDetails": {
-    "broadAccessSites": "Display name, reason, and administrator action for each public Microsoft 365 workspace evidence identifier."
+    "broadAccessSites": "Display name, reason, and administrator action for each SharePoint site connected to a public Microsoft 365 group.",
+    "sharedItems": "Object type, display name, SharePoint site, document library, sharing scope, reason, and administrator action for each sampled item with an Anyone or organization-wide sharing link.",
+    "permissionPaths": "Best-effort permission detail for sampled shared items, including link scope, direct principal type, roles, inheritance, expiration, guest context, and SharePoint location. Group membership is not expanded."
   },
   "coverageContract": {
     "required": true,
@@ -130,6 +141,38 @@
     "broadAccessSites": {
       "ruleKey": "AFD-SP-BROAD-001",
       "severity": "high"
+    },
+    "specificPeopleLinks": {
+      "ruleKey": "AFD-SP-SPECIFIC-LINK-001",
+      "severity": "low"
+    },
+    "broadIdentityPermissions": {
+      "ruleKey": "AFD-SP-BROAD-IDENTITY-001",
+      "severity": "high"
+    },
+    "guestDirectPermissions": {
+      "ruleKey": "AFD-SP-GUEST-DIRECT-001",
+      "severity": "high"
+    },
+    "groupDirectPermissions": {
+      "ruleKey": "AFD-SP-GROUP-DIRECT-001",
+      "severity": "medium"
+    },
+    "userDirectPermissions": {
+      "ruleKey": "AFD-SP-USER-DIRECT-001",
+      "severity": "low"
+    },
+    "applicationPermissions": {
+      "ruleKey": "AFD-SP-APPLICATION-001",
+      "severity": "high"
+    },
+    "inheritedPermissions": {
+      "ruleKey": "AFD-SP-INHERITED-001",
+      "severity": "medium"
+    },
+    "unclassifiedPermissions": {
+      "ruleKey": "AFD-SP-PERMISSION-UNKNOWN-001",
+      "severity": "medium"
     },
     "guestUsers": {
       "ruleKey": "AFD-DIR-GUESTS-001",
