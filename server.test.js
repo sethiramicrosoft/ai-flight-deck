@@ -485,7 +485,10 @@ test("imports Microsoft readiness evidence and saves an approved pilot cohort", 
     const artifact = await fetch(`http://127.0.0.1:${port}/api/artifacts/baseline`);
     const artifactBody = await artifact.json();
     assert.equal(artifact.status, 200);
-    assert.equal(artifactBody.estateAssessment.controlResults[0].status, "Fail");
+    assert.equal(artifactBody.estateAssessment.controlResults[0].status, "Unknown");
+    assert.equal(artifactBody.estateAssessment.controlResults[0].authority.claimedStatus, "Fail");
+    assert.match(artifactBody.estateAssessment.controlResults[0].authority.whatWouldChangeDecision.join(" "),
+      /source observations/);
     assert.equal(artifactBody.estateAssessment.upstreamSources[0].sourceType,
       "m365-copilot-readiness");
 
@@ -577,8 +580,8 @@ test("imports the pinned Microsoft automated assessment and stages unmapped rows
         content: csv
       })
     });
-    assert.equal(imported.status, 200);
     const importedBody = await imported.json();
+    assert.equal(imported.status, 200, JSON.stringify(importedBody));
     assert.equal(importedBody.summary.mappedRows, 1);
     assert.equal(importedBody.summary.stagedRows, 1);
     assert.equal(importedBody.mappedRows[0].proposedStatus, "Fail");

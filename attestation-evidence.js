@@ -82,6 +82,8 @@ function verifySignedAttestation(record, { key, keyId, now = new Date() }) {
   if (record.keyId !== keyId || !DECISIONS.has(record.decision)) return false;
   if (!Number.isFinite(Date.parse(record.attestedAt)) ||
       !Number.isFinite(Date.parse(record.expiresAt)) ||
+      Date.parse(record.attestedAt) > now.getTime() + 300000 ||
+      Date.parse(record.expiresAt) <= Date.parse(record.attestedAt) ||
       Date.parse(record.expiresAt) <= now.getTime()) return false;
   try {
     return verifyAttestationRecord(record, key);
@@ -116,7 +118,7 @@ function applyGenericAttestations({
       return result;
     }
     const record = latestByControl.get(result.controlId);
-    if (!record) return result;
+    if (!record || record.domainId !== domain.id) return result;
     const applicability = record.decision === "NotApplicable"
       ? {
         applies: false,
@@ -125,14 +127,14 @@ function applyGenericAttestations({
         expiresAt: record.expiresAt
       }
       : { applies: true, reason: control.applicability };
+    const { confidence: priorSourceConfidence, ...previous } = result;
     return {
-      ...result,
+      ...previous,
       status: record.decision,
       applicability,
       observedAt: record.attestedAt,
       freshUntil: record.expiresAt,
       coverage: { population: 1, evaluated: 1, excluded: 0, complete: true },
-      confidence: 1,
       provenance: {
         ...result.provenance,
         collectorId: "local-signed-attestation",

@@ -1,0 +1,17 @@
+{
+  "AFD-IAM-007": { "accountRef": "", "owner": "", "exclusionEvidenceRef": "", "monitoringAlertRef": "" },
+  "AFD-DEV-005": { "owner": "", "policyRef": "", "conditionalAccessEvidenceRef": "", "enrollmentRestrictionsEvidenceRef": "", "settingsMatchPolicy": false },
+  "AFD-OPS-004": { "owner": "", "advisoryReviewRef": "", "reviewedAt": "", "catalogueUpdated": false },
+  "AFD-OPS-005": { "technicalContact": "", "executiveContact": "", "tenantId": "", "reviewedAt": "" },
+  "AFD-COPILOT-006": { "owner": "", "decision": "", "privacyAssessmentRef": "", "tenantSettingEvidenceRef": "", "tenantSettingMatch": false },
+  "AFD-PPA-005": { "sources": [{ "id": "", "sensitivityLabel": "", "dlpAlignment": "", "promptInjectionReview": "" }], "tools": [{ "id": "", "inputBoundary": "", "outputBoundary": "" }] },
+  "AFD-ADOPT-001": { "useCases": [
+    { "id": "", "owner": "", "targetCohort": "", "expectedOutcome": "", "successMetric": "" },
+    { "id": "", "owner": "", "targetCohort": "", "expectedOutcome": "", "successMetric": "" },
+    { "id": "", "owner": "", "targetCohort": "", "expectedOutcome": "", "successMetric": "" }
+  ] },
+  "AFD-ADOPT-002": { "cohorts": [{ "id": "", "owner": "", "groupId": "", "entryCriteria": "", "exitCriteria": "" }] },
+  "AFD-ADOPT-003": { "training": { "deliveredAt": "" }, "support": { "intake": "", "owner": "", "responseTarget": "" } },
+  "AFD-ADOPT-004": { "publishedUseCaseIds": [""], "acceptances": [{ "useCaseId": "", "champion": "", "impactAssessmentUrl": "", "expiresAt": "" }] },
+  "AFD-ADOPT-006": { "reviews": [{ "heldAt": "", "driftReviewed": false, "decisions": [""] }] }
+}

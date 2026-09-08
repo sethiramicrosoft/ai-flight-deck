@@ -39,7 +39,6 @@ function unknownResult(controlId, context, execution) {
       excluded: 0,
       reason
     },
-    confidence: 0,
     provenance: {
       collectorId: execution.collectorId,
       collectorVersion: execution.collectorVersion,

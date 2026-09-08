@@ -486,6 +486,7 @@ function buildImportedResult({
     coverage: { population, evaluated, complete, excluded: 0, reason: source },
     confidence,
     provenance: {
+      acquisitionMode: "Imported",
       collectorId: "microsoft-upstream-evidence",
       collectorVersion: VERSION,
       collectorRunId: `import-${Date.parse(importedAt)}`,
@@ -644,8 +645,7 @@ function mergeImportedControlResults(scan, importedResults, sourceSummary) {
   scan.estateAssessment.controlResults = scan.estateAssessment.controlResults.map(result => {
     const imported = replacements.get(`${result.cohortId}:${result.controlId}`);
     if (!imported) return result;
-    const liveConclusive = result.status !== "Unknown" &&
-      result.provenance?.collectorId !== "microsoft-upstream-evidence";
+    const liveConclusive = require("./evidence-admissibility").evaluateControl(result, new Date()).admissible;
     if (liveConclusive) {
       conflicts.push({
         controlId: result.controlId,
@@ -653,7 +653,7 @@ function mergeImportedControlResults(scan, importedResults, sourceSummary) {
         retainedStatus: result.status,
         importedStatus: imported.status,
         importedSource: sourceSummary.sourceType,
-        reason: "Fresh authoritative live evidence takes precedence over imported evidence."
+        reason: "Current source-admitted evidence takes precedence over imported evidence."
       });
       return result;
     }

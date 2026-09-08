@@ -30,6 +30,7 @@ const {
 } = require("./attestation-evidence");
 const { validateEvidencePackage } = require("./collector-adapters");
 const { buildEvidenceCompletionPlan } = require("./evidence-completion");
+const { validateAssessmentAuthority } = require("./evidence-authority");
 
 const DEFAULT_PORT = 8080;
 const MAX_LOG_LENGTH = 50000;
@@ -442,6 +443,7 @@ function createApp({
     const artifactPath = artifactPaths[kind];
     const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
     if (kind === "baseline") {
+      validateAssessmentAuthority(artifact, { key: integrityKey, keyId: integrityKeyId });
       if (artifact.evidenceGraph) {
         artifact.evidenceGraphEnvelope = createEvidenceEnvelope({
           tenant: artifact.tenant?.tenantId || artifact.tenant?.id,
@@ -452,8 +454,8 @@ function createApp({
           key: integrityKey
         });
         delete artifact.evidenceGraph;
-        writeJsonAtomic(artifactPath, artifact);
       }
+      writeJsonAtomic(artifactPath, artifact);
 
       const history = fs.existsSync(artifactPaths.history)
         ? JSON.parse(fs.readFileSync(artifactPaths.history, "utf8"))
@@ -482,6 +484,7 @@ function createApp({
     if (sha256Digest(artifact) !== envelope.payloadDigest) {
       throw new Error("The stored artifact no longer matches its signed evidence envelope.");
     }
+    if (kind === "baseline") validateAssessmentAuthority(artifact, { key: integrityKey, keyId: integrityKeyId });
     return {
       ...artifact,
       integrity: {
@@ -937,6 +940,17 @@ function createApp({
       }
 
       const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+      const publicFiles = new Set(["index.html", "enablement-playbook.js", "evidence-completion.js",
+        "mission-engine.js", "evidence-admissibility.js", "evidence-graph.js",
+        "schema/readiness-catalog.v1.json", "schema/control-result.schema.v1.json",
+        "schema/evidence-authority.schema.v2.json", "schema/attestation-data-examples.v1.json",
+        "schema/scan-contract.v1.json", "schema/power-platform-evidence.template.v1.json",
+        "scanner/collect-admin-evidence.ps1", "scanner/collect-power-platform-evidence.ps1"]);
+      if (!publicFiles.has(relativePath)) {
+        res.writeHead(404);
+        res.end("Not found");
+        return;
+      }
       const filePath = path.resolve(root, relativePath);
       if (filePath !== path.resolve(root) && !filePath.startsWith(`${path.resolve(root)}${path.sep}`)) {
         res.writeHead(403);

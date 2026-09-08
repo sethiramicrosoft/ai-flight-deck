@@ -1,115 +1,85 @@
 "use strict";
-
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const catalog = require("./schema/readiness-catalog.v1.json");
-const { evaluateMissions } = require("./mission-engine");
+const f = require("./authority-test-fixtures");
+const { evaluateMissions, evaluateControl } = require("./mission-engine");
+const catalog = { ...f.catalog, missions: [
+  { id: "first", order: 1, requiredControlIds: ["AFD-LIC-001", "AFD-LIC-004"] },
+  { id: "second", order: 2, requiredControlIds: ["AFD-IAM-007"] },
+  { id: "third", order: 3, requiredControlIds: ["AFD-LIC-002"] }
+] };
+const evaluate = (controlResults, options = {}) => evaluateMissions({
+  catalog, cohorts: [f.context.cohort], controlResults, now: f.now,
+  tenantId: f.context.tenantId, collectorRunId: f.context.collectorRunId, ...options
+})[0].missions;
 
-const now = new Date("2026-07-17T12:00:00Z");
-const cohort = { id: "pilot", name: "Pilot" };
-
-function result(controlId, status = "Pass", overrides = {}) {
-  return {
-    controlId,
-    cohortId: "pilot",
-    status,
-    freshUntil: "2026-07-18T12:00:00Z",
-    coverage: { population: 1, evaluated: 1, complete: true },
-    applicability: { applies: true, reason: "Applies" },
-    ...overrides
-  };
-}
-
-function resultsForMission(missionId) {
-  const missionIndex = catalog.missions.findIndex(mission => mission.id === missionId);
-  const required = new Set(
-    catalog.missions.slice(0, missionIndex + 1).flatMap(mission => mission.requiredControlIds)
-  );
-  return [...required].map(controlId => result(controlId));
-}
-
-test("unknown mandatory evidence blocks the first mission", () => {
-  const [{ missions }] = evaluateMissions({
-    catalog,
-    cohorts: [cohort],
-    controlResults: [],
-    now
-  });
+test("all thirteen domains remain in the real catalogue and missing controls block progression", () => {
+  assert.equal(f.catalog.domains.length, 13);
+  assert.equal(f.catalog.domains.flatMap(d => d.controls).length, 77);
+  const missions = evaluate([], { catalog: f.catalog });
   assert.equal(missions[0].status, "Blocked");
-  assert.equal(missions[0].satisfied, false);
-  assert.equal(missions[0].blockers.every(blocker => blocker.reason === "Missing"), true);
+  assert.ok(missions[0].blockers.every(b => b.reason === "Missing"));
   assert.equal(missions[1].status, "PredecessorBlocked");
 });
 
-test("missions progress only when their controls and predecessors pass", () => {
-  const [{ missions }] = evaluateMissions({
-    catalog,
-    cohorts: [cohort],
-    controlResults: resultsForMission("safePilot"),
-    now
-  });
+test("missions progress using real derived receipts and verified accountable evidence", async () => {
+  const results = await f.licensing();
+  let missions = evaluate(results);
   assert.equal(missions[0].status, "Eligible");
-  assert.equal(missions[1].status, "Eligible");
-  assert.equal(missions[2].status, "Blocked");
-  assert.equal(missions[3].status, "PredecessorBlocked");
+  assert.equal(missions[1].status, "Blocked");
+  assert.equal(missions[2].status, "PredecessorBlocked");
+  missions = evaluate([...results, f.attested().result]);
+  assert.ok(missions.every(m => m.status === "Eligible"));
 });
 
-test("approved not-applicable gates satisfy a mission until approval expiry", () => {
-  const controlResults = resultsForMission("activation");
-  controlResults[0] = result(controlResults[0].controlId, "NotApplicable", {
-    applicability: {
-      applies: false,
-      reason: "Approved compensating control",
-      approvedBy: "security-owner",
-      expiresAt: "2026-07-18T12:00:00Z"
-    }
-  });
-  const [{ missions }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
-  assert.equal(missions[0].status, "Eligible");
-
-  controlResults[0].applicability.expiresAt = "2026-07-16T12:00:00Z";
-  const [{ missions: expired }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
-  assert.equal(expired[0].status, "Blocked");
-  assert.equal(expired[0].blockers[0].reason, "UnapprovedNotApplicable");
+test("predecessor-blocked missions explain the predecessor even when own controls are satisfied", async () => {
+  const missions = evaluate((await f.licensing()).filter(r => r.controlId !== "AFD-LIC-001"));
+  assert.equal(missions[2].blockers.length, 0);
+  assert.equal(missions[2].satisfiedControls, 1);
+  assert.equal(missions[2].status, "PredecessorBlocked");
+  assert.match(missions[2].whatWouldChangeDecision.join(" "), /earlier mission/);
 });
 
-test("expired evidence reopens a previously eligible mission", () => {
-  const controlResults = resultsForMission("activation");
-  controlResults[0].freshUntil = "2026-07-17T11:59:59Z";
-  const [{ missions }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
+test("partial rows and missing confidence never manufacture minimum 100 or zero", async () => {
+  const missions = evaluate((await f.licensing()).filter(r => r.controlId === "AFD-LIC-001"));
+  assert.equal(missions[0].evidenceQuality.resultsAvailable, 1);
+  assert.equal(missions[0].evidenceQuality.missingControls, 1);
+  assert.equal(missions[0].evidenceQuality.minimumConfidence, null);
+  const all = evaluate([...await f.licensing(), f.attested().result]);
+  assert.equal(all[1].evidenceQuality.minimumConfidence, null);
+  assert.equal(all[1].evidenceQuality.reportedConfidenceControls, 0);
+});
+
+test("expiry reopens eligibility without requiring recollection to change the stored status", async () => {
+  const missions = evaluate(await f.licensing(), { now: new Date(f.now.getTime() + 1000 * 3600000) });
   assert.equal(missions[0].status, "EvidenceExpired");
   assert.equal(missions[0].satisfied, false);
 });
 
-test("pass with incomplete coverage does not satisfy a mission", () => {
-  const controlResults = resultsForMission("activation");
-  controlResults[0].coverage.complete = false;
-  const [{ missions }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
-  assert.equal(missions[0].status, "Blocked");
-  assert.equal(missions[0].blockers[0].reason, "IncompleteCoverage");
+test("legacy Pass, forged Verified markers and unverified NA never satisfy any mission", () => {
+  for (const r of [
+    { ...f.base("AFD-LIC-001"), status: "Pass" },
+    { ...f.base("AFD-LIC-001"), status: "Pass", authority: { validationStatus: "Verified" } },
+    { ...f.base("AFD-LIC-001"), status: "NotApplicable",
+      applicability: { applies: false, reason: "skip", approvedBy: "owner", expiresAt: "2099-01-01T00:00:00Z" } }
+  ]) {
+    assert.equal(evaluateControl(r, f.now).satisfied, false);
+    assert.match(evaluate([r])[0].whatWouldChangeDecision.join(" "), /Recollect/);
+  }
 });
 
-test("not-applicable without a future expiry never satisfies a mission", () => {
-  const controlResults = resultsForMission("activation");
-  controlResults[0] = result(controlResults[0].controlId, "NotApplicable", {
-    applicability: {
-      applies: false,
-      reason: "Owner decision",
-      approvedBy: "security-owner",
-      expiresAt: null
-    }
-  });
-  const [{ missions }] = evaluateMissions({ catalog, cohorts: [cohort], controlResults, now });
-  assert.equal(missions[0].status, "Blocked");
-  assert.equal(missions[0].blockers[0].reason, "UnapprovedNotApplicable");
+test("modifying admitted evidence or mixing a foreign run invalidates readiness", async () => {
+  const results = await f.licensing();
+  results[0].coverage.evaluated = 2;
+  assert.equal(evaluate(results)[0].satisfied, false);
+  const foreign = await f.licensing({ runContext: { ...f.context, collectorRunId: "foreign" } });
+  assert.equal(evaluate(foreign)[0].satisfied, false);
 });
 
-test("duplicate cohort-control results are rejected", () => {
-  const duplicate = result(catalog.missions[0].requiredControlIds[0]);
-  assert.throws(() => evaluateMissions({
-    catalog,
-    cohorts: [cohort],
-    controlResults: [duplicate, { ...duplicate }],
-    now
-  }), /Duplicate result/);
+test("duplicate rows and invalid evaluation inputs fail explicitly", async () => {
+  const [r] = await f.licensing();
+  assert.throws(() => evaluate([r, r]), /Duplicate/);
+  assert.throws(() => evaluate([], { now: new Date("invalid") }), /valid evaluation time/);
+  assert.throws(() => evaluate([], { cohorts: [] }), /at least one cohort/);
+  assert.throws(() => evaluate([], { catalog: {} }), /valid readiness catalogue/);
 });

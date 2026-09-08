@@ -19,6 +19,7 @@ function observations() {
       id: "sku-1",
       skuId: "copilot-sku",
       skuPartNumber: "MICROSOFT_365_COPILOT",
+      capabilityStatus: "Enabled",
       consumedUnits: 1,
       prepaidUnits: { enabled: 10 },
       servicePlans: [{

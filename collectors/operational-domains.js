@@ -185,7 +185,7 @@ function evidenceResult(domainId, collectorId, controlId, status, context, optio
       excluded: options.excluded ?? 0,
       reason: options.coverageReason || ""
     },
-    confidence: options.confidence ?? (options.complete ? 1 : 0),
+    ...(options.confidence === undefined ? {} : { confidence: options.confidence }),
     provenance: {
       collectorId,
       collectorVersion: VERSION,
@@ -249,7 +249,6 @@ function unknown(domainId, collectorId, controlId, context, code, description, o
   return evidenceResult(domainId, collectorId, controlId, "Unknown", context, {
     ...options,
     complete: false,
-    confidence: 0,
     limitations: [...(options.limitations || []), limitation(code, description)]
   });
 }
@@ -689,7 +688,6 @@ function attestedResult(controlId, record, context, status, observedValue, optio
       population: options.population ?? 1,
       evaluated: options.evaluated ?? 1,
       complete: true,
-      confidence: 1,
       source: "Validated signed attestation store",
       observedValue: stable(observedValue),
       evidenceRefs: [{
@@ -720,7 +718,6 @@ function normalizeAdoption({ observations, context }) {
         controlId, "NotApplicable", context, {
           applicability: exemption.applicability,
           complete: true,
-          confidence: 1,
           source: "Validated signed attestation store",
           observedValue: stable(exemption.record.data),
           evidenceRefs: [{

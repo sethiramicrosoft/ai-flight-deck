@@ -161,7 +161,7 @@ function result(domainId, controlId, status, context, options = {}) {
       excluded: options.excluded || 0,
       reason: options.coverageReason || ""
     },
-    confidence: options.confidence ?? (complete ? 1 : 0),
+    ...(options.confidence === undefined ? {} : { confidence: options.confidence }),
     provenance: {
       collectorId: `microsoft-graph-${domainId.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`,
       collectorVersion: VERSION,
@@ -190,7 +190,6 @@ function unknown(domainId, controlId, context, limitations, options = {}) {
   return result(domainId, controlId, "Unknown", context, {
     ...options,
     complete: false,
-    confidence: 0,
     limitations: Array.isArray(limitations) ? limitations : [limitations]
   });
 }

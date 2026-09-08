@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-flight-deck.local/schema/evidence-authority.schema.v2.json",
+  "title": "Bounded observation authority (not Microsoft source attestation)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "acquisitionMode", "claimedStatus", "validationStatus", "validatedAt", "validator", "evidenceRecord", "assumptions", "whatWouldChangeDecision"],
+  "properties": {
+    "schemaVersion": { "const": "2.0.0" },
+    "acquisitionMode": { "enum": ["LiveGraph", "SignedAttestation", "Imported", "LocalProbe", "Unavailable", "Unspecified"] },
+    "claimedStatus": { "enum": ["Pass", "Fail", "Warning", "Unknown", "NotApplicable"] },
+    "validationStatus": { "enum": ["Accepted", "Rejected"] },
+    "validatedAt": { "type": "string", "format": "date-time" },
+    "validator": { "const": "ai-flight-deck/bounded-observation-validator" },
+    "evidenceRecord": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "version", "tenant", "producer", "generatedAt", "payload", "payloadDigest", "signatureAlgorithm", "keyId", "signature"],
+          "properties": {
+            "schema": { "const": "ai-flight-deck/evidence-envelope" },
+            "version": { "const": "1.0.0" },
+            "tenant": { "type": "string", "minLength": 1 },
+            "producer": { "const": "ai-flight-deck/observation-receipt" },
+            "generatedAt": { "type": "string", "format": "date-time" },
+            "payloadDigest": { "$ref": "#/$defs/digest" },
+            "signatureAlgorithm": { "const": "HMAC-SHA256" },
+            "keyId": { "type": "string", "minLength": 1 },
+            "signature": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "contract", "acquisitionMode", "binding", "sourceDigest", "resultDigest", "facts"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "contract": { "enum": ["licence-inventory-v1", "cohort-licence-assignment-v1", "copilot-capacity-v1", "accountable-statement-v1"] },
+                "acquisitionMode": { "enum": ["LiveGraph", "SignedAttestation"] },
+                "sourceDigest": { "$ref": "#/$defs/digest" },
+                "resultDigest": { "$ref": "#/$defs/digest" },
+                "binding": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["tenantId", "cohortId", "cohortDigest", "collectorRunId", "domainId", "controlId", "instanceId"],
+                  "properties": {
+                    "tenantId": { "type": "string", "format": "uuid" },
+                    "cohortId": { "type": "string", "minLength": 1 },
+                    "cohortDigest": { "$ref": "#/$defs/digest" },
+                    "collectorRunId": { "type": "string", "minLength": 1 },
+                    "domainId": { "type": "string", "minLength": 1 },
+                    "controlId": { "type": "string", "pattern": "^AFD-[A-Z0-9]+-[0-9]{3}$" },
+                    "instanceId": { "type": "string", "minLength": 1 }
+                  }
+                },
+                "facts": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["outcome", "population"],
+                  "properties": {
+                    "outcome": { "enum": ["Pass", "Fail", "Warning", "NotApplicable"] },
+                    "population": { "type": "integer", "minimum": 0 },
+                    "cohortSize": { "type": "integer", "minimum": 1 },
+                    "missing": { "type": "integer", "minimum": 0 },
+                    "outside": { "type": "integer", "minimum": 0 },
+                    "availableUnits": { "type": "integer" },
+                    "active": { "type": "boolean" },
+                    "record": { "$ref": "#/$defs/attestation" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "whatWouldChangeDecision": { "type": "array", "items": { "type": "string" } }
+  },
+  "allOf": [{
+    "if": { "properties": { "validationStatus": { "const": "Accepted" } } },
+    "then": { "properties": { "evidenceRecord": { "type": "object" } } }
+  }],
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenantId", "cohortId", "domainId", "controlId", "decision", "statement", "attestedBy", "attestedAt", "expiresAt", "keyId", "signature", "evidenceReferences", "data"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "tenantId": { "type": "string", "format": "uuid" },
+        "cohortId": { "type": "string", "minLength": 1 },
+        "domainId": { "type": "string", "minLength": 1 },
+        "controlId": { "type": "string", "minLength": 1 },
+        "decision": { "enum": ["Pass", "Fail", "Warning", "NotApplicable"] },
+        "statement": { "type": "string", "minLength": 1 },
+        "attestedBy": { "type": "string", "minLength": 1 },
+        "attestedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "keyId": { "type": "string", "minLength": 1 },
+        "signature": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "evidenceReferences": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "data": { "type": "object" },
+        "approvedBy": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

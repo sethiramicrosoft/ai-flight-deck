@@ -18,6 +18,7 @@ const { createGovernanceDomainCollectors } = require("./collectors/governance-do
 const { createOperationalDomainCollectors } = require("./collectors/operational-domains");
 const { applyGenericAttestations } = require("./attestation-evidence");
 const { buildEvidenceGraph } = require("./evidence-graph-builder");
+const { captureAttestationEvidence, validateControlResultsAuthority } = require("./evidence-authority");
 
 function buildEstateCollectors({
   rawToken,
@@ -28,23 +29,24 @@ function buildEstateCollectors({
 }) {
   const request = adapters.graphRequest || graphRequest(rawToken);
   return [
-    createLicensingCollector({ request }),
-    ...createGraphDomainCollectors({ request }),
+    { ...createLicensingCollector({ request }), acquisitionMode: "LiveGraph" },
+    ...createGraphDomainCollectors({ request }).map(c => ({ ...c, acquisitionMode: "LiveGraph" })),
     ...createGovernanceDomainCollectors({
       graphRequest: request,
       adminCommand: adapters.adminCommand || createAdminCommandAdapter(workspace, {
-        verifyDocument: doc => verifyEvidencePackage?.("admin", doc) ?? true
+        verifyDocument: doc => verifyEvidencePackage?.("admin", doc) ?? false
       })
-    }),
+    }).map(c => ({ ...c, acquisitionMode: "Unspecified" })),
     ...createOperationalDomainCollectors({
       networkProbe: adapters.networkProbe || createNetworkProbe(),
       powerPlatformClient: adapters.powerPlatformClient || createPowerPlatformClient(workspace, {
-        verifyDocument: doc => verifyEvidencePackage?.("powerPlatform", doc) ?? true
+        verifyDocument: doc => verifyEvidencePackage?.("powerPlatform", doc) ?? false
       }),
       graphReportsClient: adapters.graphReportsClient || createGraphReportsClient(rawToken),
       attestationStore: adapters.attestationStore ||
         createAttestationStore(workspace, verifyAttestation)
-    })
+    }).map(c => ({ ...c, acquisitionMode: c.domainIds.includes("networkConnectivity")
+      ? "LocalProbe" : c.domainIds.includes("powerPlatformAgents") ? "Imported" : "SignedAttestation" }))
   ];
 }
 
@@ -257,6 +259,7 @@ async function collectEstate({
     maxConcurrency: 4,
     timeoutMs: 120000
   });
+  context.collectorRunId = collection.collectorRunId;
   if (attestationIntegrity?.key && attestationIntegrity?.keyId) {
     const attestationPath = path.join(workspace, "attestations.json");
     const document = fs.existsSync(attestationPath)
@@ -272,7 +275,23 @@ async function collectEstate({
       keyId: attestationIntegrity.keyId,
       now: new Date(context.observedAt)
     });
+    const records = Array.isArray(document) ? document : document.attestations || [];
+    for (const result of collection.controlResults) {
+      if (!result.attestation) continue;
+      const record = records.find(item =>
+        result.evidenceRefs.some(ref => ref.id === `attestation:${item.id}`));
+      const control = catalog.domains.flatMap(d => d.controls).find(c => c.id === result.controlId);
+      if (record) captureAttestationEvidence(result, record, context, control,
+        attestationIntegrity, new Date());
+    }
   }
+  collection.controlResults = validateControlResultsAuthority({
+    catalog,
+    controlResults: collection.controlResults,
+    validatedAt: new Date().toISOString(),
+    context,
+    integrity: attestationIntegrity
+  });
   const updated = updateEstateAssessment(scan, collection);
   updated.evidenceGraph = buildEvidenceGraph(updated);
   return updated;

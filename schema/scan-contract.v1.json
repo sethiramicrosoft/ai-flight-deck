@@ -17,7 +17,11 @@
     "required": true,
     "defaultCohortId": "tenant-wide",
     "unknownBlocksMissionProgression": true,
-    "approvedNotApplicableSatisfiesGate": true
+    "approvedNotApplicableSatisfiesGate": true,
+    "authorityPath": "schema/evidence-authority.schema.v2.json",
+    "authorityVersion": "2.0.0",
+    "legacyResultsRequireRecollection": true,
+    "satisfactionRequiresVerifiedSourceReceipt": true
   },
   "estateDomains": [
     "licensingAndTenantEntitlement",

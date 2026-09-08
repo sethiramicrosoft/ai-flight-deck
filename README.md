@@ -19,6 +19,118 @@ Platform evidence package, signed attestation, expired evidence, or live
 recollection requirement. The product never converts missing evidence into a
 passing result.
 
+New results use the version 2 bounded observation validator described below.
+Collector execution, source acquisition, local integrity, accountable statements,
+and observation validation are different facts. A plausible observation object,
+successful collector run, high confidence, or locally sealed import is not proof
+that a control passed. Unsupported conclusive claims, including applicability
+claims, become `Unknown`, with the original claim retained for owner review.
+This prototype does **not** currently have validated observation paths for every
+control, and must not be used to approve an estate-wide rollout.
+
+## Evidence authority and supported boundaries
+
+`collector-runtime.js` retains only source-derived proof facts and a digest before
+discarding raw collector observations. It does not persist raw Graph user records,
+tokens, invented request IDs, or credentials in the receipt. `evidence-authority.js`
+checks those facts against the normalized decision and creates a locally
+HMAC-sealed, source-bound observation receipt. Each new `evidenceRefs` entry resolves
+to that receipt's record, rather than to a decorative string.
+
+The implemented automated contracts are:
+
+| Control | Validated observation boundary |
+|---|---|
+| AFD-LIC-001 | Complete Graph SKU/user enumeration, resolved approved cohort, active Copilot subscriptions, and **prepaid minus consumed** units covering the cohort, matching the catalogue criterion |
+| AFD-LIC-002 | Complete Graph user enumeration, approved cohort membership, and enabled Copilot service-plan assignments with no missing members or licensed users outside the cohort; an assigned SKU alone is insufficient |
+| AFD-LIC-004 | Complete, well-formed SKU/add-on inventory, with a matching normalized inventory; this does not independently prove entitlement to every downstream feature |
+
+The automated Copilot entitlement contracts identify the
+`M365_COPILOT_APPS` service plan by its documented identifier
+`a62f8878-de10-42f3-b68f-6149a25ceb97`, rather than matching any product name
+containing “Copilot.” This excludes Studio-only and unrelated Copilot products.
+Source: Microsoft's [licensing identifier reference](https://learn.microsoft.com/en-us/entra/identity/users/licensing-service-plan-reference).
+The boundary is Copilot in productivity apps; other features still require their
+own applicable controls and evidence.
+
+All eleven catalogue-designated attested controls have bounded data contracts.
+An accepted statement means that the accountable signer supplied the required
+facts and references, not that Flight Deck fetched those documents or independently
+tested effective settings. The local HMAC protects integrity; it does not authenticate
+Microsoft's truth, prove the signer's service role, or constitute external evidence.
+The existing local service/adapter and host remain trust boundaries.
+
+| Attested control | Required data (non-empty text unless stated otherwise) |
+|---|---|
+| AFD-IAM-007 | `accountRef`, `owner`, `exclusionEvidenceRef`, `monitoringAlertRef` |
+| AFD-DEV-005 | `owner`, `policyRef`, `conditionalAccessEvidenceRef`, `enrollmentRestrictionsEvidenceRef`, `settingsMatchPolicy: true` |
+| AFD-OPS-004 | `owner`, `advisoryReviewRef`, `reviewedAt` within 7 days, `catalogueUpdated: true` |
+| AFD-OPS-005 | `technicalContact`, `executiveContact`, exact `tenantId`, `reviewedAt` within 30 days |
+| AFD-COPILOT-006 | `owner`, `decision`, `privacyAssessmentRef`, `tenantSettingEvidenceRef`, `tenantSettingMatch: true` |
+| AFD-PPA-005 | Non-empty `sources`, each with `id`, `sensitivityLabel`, `dlpAlignment`, `promptInjectionReview`; `tools` array, each with `id`, `inputBoundary`, `outputBoundary` |
+| AFD-ADOPT-001 | At least three `useCases`, each with owner, exact `targetCohort`, expected outcome and success metric |
+| AFD-ADOPT-002 | Non-empty `cohorts`, including the selected cohort's `id`; each has owner, `groupId`, entry and exit criteria |
+| AFD-ADOPT-003 | `training.deliveredAt` within 30 days; `support` with intake, owner and response target |
+| AFD-ADOPT-004 | Non-empty `publishedUseCaseIds`, each covered by a current `acceptances` record with use-case ID, champion, impact assessment URL and expiry |
+| AFD-ADOPT-006 | Non-empty `reviews` within 7 days, each with `driftReviewed: true` and non-empty textual decisions |
+
+Set up shows the exact JSON structure for the selected control. The same examples
+are in `schema/attestation-data-examples.v1.json`. Replace every blank with reviewed
+facts; templates are not evidence. Include at least one evidence reference and a
+current signature, statement, attester, tenant, cohort, domain, control and expiry.
+Adoption controls also retain their existing domain normalization checks.
+Only AFD-DEV-005, AFD-PPA-005, AFD-ADOPT-002 and AFD-ADOPT-003 support an attested
+`NotApplicable`: provide `applicablePopulation: 0`, `scopeEvidenceRef`, a reason and
+an approver. Signing an exemption for an unconditional control cannot bypass it.
+Signed Fail/Warning reports remain findings for review rather than positive proof.
+
+For all other controls, collectors and the existing 77-control guidance remain
+available, but unimplemented observation validation paths explicitly remain
+`Unknown` / “Observation validation required.” Administrator/Power Platform imports
+and upstream CSV reports remain useful input and findings; their local seal and
+challenge do not establish source truth or effective enforcement. The administrator
+package contract remains exactly version **1.0.0**. Network probes remain limited to
+the scanner host; inventory and sampled access are not effective-access proofs.
+
+### Admission, freshness and reader parity
+
+- Binding must match the trusted tenant, cohort, domain, control, instance, actor,
+  catalogue version and collector run. Cross-run or cross-tenant replay is rejected.
+- Coverage must use non-negative safe integers, with `population = evaluated` and
+  `excluded = 0`. Exclusion approval is not implemented; an “approved” text reason
+  cannot substitute for it. Empty inventory may be valid; empty cohort evidence is not.
+- Evidence must be current relative to evaluation time, no more than five minutes
+  in the future, and expire within the catalogue's exact freshness cap. Signed
+  statements are signature-checked again on read and expire with their evidence.
+- Evidence limitations cannot coexist with a conclusive observation claim.
+  Confidence is retained as reported, never used to manufacture authority, and
+  missing confidence is displayed as “not reported,” not 0% or 100%.
+- `evidence-admissibility.js` is the single satisfaction rule for missions,
+  enablement, evidence completion, decision blockers and control CSV exports.
+  Admission is process-local and binds the complete result against subsequent
+  mutation. Serialized `Verified`/`Accepted` markers are never sufficient.
+- The local service verifies the artifact envelope **and the separate observation
+  receipts** before serving results. The browser admits only responses obtained
+  through that same-origin artifact API; file-imported and legacy results display
+  a recollection explanation. A JSON file is not a transferable trust token.
+- Mission quality includes missing controls and missing confidence. A mission
+  whose own controls pass still explains any blocked predecessor.
+
+`schema/control-result.schema.v1.json` remains backward-compatible for legacy
+results without authority; newly generated authority follows the strict
+`schema/evidence-authority.schema.v2.json` contract. Older artifacts are displayed
+for review, not silently grandfathered into a readiness decision. Result projection
+can change as evidence expires; the stored artifact envelope still identifies the
+original collected artifact.
+
+Targeted verification:
+
+```powershell
+node --test evidence-authority.test.js mission-engine.test.js enablement-playbook.test.js evidence-completion.test.js estate-collector-suite.test.js server.test.js
+```
+
+The strict schema regression uses the existing Python `jsonschema` installation.
+
 ## Microsoft tools used and credited
 
 AI Flight Deck is an independent hackathon prototype. It is not a Microsoft
@@ -60,9 +172,9 @@ Flight Deck adds the decision and evidence workflow around them:
 | Provenance and freshness | Retains source artifact hashes, report dates, collector identity, evidence limitations, and conflicts between imported and live evidence |
 | Detailed exports | Exports the complete control-level assessment and correction context for review outside the application |
 
-In one sentence: **Microsoft tools tell you what they observed; AI Flight Deck
-tells you whether a specific pilot can launch, why it cannot, who must act, and
-whether the evidence proves the fix worked.**
+In one sentence: **Microsoft tools report observations; AI Flight Deck distinguishes
+supported evidence from unresolved claims and shows why a pilot remains blocked,
+who must act, and what evidence is needed next.**
 
 ### Using the control instructions
 
@@ -163,7 +275,7 @@ collection to a cohort-specific decision.
 
 [![AI Flight Deck evidence completion center](docs/screenshots/02-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
 
-The screenshots use the built-in synthetic Contoso Aviation demonstration
+The screenshots use an isolated, explicitly labelled synthetic offline fixture
 data. They do not contain tenant data and are intended to show the product
 experience before a live scan is connected.
 

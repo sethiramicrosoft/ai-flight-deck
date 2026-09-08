@@ -1,8 +1,9 @@
 (function (root, factory) {
-  const api = factory();
+  const api = factory(typeof module === "object" && module.exports
+    ? require("./evidence-admissibility") : root.FlightDeckEvidenceAdmissibility);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.FlightDeckEnablement = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (evidence) {
   "use strict";
 
   const DOMAIN_PROFILES = Object.freeze({
@@ -710,49 +711,21 @@
   }
 
   function hasConclusiveCoverage(result) {
-    const coverage = result?.coverage;
-    return coverage?.complete === true &&
-      Number.isInteger(coverage.population) &&
-      Number.isInteger(coverage.evaluated) &&
-      coverage.population >= 0 &&
-      coverage.evaluated >= 0 &&
-      coverage.evaluated <= coverage.population;
+    return evidence.hasConclusiveCoverage(result);
   }
 
   function hasCurrentFreshness(result, control, now) {
-    if (!result?.observedAt || Number.isNaN(Date.parse(result.observedAt)) ||
-        !result.freshUntil || Number.isNaN(Date.parse(result.freshUntil))) {
-      return false;
-    }
-    const observedAt = Date.parse(result.observedAt);
-    const freshUntil = Date.parse(result.freshUntil);
-    const clockSkewMs = 5 * 60 * 1000;
-    const maximumFreshnessMs = Number(control?.freshnessHours) * 60 * 60 * 1000;
-    return observedAt <= now.getTime() + clockSkewMs &&
-      freshUntil > now.getTime() &&
-      freshUntil > observedAt &&
-      (!Number.isFinite(maximumFreshnessMs) ||
-       freshUntil <= observedAt + maximumFreshnessMs + clockSkewMs);
+    return evidence.hasCurrentFreshness(result, control, now);
   }
 
   function isSatisfied(result, now = new Date(), control = null) {
-    if (!result) return false;
-    if (!hasConclusiveCoverage(result) || !hasCurrentFreshness(result, control, now)) {
-      return false;
-    }
-    if (result.status === "Pass") return true;
-    return result.status === "NotApplicable" &&
-      result.applicability?.applies === false &&
-      typeof result.applicability?.approvedBy === "string" &&
-      result.applicability.approvedBy.trim() &&
-      result.applicability.expiresAt &&
-      !Number.isNaN(Date.parse(result.applicability.expiresAt)) &&
-      Date.parse(result.applicability.expiresAt) > now.getTime();
+    return evidence.evaluateControl(result, now, control).satisfied;
   }
 
   function classify(result, now, control = null) {
     if (isSatisfied(result, now, control)) return "Complete";
     if (!result || result.status === "Unknown") return "Evidence required";
+    if (!evidence.evaluateControl(result, now, control).admissible) return "Evidence required";
     if (!hasConclusiveCoverage(result) || !hasCurrentFreshness(result, control, now)) {
       return "Evidence required";
     }
@@ -764,7 +737,7 @@
     const profile = DOMAIN_PROFILES[domain.id];
     if (!profile) throw new Error(`No enablement profile exists for domain '${domain.id}'.`);
     const override = CONTROL_OVERRIDES[control.id] || {};
-    const status = result?.status || "Unknown";
+    const status = evidence.evaluateControl(result, now, control).admissible ? result.status : "Unknown";
     const category = classify(result, now, control);
     const evidenceSources = control.evidenceSources || [];
     const roles = domain.ownerRoles || [];
@@ -846,12 +819,13 @@
     const targetResults = cohortId
       ? controlResults.filter(result => result.cohortId === cohortId)
       : controlResults.filter(result => !result.cohortId);
+    const consistentBindings = evidence.hasConsistentBindings(targetResults);
     const results = new Map();
     for (const result of targetResults) {
       if (results.has(result.controlId)) {
         throw new Error(`Duplicate result for cohort '${cohortId || "unspecified"}' and control '${result.controlId}'.`);
       }
-      results.set(result.controlId, result);
+      results.set(result.controlId, consistentBindings ? result : { ...result });
     }
     const controls = catalog.domains.flatMap(domain =>
       domain.controls.map(control => controlPlaybook(domain, control, results.get(control.id), now))
@@ -1002,6 +976,7 @@
     hasConclusiveCoverage,
     hasCurrentFreshness,
     isSatisfied,
+    hasConsistentBindings: evidence.hasConsistentBindings,
     classify,
     controlPlaybook,
     buildTenantPlan,

@@ -50,7 +50,7 @@ function evidenceResult(controlId, status, context, options = {}) {
       excluded: options.excluded || 0,
       reason: options.coverageReason || ""
     },
-    confidence: options.confidence ?? (options.complete ? 1 : 0),
+    ...(options.confidence === undefined ? {} : { confidence: options.confidence }),
     provenance: {
       collectorId: "microsoft-graph-licensing",
       collectorVersion: "1.0.0",
@@ -106,7 +106,8 @@ function normalizeLicensing({ observations, context }) {
     String(a.skuPartNumber || "").localeCompare(String(b.skuPartNumber || "")));
   const users = [...observations.users].sort((a, b) => String(a.id).localeCompare(String(b.id)));
   const cohortIds = new Set(context.cohort?.principalIds || []);
-  const cohortConfigured = Boolean(context.cohort?.approved === true && cohortIds.size);
+  const cohortConfigured = Boolean(context.cohort?.approved === true && cohortIds.size &&
+    [...cohortIds].every(id => users.some(user => user.id === id)));
   const cohortUsers = users.filter(user => cohortIds.has(user.id));
   const copilotSkus = findCopilotSkus(skus);
   const copilotSkuIds = new Set(copilotSkus
@@ -140,13 +141,15 @@ function normalizeLicensing({ observations, context }) {
     }));
   } else {
     const enabledUnits = copilotSkus.reduce((sum, sku) => sum + Number(sku.prepaidUnits?.enabled || 0), 0);
+    const availableUnits = enabledUnits - copilotSkus.reduce((sum, sku) => sum + Number(sku.consumedUnits || 0), 0);
+    const active = copilotSkus.length > 0 && copilotSkus.every(sku => sku.capabilityStatus === "Enabled");
     const cohortLicensed = cohortUsers.filter(user =>
       hasCopilotPlan(user, copilotSkuIds, servicePlanNames));
     const missingUsers = cohortUsers.filter(user =>
       !hasCopilotPlan(user, copilotSkuIds, servicePlanNames));
     const outOfCohort = copilotUsers.filter(user => !cohortIds.has(user.id));
     results.push(evidenceResult("AFD-LIC-001",
-      copilotSkus.length > 0 && enabledUnits >= cohortUsers.length ? "Pass" : "Fail",
+      active && availableUnits >= cohortUsers.length ? "Pass" : "Fail",
       context, {
         population: cohortUsers.length,
         evaluated: cohortUsers.length,
@@ -156,6 +159,7 @@ function normalizeLicensing({ observations, context }) {
         observedValue: {
           copilotSkuCount: copilotSkus.length,
           enabledUnits,
+          availableUnits,
           approvedCohortSize: cohortUsers.length
         },
         affectedPrincipals: missingUsers.map(user => user.id)
@@ -282,7 +286,7 @@ function createLicensingCollector({ request }) {
     async collect({ signal, budget }) {
       const skus = await getAll(
         request,
-        "https://graph.microsoft.com/v1.0/subscribedSkus?$select=id,skuId,skuPartNumber,consumedUnits,prepaidUnits,servicePlans",
+        "https://graph.microsoft.com/v1.0/subscribedSkus?$select=id,skuId,skuPartNumber,capabilityStatus,consumedUnits,prepaidUnits,servicePlans",
         budget,
         signal
       );

@@ -3,7 +3,14 @@
 AI Flight Deck turns Microsoft 365 Copilot readiness evidence into a four-stage
 workflow: set up the evidence, assess the estate, prepare corrections, and make
 a cohort-specific rollout decision. This tour follows the complete customer
-journey and uses only the built-in synthetic demonstration data.
+journey and uses only an isolated synthetic offline fixture. Every screenshot
+is labelled accordingly; none is a production tenant assessment.
+
+The current validator admits three automated licensing observation contracts
+and eleven accountable attestation contracts. Other controls remain visible
+with their findings and instructions, but cannot approve a rollout until their
+source-observation validation is implemented. A collected inventory, local
+signature, or high confidence value is not automatically a passed control.
 
 [Return to the README](../README.md)
 
@@ -34,7 +41,9 @@ five highest-priority unresolved controls. Each blocker shows:
 
 An unresolved result is therefore presented as a specific missing permission,
 licence, administrator package, Power Platform package, accountable
-attestation, configuration action, owner review, or recollection requirement.
+attestation, configuration action, owner review, recollection requirement, or
+an explicit evidence-integration/observation-validation gap. Select **View exact
+steps and references** to open that control's detailed instructions.
 
 [![Prioritize missing evidence](screenshots/02-setup-evidence-center.png)](screenshots/02-setup-evidence-center.png)
 
@@ -61,7 +70,11 @@ references, and bounded expiry.
 
 The attester is derived from the verified scan actor. The record is bound to
 the tenant, approved cohort, control, signer, and freshness window.
-`NotApplicable` additionally requires a named approver and reason.
+`NotApplicable` is accepted only for supported conditional controls with a
+named approver, reason, zero applicable population and a scope-evidence reference.
+The control-specific data example explains the required fields. The local
+signature protects an accountable statement; it does not independently verify
+the referenced documents or tenant settings.
 
 [![Create accountable attestations](screenshots/04-setup-attestation.png)](screenshots/04-setup-attestation.png)
 
@@ -71,8 +84,8 @@ The lower part of Set up documents the operating sequence: connect, capture a
 baseline, assess, prepare approved corrections, implement changes through
 normal administration, rescan, and compare the result.
 
-A forecast is never treated as proof. Only fresh collected evidence can close
-a control and advance a rollout mission.
+A forecast is never treated as proof. Only admitted, current evidence meeting
+a supported control contract can close a control and advance a rollout mission.
 
 [![Follow the operating workflow](screenshots/05-setup-operating-workflow.png)](screenshots/05-setup-operating-workflow.png)
 
@@ -84,6 +97,7 @@ Assessment maps 13 readiness domains and 77 controls across Activation, Safe
 pilot, Scale, and Assure. Online, degraded, and unscanned domains remain
 visible rather than being hidden behind a single score.
 
+Domain totals are recomputed from admitted evidence, not imported status counters.
 Select a domain to inspect its controls, evidence state, collection coverage,
 limitations, recommended next action, and Microsoft guidance. Evidence added
 on Set up is evaluated during the next scan and then appears here.
@@ -117,7 +131,10 @@ users” because exact effective access requires per-resource permission
 evaluation, nested-group expansion, guest mapping, inherited permissions, and
 link-use context.
 
-[![Review SharePoint access and sharing evidence](screenshots/07-assessment-sharing-review.png)](screenshots/07-assessment-sharing-review.png)
+The offline fixture can show a readiness-blocker trace instead when there is
+no supported sealed sharing path. That is not a simulated effective-access proof.
+
+[![Review the fixture's available evidence scenarios](screenshots/07-assessment-sharing-review.png)](screenshots/07-assessment-sharing-review.png)
 
 ### Inspect the evidence-backed action
 
@@ -132,7 +149,7 @@ remaining collection boundary. When no sealed access graph is available, the
 product falls back to a deterministic readiness-impact trace connecting
 missing evidence to its control, mission, decision, and correction.
 
-[![Inspect a SharePoint access review result](screenshots/08-assessment-sharing-result.png)](screenshots/08-assessment-sharing-result.png)
+[![Inspect the fixture's evidence-to-decision trace](screenshots/08-assessment-sharing-result.png)](screenshots/08-assessment-sharing-result.png)
 
 ### Review evidence-backed findings
 
@@ -178,7 +195,9 @@ same evidence priorities as the Evidence completion center.
 
 Each control provides the responsible roles, administration path,
 prerequisites, required outcome, implementation steps, acceptance criteria,
-next evidence action, and authoritative Microsoft sources. The complete
+next evidence action, and supporting Microsoft references. The catalogue's
+gates and thresholds are AI Flight Deck rollout policy, not a universal
+Microsoft prerequisite list. The complete
 customer handoff can be downloaded as Markdown.
 
 [![Follow the tenant enablement plan](screenshots/12-decision-enablement-plan.png)](screenshots/12-decision-enablement-plan.png)

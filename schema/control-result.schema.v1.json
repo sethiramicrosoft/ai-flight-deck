@@ -23,6 +23,9 @@
     "limitations"
   ],
   "properties": {
+    "authority": {
+      "$ref": "evidence-authority.schema.v2.json"
+    },
     "controlId": {
       "type": "string",
       "pattern": "^AFD-[A-Z0-9]+-[0-9]{3}$"
@@ -182,6 +185,9 @@
         "source"
       ],
       "properties": {
+        "acquisitionMode": {
+          "enum": ["LiveGraph", "SignedAttestation", "Imported", "LocalProbe", "Unavailable", "Unspecified"]
+        },
         "collectorId": {
           "type": "string",
           "minLength": 1,

@@ -7,6 +7,7 @@
   "use strict";
 
   const STATE_PRIORITY = Object.freeze({
+    ObservationValidationRequired: 0,
     IntegrationRequired: 0,
     MissingPermission: 0,
     MissingLicense: 1,
@@ -20,6 +21,10 @@
     Complete: 9
   });
   const STATE_DETAILS = Object.freeze({
+    ObservationValidationRequired: {
+      label: "Observation validation required",
+      action: "Retain the reported finding for owner review. This control needs a supported source-observation validation path; rescan or import alone cannot establish readiness."
+    },
     IntegrationRequired: {
       label: "Evidence integration required",
       action: "Retain the owner-reviewed evidence and connect the missing input. A permission grant or rescan alone will not close this gap."
@@ -45,8 +50,8 @@
       action: "Import the seven-resource Power Platform evidence package, then rescan."
     },
     RecollectionRequired: {
-      label: "Evidence expired",
-      action: "Re-run the relevant collector to replace the expired evidence."
+      label: "Recollect evidence",
+      action: "Re-run the relevant collector to replace expired, legacy or unverified evidence."
     },
     LiveCollectionRequired: {
       label: "Not yet collected",
@@ -82,16 +87,8 @@
       Date.parse(value) > now.getTime();
   }
 
-  function completeResult(result, now) {
-    if (!result || result.coverage?.complete !== true || !validFuture(result.freshUntil, now)) {
-      return false;
-    }
-    if (result.status === "Pass") return true;
-    return result.status === "NotApplicable" &&
-      result.applicability?.applies === false &&
-      typeof result.applicability?.approvedBy === "string" &&
-      Boolean(result.applicability.approvedBy.trim()) &&
-      validFuture(result.applicability.expiresAt, now);
+  function completeResult(result, now, control = null) {
+    return enablement.isSatisfied(result, now, control);
   }
 
   function limitationText(result) {
@@ -103,9 +100,11 @@
 
   function classify(control, result, options) {
     const now = options.now;
-    if (completeResult(result, now)) return "Complete";
-    if (result?.status === "Fail") return "ConfigurationAction";
-    if (result?.status === "Warning") return "OwnerReview";
+    if (completeResult(result, now, control)) return "Complete";
+    if (result && ["Pass", "NotApplicable"].includes(result.status)) return "RecollectionRequired";
+    const category = enablement.classify(result, now, control);
+    if (category === "Action required") return "ConfigurationAction";
+    if (category === "Owner review") return "OwnerReview";
     if (result?.freshUntil && !validFuture(result.freshUntil, now)) {
       return "RecollectionRequired";
     }
@@ -118,6 +117,8 @@
       return "MissingLicense";
     }
     if (control.collection.kind === "IntegrationRequired") return "IntegrationRequired";
+    if (result?.authority?.whatWouldChangeDecision?.some(reason =>
+      reason.startsWith("No source-observation validation contract"))) return "ObservationValidationRequired";
     const missingPermissions = (control.requiredPermissions || [])
       .filter(permission => !options.grantedPermissions.has(permission));
     if (missingPermissions.length) return "MissingPermission";
@@ -150,9 +151,13 @@
       throw new TypeError("A valid evaluation time is required.");
     }
     const cohortId = cohort?.id || null;
-    const resultsById = new Map(controlResults
-      .filter(result => !cohortId || result.cohortId === cohortId)
-      .map(result => [result.controlId, result]));
+    const selected = controlResults.filter(result => !cohortId || result.cohortId === cohortId);
+    const consistent = enablement.hasConsistentBindings(selected);
+    const resultsById = new Map();
+    for (const result of selected) {
+      if (resultsById.has(result.controlId)) throw new Error(`Duplicate control result '${result.controlId}'.`);
+      resultsById.set(result.controlId, consistent ? result : { ...result });
+    }
     const currentMission = firstCurrentMission(catalog, resultsById, now);
     const currentControlIds = new Set(currentMission?.requiredControlIds || []);
     const options = {
@@ -176,7 +181,8 @@
         automation: control.automation,
         missions: [...(control.missions || [])],
         currentMission: currentControlIds.has(control.id),
-        status: result?.status || "Unknown",
+        status: ["Complete", "ConfigurationAction", "OwnerReview"].includes(state) ? result.status : "Unknown",
+        reportedStatus: result?.authority?.claimedStatus || result?.status || "Unknown",
         state,
         stateLabel: STATE_DETAILS[state].label,
         nextAction: STATE_DETAILS[state].action,

@@ -1683,6 +1683,7 @@
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+  <script src="evidence-admissibility.js"></script>
   <script src="enablement-playbook.js"></script>
   <script src="evidence-completion.js"></script>
   <script src="mission-engine.js"></script>
@@ -1863,6 +1864,7 @@
     let selectedScenario = scenarios[0];
     const applied = new Set();
     let baselineScan = null;
+    let attestationDataExamples = {};
     let verificationReport = null;
     let verificationOutcome = null;
     let currentJourneyPhase = 2;
@@ -2287,7 +2289,7 @@
     }
 
     function renderEstateDomains(scan) {
-      const assessment = scan?.estateAssessment;
+      const assessment = window.FlightDeckEvidenceAdmissibility.projectAssessment(scan?.estateAssessment, readinessCatalog);
       const card = document.getElementById("dimension-card");
       if (!readinessCatalog) {
         card.innerHTML = '<div class="empty-state">The readiness control catalogue is unavailable.</div>';
@@ -2318,9 +2320,7 @@
       const hudTitle = document.createElement("h3");
       hudTitle.textContent = "Microsoft 365 Copilot control plane";
       const hudText = document.createElement("p");
-      hudText.textContent = assessment.collectedDomains === 0 && assessment.partialDomains === 2
-        ? "Current connector coverage: partial Identity and SharePoint evidence only. The other estate collectors have not been built or connected."
-        : "Select a system to inspect its evidence state and next mission.";
+      hudText.textContent = "Select a system to inspect its admitted evidence, reported findings, and remaining validation requirements.";
       hudCopy.append(kicker, hudTitle, hudText);
       const telemetry = document.createElement("div");
       telemetry.className = "mission-telemetry";
@@ -2450,7 +2450,7 @@
           const evaluation = window.FlightDeckMissionEngine.evaluateControl(result, new Date());
           const effectiveStatus = evaluation.reason === "Expired"
             ? "Expired"
-            : (result?.status || "Unknown");
+            : (evaluation.admissible ? result.status : "Unknown");
           const detail = document.createElement("details");
           detail.className = `control-detail ${effectiveStatus.toLowerCase()}`;
           const summary = document.createElement("summary");
@@ -2477,6 +2477,8 @@
           evidence.textContent = result
             ? `Evidence: ${result.provenance?.source || "Source not recorded"}. Coverage ${result.coverage?.evaluated ?? 0}/${result.coverage?.population ?? 0}.`
             : `Evidence required: ${catalogControl.evidenceSources.join(", ")}.`;
+          const authority = document.createElement("p");
+          authority.textContent = window.FlightDeckEvidenceAdmissibility.describeEvidence(result);
           const evidenceSources = document.createElement("p");
           evidenceSources.textContent =
             `Collection method: ${catalogControl.automation}. Expected sources: ${catalogControl.evidenceSources.join(", ")}.`;
@@ -2509,6 +2511,7 @@
             passCondition,
             evidenceSources,
             evidence,
+            authority,
             freshness,
             limitations,
             observation,
@@ -2559,14 +2562,13 @@
           item.classList.toggle("selected", selected);
           item.setAttribute("aria-pressed", String(selected));
         });
-        const results = mission.requiredControlIds.map(controlId => controlResults.get(controlId)).filter(Boolean);
         const passed = mission.requiredControlIds.filter(controlSatisfied).length;
-        const failed = results.filter(result => result.status === "Fail").length;
-        const warnings = results.filter(result => result.status === "Warning").length;
         const missionResult = missionResults.get(mission.id);
+        const failed = missionResult?.blockers.filter(blocker => blocker.admissible && blocker.status === "Fail").length || 0;
+        const warnings = missionResult?.blockers.filter(blocker => blocker.admissible && blocker.status === "Warning").length || 0;
         const locked = missionResult?.satisfied !== true;
         const unknown = missionResult?.blockers.filter(blocker =>
-          ["Missing", "Unknown", "InvalidFreshness"].includes(blocker.reason)
+          !blocker.admissible && blocker.reason !== "Expired"
         ).length || 0;
         const expired = missionResult?.blockers.filter(blocker => blocker.reason === "Expired").length || 0;
         consoleKicker.textContent = `${mission.code} / ${passed} of ${mission.requiredControlIds.length} gate controls satisfied`;
@@ -2575,7 +2577,14 @@
         consoleStatus.textContent = locked
           ? `Locked / ${failed} failed / ${warnings} warning / ${unknown} unknown / ${expired} expired`
           : "Gate satisfied";
-        consoleSummary.textContent = `${mission.briefing} ${mission.unlock}`;
+        const quality = missionResult?.evidenceQuality;
+        const qualitySummary = quality
+          ? ` Evidence quality: ${quality.missingControls} missing controls; ${quality.completeCoverage}/${mission.requiredControlIds.length} controls have complete coverage; ${quality.acceptedPasses} Pass results meet a supported evidence contract; ${quality.minimumConfidence === null ? "confidence not reported for every required control" : `minimum reported confidence ${Math.round(quality.minimumConfidence * 100)}%`}; earliest evidence expiry ${quality.earliestFreshUntil ? new Date(quality.earliestFreshUntil).toLocaleString() : "not available"}.`
+          : "";
+        const assumptionSummary = quality?.unresolvedAssumptions?.length
+          ? ` Unresolved assumptions: ${quality.unresolvedAssumptions.join(" ")}`
+          : "";
+        consoleSummary.textContent = `${mission.briefing} ${mission.unlock}${qualitySummary}${assumptionSummary}`;
         consoleNextLabel.textContent = "Mission gate";
         renderControlList(mission.requiredControlIds);
         const blockingTitles = (missionResult?.blockers || []).slice(0, 5).map(blocker => {
@@ -2584,8 +2593,9 @@
             .find(item => item.id === blocker.controlId);
           return control ? `${control.id} ${control.title}` : blocker.controlId;
         });
+        const decisionChanges = (missionResult?.whatWouldChangeDecision || []).slice(0, 5);
         consoleNextText.textContent = locked
-          ? `Cannot advance this cohort. Resolve: ${blockingTitles.join("; ")}${(missionResult?.blockers.length || 0) > 5 ? "; and additional blockers" : ""}.`
+          ? `Cannot advance this cohort. Resolve: ${blockingTitles.join("; ")}${(missionResult?.blockers.length || 0) > 5 ? "; and additional blockers" : ""}. What would change this decision: ${decisionChanges.join(" ")}`
           : mission.unlock;
         consoleDocumentation.hidden = true;
       };
@@ -2824,7 +2834,7 @@
         "Recommended Correction", "Responsible Roles", "Administration Portal",
         "Administration Path", "Implementation Steps", "Validation Method",
         "Microsoft Documentation", "Requirement Origin", "Evidence Collection Steps",
-        "Collection Boundary"
+        "Collection Boundary", "Evidence Decision", "Reported Status"
       ];
       const rows = baselineScan.estateAssessment.controlResults.map(result => {
         const domain = readinessCatalog.domains.find(item => item.id === result.domainId);
@@ -2840,7 +2850,7 @@
           result.controlId,
           control?.title,
           result.requirement,
-          result.status,
+          window.FlightDeckMissionEngine.evaluateControl(result, new Date()).admissible ? result.status : "Unknown",
           control?.description,
           result.applicability,
           control?.passCondition,
@@ -2868,7 +2878,9 @@
           playbook?.sources,
           playbook?.requirementOrigin,
           playbook?.collection.steps,
-          playbook?.collection.limitation
+          playbook?.collection.limitation,
+          window.FlightDeckEvidenceAdmissibility.describeEvidence(result),
+          result.authority?.claimedStatus || result.status
         ].map(csvCell).join(",");
       });
       return `\uFEFF${columns.map(csvCell).join(",")}\r\n${rows.join("\r\n")}`;
@@ -3332,10 +3344,8 @@
       const seen = new Set();
       const result = [];
       for (const controlResult of scan.estateAssessment?.controlResults || []) {
-        if (controlResult.status === "Pass" ||
-            (controlResult.status === "NotApplicable" &&
-             controlResult.applicability?.approvedBy &&
-             Date.parse(controlResult.applicability?.expiresAt) > Date.now())) {
+        const evaluation = window.FlightDeckMissionEngine.evaluateControl(controlResult, new Date());
+        if (evaluation.satisfied) {
           continue;
         }
         const catalogDomain = readinessCatalog.domains.find(domain =>
@@ -3349,12 +3359,12 @@
           id,
           controlId: catalogControl.id,
           domainId: catalogDomain.id,
-          currentStatus: controlResult.status,
+          currentStatus: evaluation.status,
           title: `${catalogControl.id}: ${catalogControl.title}`,
-          copy: controlResult.status === "Unknown"
-            ? `Evidence required. ${catalogControl.remediation}`
+          copy: !evaluation.admissible
+            ? `Evidence required. ${evaluation.explanation} ${catalogControl.remediation}`
             : catalogControl.remediation,
-          effort: controlResult.status === "Unknown"
+          effort: !evaluation.admissible
             ? "Connect evidence"
             : controlResult.status === "Fail"
               ? "Administrator action"
@@ -3446,13 +3456,20 @@
           ...(control.state === "MissingLicense" ? control.missingLicenses : []),
           ...control.limitations.map(item => item.description)
         ];
-        detail.textContent = missing.length
-          ? missing.join("; ")
-          : control.nextAction;
+        detail.textContent = control.nextAction;
         const meta = document.createElement("small");
         meta.className = "completion-blocker-meta";
         meta.textContent = `Owner: ${control.owner} · Effort: ${control.effort}`;
         content.append(title, meta, detail);
+        if (missing.length) {
+          const diagnostics = document.createElement("details");
+          const heading = document.createElement("summary");
+          heading.textContent = "Show collection details";
+          const explanation = document.createElement("small");
+          explanation.textContent = missing.join("; ");
+          diagnostics.append(heading, explanation);
+          content.appendChild(diagnostics);
+        }
         const instructions = document.createElement("button");
         instructions.type = "button";
         instructions.className = "btn";
@@ -3508,19 +3525,13 @@
         `Maximum expiry for this control: ${hours} hours from now.`;
       const guidance = document.getElementById("attestation-guidance");
       guidance.textContent = control
-        ? `${control.title}: ${control.passCondition} Evidence source: ${control.evidenceSources.join(", ")}.`
+        ? `${control.title}: ${control.passCondition} Evidence source: ${control.evidenceSources.join(", ")}. Supply non-empty evidence references and the data fields shown below. A local signature proves integrity of your statement, not independent inspection of these settings. For a supported Not applicable scope use applicablePopulation: 0 and scopeEvidenceRef, plus the reason and approver.`
         : "Select a control to see the evidence required to clear it.";
       const data = document.getElementById("attestation-data");
-      if (controlId === "AFD-ADOPT-001" && (!data.value.trim() || data.value.trim() === "{}")) {
-        data.value = JSON.stringify({
-          useCases: [1, 2, 3].map(index => ({
-            id: `use-case-${index}`,
-            owner: "",
-            targetCohort: "",
-            expectedOutcome: "",
-            successMetric: ""
-          }))
-        }, null, 2);
+      data.placeholder = JSON.stringify(attestationDataExamples[controlId] || {}, null, 2);
+      if (!data.value.trim() || data.value.trim() === "{}" || data.value === data.dataset.lastExample) {
+        data.value = data.placeholder;
+        data.dataset.lastExample = data.value;
       }
     }
 
@@ -3908,7 +3919,7 @@
           nextPage = "remediation";
           phase = 3;
         } else {
-          const estate = baselineScan?.estateAssessment;
+          const estate = window.FlightDeckEvidenceAdmissibility.projectAssessment(baselineScan?.estateAssessment, readinessCatalog);
           title.textContent = "Microsoft 365 Copilot estate readiness cannot be determined yet";
           reason.textContent = `The current connector collected partial evidence for ${estate?.partialDomains ?? 0} of ${estate?.requiredDomains ?? 13} required systems. Its sharing signal is ${activeTenant.baselineScore}; ${baselineScan?.summary?.broadAccessSites ?? 0} public SharePoint sites require owner validation. Complete the missing missions before making a rollout decision.`;
           actionText = "Review readiness coverage";
@@ -3946,6 +3957,7 @@
       const icon = document.getElementById("clearance-icon");
       renderEvidenceCompletion();
       const plan = refreshTenantEnablementPlan();
+      const estate = window.FlightDeckEvidenceAdmissibility.projectAssessment(baselineScan?.estateAssessment, readinessCatalog);
       const ready = plan?.recommendation === "READY";
       const decisionTitle = plan
         ? plan.recommendation === "READY"
@@ -3962,11 +3974,11 @@
         card.classList.toggle("cleared", ready);
         icon.textContent = ready ? "✓" : "!";
         status.textContent = decisionTitle;
-        const evaluated = baselineScan?.estateAssessment?.evaluatedControls ?? 0;
+        const evaluated = estate?.evaluatedControls ?? 0;
         copy.textContent = `${decisionCopy} ${evaluated} controls currently have conclusive collected evidence.`;
         score.textContent = activeTenant.baselineScore == null ? "Not calculated" : activeTenant.baselineScore;
         open.textContent = baselineScan?.summary?.broadAccessSites ?? activeTenant.criticalExposures;
-        users.textContent = `${baselineScan?.estateAssessment?.collectedDomains ?? 0}/${baselineScan?.estateAssessment?.requiredDomains ?? 13}`;
+        users.textContent = `${estate?.collectedDomains ?? 0}/${estate?.requiredDomains ?? 13}`;
         renderDecisionBlockers();
         renderTenantEnablementPlan();
         renderDecisionCenter();
@@ -3979,7 +3991,7 @@
       copy.textContent = `${decisionCopy} Sharing verification status: ${verificationOutcome.reason}`;
       score.textContent = verificationReport.verification.readinessScore;
       open.textContent = verificationReport.verification.criticalExposures;
-      users.textContent = `${baselineScan?.estateAssessment?.collectedDomains ?? 0}/${baselineScan?.estateAssessment?.requiredDomains ?? 13}`;
+      users.textContent = `${estate?.collectedDomains ?? 0}/${estate?.requiredDomains ?? 13}`;
       renderDecisionBlockers();
       renderTenantEnablementPlan();
       renderDecisionCenter();
@@ -3996,10 +4008,7 @@
         return;
       }
       const blocked = baselineScan.estateAssessment.controlResults
-        .filter(result => result.status !== "Pass" &&
-          !(result.status === "NotApplicable" &&
-            result.applicability?.approvedBy &&
-            Date.parse(result.applicability?.expiresAt) > Date.now()))
+        .filter(result => !window.FlightDeckMissionEngine.evaluateControl(result, new Date()).satisfied)
         .sort((left, right) => {
           const rank = { Fail: 0, Warning: 1, Unknown: 2, NotApplicable: 3 };
           return (rank[left.status] ?? 4) - (rank[right.status] ?? 4) ||
@@ -4009,8 +4018,9 @@
         const domain = readinessCatalog.domains.find(item => item.id === result.domainId);
         const control = domain?.controls.find(item => item.id === result.controlId);
         if (!control) continue;
+        const evaluation = window.FlightDeckMissionEngine.evaluateControl(result, new Date());
         const detail = document.createElement("details");
-        detail.className = `control-detail ${result.status.toLowerCase()}`;
+        detail.className = `control-detail ${evaluation.status.toLowerCase()}`;
         const summary = document.createElement("summary");
         const heading = document.createElement("span");
         heading.className = "control-heading";
@@ -4021,14 +4031,16 @@
         heading.append(id, title);
         const badge = document.createElement("span");
         badge.className = "control-badge";
-        badge.textContent = result.status;
+        badge.textContent = evaluation.status;
         summary.append(heading, badge);
         const body = document.createElement("div");
         body.className = "control-body";
         const impact = document.createElement("p");
         impact.textContent = control.description;
         const blocker = document.createElement("p");
-        blocker.textContent = result.limitations?.length
+        blocker.textContent = !evaluation.admissible
+          ? `Evidence decision: ${evaluation.explanation} Reported status: ${evaluation.reportedStatus}.`
+          : result.limitations?.length
           ? `Blocking evidence: ${result.limitations.map(item => item.description).join(" ")}`
           : "This control did not meet its required condition.";
         const playbook = window.FlightDeckEnablement.controlPlaybook(domain, control, result);
@@ -4132,7 +4144,7 @@
       selectedScenario = scenarios[0] || null;
       document.querySelector(".tenant strong").textContent = activeTenant.name;
       document.getElementById("tenant-status").textContent = "Imported point-in-time scan";
-      const estate = scan.estateAssessment;
+      const estate = window.FlightDeckEvidenceAdmissibility.projectAssessment(scan.estateAssessment, readinessCatalog);
       const missingDomains = estate.requiredDomains - estate.collectedDomains - estate.partialDomains;
       document.getElementById("source-ribbon").textContent = scanIsComplete(scan)
         ? `Partial evidence is available for ${estate.partialDomains} of ${estate.requiredDomains} readiness domains for ${activeTenant.name}; ${missingDomains} domain collectors remain unavailable.`
@@ -4283,6 +4295,9 @@
         throw new Error(`Unable to load the readiness control catalogue (${response.status}).`);
       }
       readinessCatalog = validateReadinessCatalog(await response.json());
+      const examples = await fetch("schema/attestation-data-examples.v1.json", { cache: "no-store" });
+      if (!examples.ok) throw new Error(`Unable to load attestation data examples (${examples.status}).`);
+      attestationDataExamples = await examples.json();
       renderEstateDomains({ estateAssessment: buildDemoEstateAssessment(readinessCatalog) });
       renderClearance();
     }
@@ -4520,6 +4535,7 @@
     async function loadWorkflowArtifact(result) {
       const artifact = await apiJson(`/api/artifacts/${result}`);
       if (result === "baseline") {
+        window.FlightDeckEvidenceAdmissibility.acceptServiceAssessment(artifact, readinessCatalog);
         applyTenantScan(artifact);
       } else {
         applyVerificationReport(artifact, { trusted: true });

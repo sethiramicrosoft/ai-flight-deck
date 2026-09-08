@@ -1,5 +1,7 @@
 "use strict";
 
+const { captureCollectorEvidence } = require("./evidence-authority");
+
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const ID_PATTERN = /^[a-z][a-z0-9-]{2,127}$/;
 const CONTROL_ID_PATTERN = /^AFD-[A-Z0-9]+-\d{3}$/;
@@ -239,6 +241,7 @@ class CollectorRegistry {
       if (controlResults.some(result => !result || !allowedControls.has(result.controlId))) {
         throw new Error(`Collector '${collector.id}' emitted an undeclared control result.`);
       }
+      captureCollectorEvidence(collector, observations, context, controlResults);
       return {
         ...capability,
         status: "Completed",

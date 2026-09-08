@@ -38,12 +38,15 @@ test("evidence completion plan uses specific missing permissions before generic 
   assert.deepEqual(planned.missingPermissions, control.requiredPermissions);
 });
 
-test("only complete fresh pass or bounded approved not-applicable evidence is complete", () => {
+test("only source-admitted pass or signed bounded applicability evidence is complete", async () => {
+  const f = require("./authority-test-fixtures");
   const base = {
     freshUntil: "2026-09-11T00:00:00.000Z",
     coverage: { complete: true }
   };
-  assert.equal(completeResult({ ...base, status: "Pass" }, now), true);
+  assert.equal(completeResult({ ...base, status: "Pass" }, now), false);
+  const [derived] = await f.licensing();
+  assert.equal(completeResult(derived, f.now), true);
   assert.equal(completeResult({
     ...base,
     status: "Pass",
@@ -57,7 +60,10 @@ test("only complete fresh pass or bounded approved not-applicable evidence is co
       approvedBy: "Program owner",
       expiresAt: "2026-09-11T00:00:00.000Z"
     }
-  }, now), true);
+  }, now), false);
+  const signed = f.attested("AFD-DEV-005", { applicablePopulation: 0, scopeEvidenceRef: "review:no-byod" },
+    { decision: "NotApplicable", reason: "No BYOD", approvedBy: "owner" }).result;
+  assert.equal(completeResult(signed, f.now), true);
   assert.equal(completeResult({
     ...base,
     status: "NotApplicable",

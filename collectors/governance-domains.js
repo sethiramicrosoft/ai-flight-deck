@@ -309,7 +309,7 @@ function controlResult(domainId, controlId, status, context, options = {}) {
       excluded: options.excluded || 0,
       reason: options.coverageReason || ""
     },
-    confidence: options.confidence ?? (options.complete ? 1 : 0),
+    ...(options.confidence === undefined ? {} : { confidence: options.confidence }),
     provenance: {
       collectorId: `microsoft-365-${domainId.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`,
       collectorVersion: VERSION,
