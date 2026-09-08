@@ -2031,6 +2031,7 @@
       if (scan.integrity?.verifiedByLocalService !== true || !scan.evidenceGraphEnvelope) {
         return buildReadinessScenarios(scan);
       }
+      const potentialTenantAudience = scan.summary.enabledMemberUsers;
       const simulation = window.FlightDeckEvidenceGraph.simulateEvidenceGraph(scan.evidenceGraphEnvelope, {
         tenantId: scanTenantId(scan),
         cohortId: scan.estateAssessment?.cohorts?.[0]?.id || "tenant-wide",
