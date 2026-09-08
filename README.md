@@ -466,6 +466,12 @@ controls can still be evaluated.
 
 #### Power Platform and Copilot Studio
 
+Set up displays **Before you scan: some evidence requires manual work** above
+the scan button, with a direct blank-template download and a link to the
+visible five-step import instructions. Those instructions identify the
+administrator's role, seven evidence lists, fields to replace, 30-minute
+challenge window, rescan step, and the limits of imported evidence.
+
 Download
 [`schema/power-platform-evidence.template.v1.json`](schema/power-platform-evidence.template.v1.json),
 select **Create collection challenge** for Power Platform, then replace the

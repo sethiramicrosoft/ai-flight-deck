@@ -250,6 +250,9 @@
     .completion-blocker small { display: block; color: var(--cp-text-soft); margin-top: 4px; }
     .completion-blocker-meta { font-weight: 700; }
     .completion-state { color: var(--cp-accent); font-size: 12px; font-weight: 700; }
+    .manual-evidence-steps { padding-left: 24px; color: var(--cp-text-muted); }
+    .manual-evidence-steps li { margin: 12px 0; line-height: 1.5; }
+    #power-platform-manual-evidence { min-width: 0; overflow-wrap: anywhere; }
     .source-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
     .source-metric { padding: 10px; border: 1px solid var(--cp-border); border-radius: 0.625rem; background: var(--cp-bg-elevated); }
     .source-metric strong { display: block; color: var(--cp-text); font-size: 18px; }
@@ -1338,6 +1341,16 @@
             <p class="eyebrow">Step 1 of 4</p>
             <h2>Set up an estate-wide Copilot readiness assessment</h2>
             <p class="subtitle">Choose a path: import Microsoft's readiness evidence for a fast start, run the live read-only scan, or combine both for the strongest pilot decision.</p>
+            <div class="source-status" id="manual-evidence-notice" style="margin-top:12px" aria-labelledby="manual-evidence-notice-title">
+              <strong id="manual-evidence-notice-title">Before you scan: some evidence requires manual work</strong>
+              <p>The scan collects supported read-only data. It does not complete every workload or automatically fill the evidence templates.</p>
+              <p><strong>Power Platform:</strong> An administrator must gather exports, fill in the blank JSON template, and import it. There is no automatic Power Platform collector in this version.</p>
+              <div class="actions">
+                <a class="btn" href="schema/power-platform-evidence.template.v1.json" download>Download blank JSON template</a>
+                <button class="btn" type="button" data-scroll="power-platform-manual-evidence">How to fill and import it</button>
+              </div>
+              <p><strong>Exchange, SharePoint and Purview:</strong> Administrators run the separate PowerShell collector and import its output. <strong>Owner reviews:</strong> Accountable owners provide statements and supporting evidence. Missing or unvalidated evidence stays unresolved.</p>
+            </div>
             <div class="actions" style="margin-top:18px">
               <button class="btn primary" id="connect-scan">Connect and scan tenant</button>
               <button class="btn" data-scroll="readiness-file">Import Microsoft readiness</button>
@@ -1445,9 +1458,9 @@
         </article>
         <div class="evidence-source-grid" style="margin-top:16px">
           <article class="card">
-            <p class="eyebrow">Workload administrators</p>
+            <p class="eyebrow">Manual step required · Workload administrators</p>
             <h3>Import administrator evidence</h3>
-            <p class="subtitle">Run the shipped read-only PowerShell producer for Exchange Online, SharePoint Online, and Purview. Import the resulting schema-versioned package here; the local service seals it and rejects stale or cross-tenant evidence.</p>
+            <p class="subtitle">The main tenant scan does not run this collector for you. A workload administrator must download and run the read-only PowerShell collector for Exchange Online, SharePoint Online, or Purview, then import its output here. Create a collection challenge after your baseline scan and import within its 30-minute window. Importing a package does not automatically pass its controls.</p>
             <label class="field" style="margin-top:12px">Administrator evidence package
               <input type="file" id="admin-evidence-file" accept=".json,application/json">
             </label>
@@ -1459,24 +1472,33 @@
             <pre class="service-log" id="admin-evidence-challenge" hidden></pre>
             <div class="source-status" id="admin-evidence-status" role="status" aria-live="polite">No locally sealed administrator evidence package is available.</div>
           </article>
-          <article class="card">
-            <p class="eyebrow">Power Platform administrator</p>
+          <article class="card" id="power-platform-manual-evidence" tabindex="-1" aria-label="Manual Power Platform evidence instructions">
+            <p class="eyebrow">Manual step required · Power Platform administrator</p>
             <h3>Import Power Platform evidence</h3>
-            <p class="subtitle">Populate the seven required resource arrays from authenticated Power Platform and Copilot Studio exports. Import the package before rescanning.</p>
+            <p class="subtitle" id="power-platform-manual-boundary"><strong>Not collected automatically.</strong> Connecting your tenant does not collect this Power Platform evidence. An administrator must gather exports, fill in a JSON template, and upload the completed file here. The download is a blank data template, not a collector.</p>
+            <ol class="manual-evidence-steps" id="power-platform-manual-steps">
+              <li><strong>Run a baseline scan first.</strong> Use the tenant you intend to assess. A baseline is required before you can create the import code.</li>
+              <li><strong>Download and fill in the template.</strong> Use authenticated exports from the <a class="doc-link" href="https://admin.powerplatform.microsoft.com/" target="_blank" rel="noopener noreferrer">Power Platform admin center</a> and <a class="doc-link" href="https://copilotstudio.microsoft.com/" target="_blank" rel="noopener noreferrer">Copilot Studio</a>. This is not a one-click export-to-template conversion; map the information into the seven lists below.</li>
+              <li><strong>Replace the sample values.</strong> Set <code>tenantId</code> to your baseline tenant ID, <code>actorId</code> to the collecting administrator, and <code>producedAt</code> to the actual evidence collection time in UTC. Keep the schema and producer version fields unchanged. Do not put passwords or tokens in the file.</li>
+              <li><strong>Create the collection challenge when the file is ready.</strong> Copy the one-time code into <code>collectionChallenge</code>. You have 30 minutes to import; if it expires, create a new challenge.</li>
+              <li><strong>Select the completed JSON file below, then click Import Power Platform evidence.</strong> Read the import result, then run another tenant scan to process the package.</li>
+            </ol>
+            <p class="subtitle">Fill these seven lists under <code>evidence</code>: <code>environments</code>, <code>dlpPolicies</code>, <code>connectors</code>, <code>agents</code>, <code>agentOwners</code>, <code>agentSharing</code>, and <code>agentLifecycle</code>. Record collection failures in <code>errors</code>; do not leave a list empty merely because you could not collect it. An empty list is not proof of complete coverage.</p>
+            <p class="source-status"><strong>After import:</strong> The app checks the package and protects it against alteration. It does not independently verify the exports or automatically mark controls as Pass. Power Platform controls without a supported observation-validation path remain Unknown. The owner statement for AFD-PPA-005 uses the separate attestation form below.</p>
             <label class="field" style="margin-top:12px">Power Platform evidence package
-              <input type="file" id="power-platform-evidence-file" accept=".json,application/json">
+              <input type="file" id="power-platform-evidence-file" accept=".json,application/json" aria-describedby="power-platform-manual-boundary power-platform-manual-steps">
             </label>
             <div class="actions" style="margin-top:12px">
               <button class="btn" id="prepare-power-platform-evidence" type="button">Create collection challenge</button>
               <button class="btn primary" id="import-power-platform-evidence" type="button">Import Power Platform evidence</button>
-              <a class="btn" href="schema/power-platform-evidence.template.v1.json" download>Download template</a>
+              <a class="btn" href="schema/power-platform-evidence.template.v1.json" download>Download blank JSON template</a>
             </div>
             <pre class="service-log" id="power-platform-evidence-challenge" hidden></pre>
             <div class="source-status" id="power-platform-evidence-status" role="status" aria-live="polite">No locally sealed Power Platform evidence package is available.</div>
           </article>
         </div>
         <article class="card" style="margin-top:16px">
-          <p class="eyebrow">Accountable human evidence</p>
+          <p class="eyebrow">Manual step required · Accountable owner</p>
           <h3>Create a locally sealed attestation</h3>
           <p class="subtitle">Use only for controls explicitly classified as Attested. The accountable owner supplies the statement and supporting JSON; AI Flight Deck binds it to the tenant, approved cohort, control, signer, and control-specific expiry window.</p>
           <div class="field-grid">
