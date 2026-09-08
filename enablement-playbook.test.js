@@ -6,6 +6,7 @@ const catalog = require("./schema/readiness-catalog.v1.json");
 const {
   DOMAIN_PROFILES,
   CONTROL_OVERRIDES,
+  CONTROL_CHECKLISTS,
   controlPlaybook,
   buildTenantPlan,
   tenantPlanMarkdown
@@ -19,12 +20,17 @@ test("every readiness control produces an actionable Microsoft-sourced playbook"
   assert.equal(playbooks.length, 77);
   assert.equal(Object.keys(DOMAIN_PROFILES).length, 13);
   assert.equal(Object.keys(CONTROL_OVERRIDES).length, 77);
+  assert.equal(Object.keys(CONTROL_CHECKLISTS).length, 77);
   for (const playbook of playbooks) {
     assert.match(playbook.portalUrl, /^https:\/\//);
     assert.ok(playbook.adminPath.length > 8);
     assert.ok(playbook.responsibleRoles.length > 0);
     assert.equal(playbook.steps.length, 6);
     assert.ok(playbook.steps.every(step => step.length > 20));
+    assert.deepEqual(playbook.steps.slice(2, 4), CONTROL_CHECKLISTS[playbook.controlId]);
+    assert.match(playbook.requirementOrigin, /not automatically Microsoft deployment prerequisites/);
+    assert.ok(playbook.collection.steps.length >= 2);
+    assert.ok(playbook.collection.limitation.length > 20);
     assert.ok(playbook.sources.length > 0);
     assert.ok(playbook.sources.every(source =>
       /^https:\/\/(learn|adoption)\.microsoft\.com\//.test(source.url)
@@ -173,11 +179,47 @@ test("downloadable Markdown contains every control, implementation steps, and ci
   assert.match(markdown, /# Microsoft 365 Copilot tenant enablement plan/);
   assert.match(markdown, /\*\*Recommendation:\*\* NO-GO/);
   assert.match(markdown, /\*\*Implementation steps:\*\*/);
-  assert.match(markdown, /\*\*Authoritative Microsoft source:\*\*/);
+  assert.match(markdown, /\*\*Microsoft guidance reference:\*\*/);
+  assert.match(markdown, /\*\*Evidence collection and completion:\*\*/);
+  assert.match(markdown, /not certification of this AI Flight Deck gate/);
+  assert.doesNotMatch(markdown, /Authoritative Microsoft source/);
   assert.doesNotMatch(markdown, /\n!\[remote\]/);
   assert.ok(markdown.includes("Contoso \\`fake\\`"));
   for (const domain of catalog.domains) assert.match(markdown, new RegExp(`## ${domain.name}`));
   for (const control of catalog.domains.flatMap(domain => domain.controls)) {
     assert.ok(markdown.includes(`### ${control.id}: ${control.title}`));
   }
+});
+
+test("evidence routes distinguish unconnected inputs, templates, attestations and supported collectors", () => {
+  const plan = buildTenantPlan({ catalog });
+  const byId = new Map(plan.controls.map(control => [control.controlId, control]));
+  for (const id of ["AFD-TEAMS-001", "AFD-SEC-003", "AFD-DEV-006", "AFD-ADOPT-005", "AFD-NET-002"]) {
+    assert.equal(byId.get(id).collection.kind, "IntegrationRequired");
+    assert.match(byId.get(id).collection.limitation, /rescan alone/);
+  }
+  assert.equal(byId.get("AFD-IAM-007").collection.kind, "SignedAttestationRequired");
+  assert.equal(byId.get("AFD-PPA-001").collection.kind, "PowerPlatformEvidenceRequired");
+  assert.match(byId.get("AFD-PPA-001").collection.limitation, /not an automated collector/);
+  assert.equal(byId.get("AFD-EXO-001").collection.kind, "AdminEvidenceRequired");
+  assert.match(byId.get("AFD-EXO-001").collection.steps.join(" "), /-Workloads "exchangeOnline"/);
+  assert.equal(byId.get("AFD-SEC-004").collection.kind, "LiveCollectionRequired");
+});
+
+test("affected identifiers survive in playbooks and are escaped in Markdown exports", () => {
+  const plan = buildTenantPlan({
+    catalog,
+    controlResults: [{
+      controlId: "AFD-EXO-001",
+      status: "Fail",
+      affectedResources: ["mailbox-1", "![tracking](https://example.test/image)"],
+      affectedPrincipals: ["user-1"]
+    }]
+  });
+  const control = plan.controls.find(item => item.controlId === "AFD-EXO-001");
+  assert.deepEqual(control.affectedScope.principals, ["user-1"]);
+  const markdown = tenantPlanMarkdown(plan);
+  assert.ok(markdown.includes("mailbox\\-1"));
+  assert.ok(markdown.includes("\\!\\[tracking\\]"));
+  assert.doesNotMatch(markdown, /!\[tracking\]/);
 });

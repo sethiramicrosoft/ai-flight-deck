@@ -554,7 +554,7 @@
     .control-detail.pass .control-badge { border-color: var(--cp-success); color: var(--cp-success); }
     .control-detail.fail .control-badge, .control-detail.expired .control-badge { border-color: var(--cp-danger); color: var(--cp-danger); }
     .control-detail.warning .control-badge { border-color: var(--cp-warning); color: var(--cp-warning); }
-    .control-body { padding: 0 10px 10px; border-top: 1px solid var(--cp-border); }
+    .control-body { padding: 0 10px 10px; border-top: 1px solid var(--cp-border); overflow-wrap: anywhere; }
     .control-body p { margin: 9px 0 0; }
     .control-body ol { margin: 9px 0 0; padding-left: 22px; }
     .control-body li { margin: 7px 0; color: var(--cp-text-muted); line-height: 1.45; }
@@ -577,6 +577,8 @@
     .enablement-domain { margin-top: 18px; }
     .enablement-domain h3 { margin-bottom: 8px; }
     .enablement-controls { display: grid; gap: 8px; }
+    .enablement-actions { min-width: 0; max-width: 100%; }
+    .enablement-actions > * { max-width: 100%; }
     .enablement-note { color: var(--cp-text-muted); font-size: 12px; }
     .console-next {
       margin-top: auto;
@@ -1270,7 +1272,7 @@
         </article>
         <article class="card" style="margin-top:16px">
           <div class="section-head" style="margin-top:0">
-            <div><h2>Decision blockers</h2><p>Every unresolved gate links to the required action and authoritative Microsoft guidance.</p></div>
+            <div><h2>Decision blockers</h2><p>Open the required action, implementation instructions, and supporting Microsoft guidance for each listed blocker.</p></div>
           </div>
           <div class="decision-blocker-list" id="decision-blockers"></div>
         </article>
@@ -1278,9 +1280,9 @@
           <div class="section-head" style="margin-top:0">
             <div>
               <h2>Tenant-wide Copilot enablement plan</h2>
-              <p>Exact owners, administration paths, implementation steps, acceptance criteria, and authoritative Microsoft sources for all 77 controls.</p>
+              <p>Accountable owners, administration paths, implementation steps, collection boundaries, and supporting Microsoft references for all 77 controls.</p>
             </div>
-            <div class="actions">
+            <div class="actions enablement-actions">
               <select id="enablement-filter" aria-label="Filter tenant enablement controls">
                 <option value="remaining">Remaining requirements</option>
                 <option value="action">Action required</option>
@@ -2821,7 +2823,8 @@
         "Evidence References", "Limitation Codes", "Limitation Details",
         "Recommended Correction", "Responsible Roles", "Administration Portal",
         "Administration Path", "Implementation Steps", "Validation Method",
-        "Microsoft Documentation"
+        "Microsoft Documentation", "Requirement Origin", "Evidence Collection Steps",
+        "Collection Boundary"
       ];
       const rows = baselineScan.estateAssessment.controlResults.map(result => {
         const domain = readinessCatalog.domains.find(item => item.id === result.domainId);
@@ -2862,7 +2865,10 @@
           playbook?.adminPath,
           playbook?.steps,
           playbook?.validation,
-          playbook?.sources
+          playbook?.sources,
+          playbook?.requirementOrigin,
+          playbook?.collection.steps,
+          playbook?.collection.limitation
         ].map(csvCell).join(",");
       });
       return `\uFEFF${columns.map(csvCell).join(",")}\r\n${rows.join("\r\n")}`;
@@ -3397,7 +3403,7 @@
         catalog: readinessCatalog,
         controlResults: baselineScan?.estateAssessment?.controlResults || [],
         grantedPermissions,
-        availableLicenses: [],
+        availableLicenses: null,
         cohort: activeCohort(),
         now: new Date()
       });
@@ -3436,8 +3442,8 @@
         title.textContent = `${control.controlId}: ${control.title}`;
         const detail = document.createElement("small");
         const missing = [
-          ...control.missingPermissions,
-          ...control.missingLicenses,
+          ...(control.state === "MissingPermission" ? control.missingPermissions : []),
+          ...(control.state === "MissingLicense" ? control.missingLicenses : []),
           ...control.limitations.map(item => item.description)
         ];
         detail.textContent = missing.length
@@ -3447,6 +3453,13 @@
         meta.className = "completion-blocker-meta";
         meta.textContent = `Owner: ${control.owner} · Effort: ${control.effort}`;
         content.append(title, meta, detail);
+        const instructions = document.createElement("button");
+        instructions.type = "button";
+        instructions.className = "btn";
+        instructions.textContent = "View exact steps and references";
+        instructions.setAttribute("aria-label", `View steps and references for ${control.controlId}`);
+        instructions.addEventListener("click", () => openControlPlaybook(control.controlId));
+        content.appendChild(instructions);
         const state = document.createElement("span");
         state.className = "completion-state";
         state.textContent = control.stateLabel;
@@ -3718,7 +3731,7 @@
         controlResults: baselineScan?.estateAssessment?.controlResults || [],
         grantedPermissions: (baselineScan?.scope?.grantedScopes || [])
           .map(scope => String(scope).split("/").pop()),
-        availableLicenses: [],
+        availableLicenses: null,
         cohort: activeCohort(),
         now: new Date()
       });
@@ -3747,6 +3760,7 @@
         list.className = "enablement-controls";
         for (const control of domainControls) {
           const detail = document.createElement("details");
+          detail.id = `enablement-${control.controlId}`;
           detail.className = `control-detail ${control.status.toLowerCase()}`;
           const controlSummary = document.createElement("summary");
           const headingWrap = document.createElement("span");
@@ -3772,6 +3786,12 @@
           location.textContent = `Where to implement: ${control.portal} > ${control.adminPath}.`;
           const outcome = document.createElement("p");
           outcome.textContent = `Required outcome: ${control.requiredOutcome}`;
+          const policy = document.createElement("p");
+          policy.textContent = control.requirementOrigin;
+          const prerequisites = document.createElement("p");
+          prerequisites.textContent = `Read permissions: ${control.prerequisites.permissions.join(", ") || "None listed"}. Entitlement prerequisites: ${control.prerequisites.licenses.join(", ") || "None listed"}. This view has no complete entitlement inventory; these are prerequisites to confirm, not evidence of missing licences.`;
+          const scope = document.createElement("p");
+          scope.textContent = `Affected resources: ${control.affectedScope.resources.join(", ") || "No identifiers recorded; establish scope before making changes"}. Affected principals: ${control.affectedScope.principals.join(", ") || "No identifiers recorded"}.`;
           const evidence = document.createElement("p");
           evidence.textContent = evidenceCompletion
             ? `Next evidence step: ${evidenceCompletion.nextAction}`
@@ -3786,19 +3806,46 @@
             item.textContent = step;
             steps.appendChild(item);
           });
+          const collectionHeading = document.createElement("p");
+          collectionHeading.textContent = "Evidence collection and completion";
+          const collectionSteps = document.createElement("ol");
+          control.collection.steps.forEach(step => {
+            const item = document.createElement("li");
+            item.textContent = step;
+            collectionSteps.appendChild(item);
+          });
+          const boundary = document.createElement("p");
+          boundary.textContent = `Collection boundary: ${control.collection.limitation}`;
           const source = document.createElement("a");
           source.className = "doc-link";
           source.href = control.sources[0].url;
           source.target = "_blank";
           source.rel = "noopener noreferrer";
-          source.textContent = `Authoritative Microsoft source: ${control.sources[0].title}`;
-          body.append(owner, location, outcome, evidence, stepsHeading, steps, source);
+          source.textContent = `Microsoft guidance reference: ${control.sources[0].title}`;
+          const sourceNote = document.createElement("p");
+          sourceNote.textContent = `${control.sources[0].relationship} ${control.sources[0].verification}`;
+          body.append(owner, location, outcome, policy, prerequisites, scope, evidence,
+            stepsHeading, steps, collectionHeading, collectionSteps, boundary, source, sourceNote);
           detail.append(controlSummary, body);
           list.appendChild(detail);
         }
         domain.append(heading, list);
         container.appendChild(domain);
       }
+    }
+
+    function openControlPlaybook(controlId) {
+      document.getElementById("enablement-filter").value = "all";
+      renderTenantEnablementPlan("all");
+      const detail = document.getElementById(`enablement-${controlId}`);
+      if (!detail) {
+        showError(`No implementation playbook is available for ${controlId}.`);
+        return;
+      }
+      navigate(detail.closest(".page").id);
+      detail.open = true;
+      detail.querySelector("summary").focus({ preventScroll: true });
+      detail.scrollIntoView({ block: "start", behavior: "instant" });
     }
 
     function renderDecisionCenter() {
@@ -3995,7 +4042,13 @@
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = `Microsoft documentation: ${playbook.sources[0].title}`;
-        body.append(impact, blocker, action, location, link);
+        const instructions = document.createElement("button");
+        instructions.type = "button";
+        instructions.className = "btn";
+        instructions.textContent = "View exact steps and references";
+        instructions.setAttribute("aria-label", `View steps and references for ${control.id}`);
+        instructions.addEventListener("click", () => openControlPlaybook(control.id));
+        body.append(impact, blocker, action, location, link, instructions);
         detail.append(summary, body);
         container.appendChild(detail);
       }

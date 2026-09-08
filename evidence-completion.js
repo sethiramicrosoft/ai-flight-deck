@@ -1,17 +1,13 @@
 (function (root, factory) {
-  const api = factory();
+  const api = factory(typeof module === "object" && module.exports
+    ? require("./enablement-playbook") : root.FlightDeckEnablement);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.FlightDeckEvidenceCompletion = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+})(typeof globalThis !== "undefined" ? globalThis : this, function (enablement) {
   "use strict";
 
-  const ADMIN_DOMAINS = new Set([
-    "exchangeOnline",
-    "sharePointOneDrive",
-    "purviewCompliance",
-    "securityPosture"
-  ]);
   const STATE_PRIORITY = Object.freeze({
+    IntegrationRequired: 0,
     MissingPermission: 0,
     MissingLicense: 1,
     SignedAttestationRequired: 2,
@@ -24,6 +20,10 @@
     Complete: 9
   });
   const STATE_DETAILS = Object.freeze({
+    IntegrationRequired: {
+      label: "Evidence integration required",
+      action: "Retain the owner-reviewed evidence and connect the missing input. A permission grant or rescan alone will not close this gap."
+    },
     MissingPermission: {
       label: "Permission required",
       action: "Grant the listed read permission, then run this evidence collector again."
@@ -70,7 +70,9 @@
     return catalog.domains.flatMap(domain => domain.controls.map(control => ({
       ...control,
       domainId: domain.id,
-      domainName: domain.name
+      domainName: domain.name,
+      ownerRoles: [...domain.ownerRoles],
+      collection: enablement.collectionGuidance(domain, control)
     })));
   }
 
@@ -108,30 +110,22 @@
       return "RecollectionRequired";
     }
 
+    const limitations = limitationText(result);
+    if (/PERMISSION_DENIED|MISSING_PERMISSION_OR_ROLE|CONSENT_REQUIRED|FORBIDDEN|ACCESS DENIED|AUTHORIZATION_REQUESTDENIED/.test(limitations)) {
+      return "MissingPermission";
+    }
+    if (/LICENSE_REQUIRED|LICENCE_REQUIRED|LICENSE_MISSING|ENTITLEMENT_REQUIRED/.test(limitations)) {
+      return "MissingLicense";
+    }
+    if (control.collection.kind === "IntegrationRequired") return "IntegrationRequired";
     const missingPermissions = (control.requiredPermissions || [])
       .filter(permission => !options.grantedPermissions.has(permission));
     if (missingPermissions.length) return "MissingPermission";
-    const missingLicenses = (control.requiredLicenses || [])
+    const missingLicenses = options.availableLicenses === null ? [] : (control.requiredLicenses || [])
       .filter(license => !options.availableLicenses.has(license));
     if (missingLicenses.length) return "MissingLicense";
 
-    const limitations = limitationText(result);
-    if (/PERMISSION|CONSENT|FORBIDDEN|ACCESS DENIED/.test(limitations)) {
-      return "MissingPermission";
-    }
-    if (/LICEN[CS]E|ENTITLEMENT|SKU/.test(limitations)) return "MissingLicense";
-    if (/ATTESTATION/.test(limitations) || control.automation === "Attested") {
-      return "SignedAttestationRequired";
-    }
-    if (/POWER_PLATFORM|ENVIRONMENT_INVENTORY|AGENT_|CONNECTOR/.test(limitations) ||
-        control.domainId === "powerPlatformAgents") {
-      return "PowerPlatformEvidenceRequired";
-    }
-    if (/COMMAND_|ADMIN|EXCHANGE|PURVIEW|SHAREPOINT/.test(limitations) ||
-        ADMIN_DOMAINS.has(control.domainId)) {
-      return "AdminEvidenceRequired";
-    }
-    return "LiveCollectionRequired";
+    return control.collection.kind;
   }
 
   function firstCurrentMission(catalog, resultsById, now) {
@@ -145,7 +139,7 @@
     catalog,
     controlResults = [],
     grantedPermissions = [],
-    availableLicenses = [],
+    availableLicenses = null,
     cohort = null,
     now = new Date()
   }) {
@@ -164,14 +158,14 @@
     const options = {
       now,
       grantedPermissions: new Set(grantedPermissions),
-      availableLicenses: new Set(availableLicenses)
+      availableLicenses: availableLicenses === null ? null : new Set(availableLicenses)
     };
     const controls = flattenCatalog(catalog).map(control => {
       const result = resultsById.get(control.id) || null;
       const state = classify(control, result, options);
       const missingPermissions = (control.requiredPermissions || [])
         .filter(permission => !options.grantedPermissions.has(permission));
-      const missingLicenses = (control.requiredLicenses || [])
+      const missingLicenses = options.availableLicenses === null ? [] : (control.requiredLicenses || [])
         .filter(license => !options.availableLicenses.has(license));
       return {
         controlId: control.id,
@@ -186,8 +180,10 @@
         state,
         stateLabel: STATE_DETAILS[state].label,
         nextAction: STATE_DETAILS[state].action,
+        collection: control.collection,
         missingPermissions,
         missingLicenses,
+        licenseInventoryStatus: options.availableLicenses === null ? "NotAssessed" : "Recorded",
         limitations: (result?.limitations || []).map(item => ({
           code: item.code,
           description: item.description

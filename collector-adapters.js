@@ -126,9 +126,16 @@ function createAdminCommandAdapter(workspace, options = {}) {
         fileName: "admin-evidence.json"
       }
     );
-    const key = request.evidenceKey
+    const baseKey = `${request.service}:${request.command}`;
+    let key = request.evidenceKey
       ? `${request.service}:${request.command}:${request.evidenceKey}`
-      : `${request.service}:${request.command}`;
+      : baseKey;
+    // Only the query plan can establish that an older command-only entry is unambiguous.
+    if (request.allowUnkeyed === true &&
+        !Object.prototype.hasOwnProperty.call(evidence.evidence, key) &&
+        !Object.prototype.hasOwnProperty.call(evidence.errors, key)) {
+      key = baseKey;
+    }
     if (evidence.errors?.[key]) {
       throw codedError(
         evidence.errors[key].code || "COMMAND_FAILED",

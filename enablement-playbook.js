@@ -533,6 +533,182 @@
     }
   });
 
+  const CONTROL_CHECKLISTS = Object.freeze({
+    "AFD-LIC-001": ["Compare the approved cohort size with active Copilot subscription capacity and current assignments.", "Record any capacity shortfall; have the License Administrator allocate existing capacity before requesting additional licences."],
+    "AFD-LIC-002": ["Compare named pilot members with users assigned the Copilot service plan; list missing and out-of-scope assignments.", "Review group-based licensing errors and reconcile only the approved membership differences."],
+    "AFD-LIC-003": ["Open each affected user's licence details and inspect the prerequisite service plans listed by this control.", "Check the licensing group that owns a disabled plan before changing an individual assignment."],
+    "AFD-LIC-004": ["List the optional capabilities selected for the rollout and compare their entitlements with the tenant subscription inventory.", "Ask the workload owner to confirm applicability before requesting an add-on or an exception."],
+    "AFD-LIC-005": ["Record subscription identifiers, renewal dates and the owner responsible for each in-scope subscription.", "Resolve expiring subscriptions with the Billing Administrator and retain the renewal decision and date."],
+    "AFD-IAM-001": ["Inspect enabled Conditional Access policies, cohort assignments and exclusions; registration for MFA alone is not enforcement.", "Evaluate affected pilot accounts against the proposed policy and preserve approved emergency-access arrangements before enforcement."],
+    "AFD-IAM-002": ["Identify legacy-client sign-ins and inspect the legacy-authentication policy's state, target users and exclusions.", "Identify application dependencies and their owners before enforcing the blocking policy."],
+    "AFD-IAM-003": ["Compare the pilot's users and target applications with the assignments and exclusions of the approved Conditional Access baseline.", "Review effective grant controls for representative pilot accounts, including nested-group assignments."],
+    "AFD-IAM-004": ["Inspect the approved sign-in and user-risk thresholds, policy assignments and current risk detections.", "Have the security owner approve treatment of excluded accounts and unresolved detections."],
+    "AFD-IAM-005": ["Identify pilot-integrated groups, guest membership, group labels and accountable sponsors.", "Review access-review scope and decisions; record the guest memberships approved for retention or removal."],
+    "AFD-IAM-006": ["Compare active privileged role assignments with eligible assignments and the approved emergency-access inventory.", "Review activation approval, authentication requirements and standing-access exceptions with the identity owner."],
+    "AFD-IAM-007": ["Record emergency account identifiers, custodians, approved exclusions and recovery procedures without recording credentials.", "Document a recent access exercise and the sign-in alert recipient; submit the dated owner attestation."],
+    "AFD-DEV-001": ["Join pilot users to their actual Microsoft 365 Apps installations and record channel, build and observation date.", "Compare each installation with the linked Microsoft requirements; identify devices needing channel or build updates."],
+    "AFD-DEV-002": ["List pilot devices and their current compliance states, including pilot users for whom no device evidence exists.", "Open each non-compliant device's reported settings and assign remediation to its device administrator."],
+    "AFD-DEV-003": ["Resolve effective update-ring and feature-update assignments to the pilot's Windows devices.", "Identify unsupported builds and assignment exclusions before approving update-ring changes."],
+    "AFD-DEV-004": ["Inspect effective app-protection settings and assignments for the mobile apps used by the pilot.", "Check encryption and data-transfer controls explicitly; do not treat the mere existence of an app-protection policy as coverage."],
+    "AFD-DEV-005": ["Document allowed personal-device scenarios and the owner-approved access boundary.", "Compare that boundary with effective Conditional Access and enrollment restrictions, then attest to the result."],
+    "AFD-DEV-006": ["List permitted add-ins and plugins, their owners, and the pilot groups assigned the client policy.", "Review unmanaged installation controls against the approved allow-list and retain the effective policy export."],
+    "AFD-NET-001": ["Run connectivity evidence collection from every representative pilot network location, not just the scanner host.", "Give the network owner the failing destination, DNS result, proxy route and timestamp before changing egress rules."],
+    "AFD-NET-002": ["Collect WebSocket and Teams media diagnostics from the pilot locations using the linked Microsoft guidance.", "Record blocked destinations and required protocols; retest the same locations after approved network changes."],
+    "AFD-NET-003": ["Record negotiated TLS and certificate validation from pilot locations, including any inspection appliance.", "Review obsolete TLS dependencies before the network owner changes protocol or inspection settings."],
+    "AFD-NET-004": ["Measure latency from the affected pilot locations and compare it with the explicitly approved network target.", "Document the existing route and compare an approved local-egress alternative before changing routing."],
+    "AFD-NET-005": ["Record DNS, connection and TLS results for the Copilot destinations relevant to the selected features.", "Give the network owner exact failing endpoints and retest them from the same user locations."],
+    "AFD-OPS-001": ["Open the incident identifier in Service health and confirm that the affected service and time window apply to the pilot.", "Track Microsoft's incident status and the pilot impact; do not change tenant settings to work around an unrelated advisory."],
+    "AFD-OPS-002": ["List relevant Message Center post IDs, action dates and accountable owners.", "Record the action or explicit no-action decision for each overdue post."],
+    "AFD-OPS-003": ["Record the Service health review time, relevant warnings and the person responsible for follow-up.", "Link each unresolved pilot-impacting issue to an owner and an incident or support reference."],
+    "AFD-OPS-004": ["Review Copilot advisories since the last recorded review and identify changed deployment assumptions.", "Record affected control IDs, decisions and review expiry in the accountable attestation."],
+    "AFD-OPS-005": ["Confirm technical and business escalation contacts and their coverage for this pilot.", "Record the last contact review and escalation route; do not include credentials or private contact data in public exports."],
+    "AFD-EXO-001": ["Match the approved pilot's user IDs to Exchange mailbox type and cloud residency.", "Have the Exchange owner review unmatched or non-cloud mailboxes before migration or cohort changes."],
+    "AFD-EXO-002": ["Collect hybrid configuration, organization relationships and remote-domain evidence.", "Record dated free/busy and mail-flow results for representative hybrid users before deciding whether configuration changes are needed."],
+    "AFD-EXO-003": ["List Full Access and recipient delegation grants for the affected mailboxes, including disabled trustees.", "Obtain the mailbox owner's retention or removal decision for each stale delegation."],
+    "AFD-EXO-004": ["Map pilot users and shared-mailbox scenarios to actual Outlook clients and supported versions.", "Have the Exchange owner record scenario results and per-user coverage rather than relying only on detected-app totals."],
+    "AFD-EXO-005": ["Identify the transport-rule and message-trace records relevant to a reproduced pilot problem.", "Review the matching rule and business purpose before changing it; repeat the same message-flow scenario afterward."],
+    "AFD-TEAMS-001": ["Resolve the effective meeting policy for pilot users and inspect the transcription setting.", "Record whether transcription is required for the selected scenario before approving any policy change."],
+    "AFD-TEAMS-002": ["Inspect recording policy assignments, recording storage and the applicable retention configuration.", "Have the data owner approve retention treatment before changing recording or retention settings."],
+    "AFD-TEAMS-003": ["Reconcile discovered teams, private channels, owners and assigned labels against the pilot's collaboration scope.", "Assign an accountable owner to each ownerless team and review the appropriate label with its data owner."],
+    "AFD-TEAMS-004": ["Compare effective external and guest-access settings with the approved collaboration boundary.", "Record required partner access and exceptions before narrowing access."],
+    "AFD-TEAMS-005": ["Inspect the effective Copilot meeting setting for each pilot user, including policy-assignment precedence.", "Compare the setting with the approved meeting scenario and retain the policy-assignment evidence."],
+    "AFD-TEAMS-006": ["Compare apps available to the pilot with the approved application inventory and owner decisions.", "Resolve effective app governance and assignment settings using current Teams administration guidance before removing access."],
+    "AFD-SPO-001": ["Record SharePoint and OneDrive tenant sharing settings and the organization's approved maximum sharing posture.", "Review legitimate external collaboration before approving a tenant-level change."],
+    "AFD-SPO-002": ["Select the pilot's relevant sites and record site sharing settings, access-request recipients and business owners.", "Ask each site owner to resolve unintended sharing or missing access-request ownership."],
+    "AFD-SPO-003": ["Obtain a dated access-governance report for the selected sites and record its coverage and exclusions.", "Assign an owner and treatment decision to each reported oversharing concern; a sampled result is not full effective access."],
+    "AFD-SPO-004": ["List the resources the data owner wants excluded from discovery and identify the supported restriction mechanism.", "Apply only the approved restriction and evaluate discovery separately from the user's underlying permission to open content."],
+    "AFD-SPO-005": ["Confirm that Restricted SharePoint Search is part of the approved pilot strategy before changing it.", "Compare enabled state and allowed site identifiers with that strategy; search restriction is not permission removal."],
+    "AFD-SPO-006": ["Identify owners and lifecycle decisions for the pilot's in-scope sites.", "Obtain retention and business-owner approval before archiving or removing an inactive site."],
+    "AFD-SPO-007": ["Compare OneDrive default link type and permission with the documented sharing posture.", "Identify actual site-level overrides and their owners before narrowing defaults or exceptions."],
+    "AFD-PURV-001": ["Inspect label definitions and publication-policy scope for the pilot.", "Have the information-protection owner confirm classification guidance and resolve missing publication assignments."],
+    "AFD-PURV-002": ["Inspect auto-labelling policy scope, mode and available simulation results.", "Review matching content and false positives before approving enforcement; policy inventory alone does not prove content coverage."],
+    "AFD-PURV-003": ["Inspect DLP rules, workload locations, pilot assignments, mode and exceptions.", "Have the compliance owner review simulation outcomes before promoting a policy to enforcement."],
+    "AFD-PURV-004": ["Inspect audit configuration and retrieve dated Copilot activity records for an appropriate activity window.", "Distinguish no observed activity from a collection failure; record the approved retention requirement separately."],
+    "AFD-PURV-005": ["Map grounding locations to their applicable retention labels and policies.", "Obtain records-management approval for gaps or conflicts before changing retention."],
+    "AFD-PURV-006": ["Have the legal/compliance owner identify the applicable case, hold scope and authorized reviewers.", "Record a dated hold-validation result; do not create legal holds solely because this prototype reports a gap."],
+    "AFD-PURV-007": ["Inspect applicable insider-risk and communication-compliance policy scope and alert queues.", "Record alert ownership and treatment using authorized reviewers; policy existence is not proof that alerts are handled."],
+    "AFD-SEC-001": ["Compare the observed Secure Score with the organization's approved baseline and identify relevant recommendations.", "Assign recommendation owners rather than treating Microsoft's score as an automatic Copilot launch threshold."],
+    "AFD-SEC-002": ["Inspect Safe Links, Safe Attachments and anti-phishing policy settings and effective pilot coverage.", "Review preset versus custom policies and exclusions before approving changes."],
+    "AFD-SEC-003": ["Obtain authenticated Defender for Cloud Apps application and alert evidence using its own service connection.", "Assign review decisions to unapproved OAuth applications and outstanding alerts."],
+    "AFD-SEC-004": ["Identify unresolved incidents that affect the pilot, their severity, age and owner.", "Follow the incident-response process and record resolution or accepted treatment before reassessing rollout."],
+    "AFD-SEC-005": ["Map pilot devices to Defender onboarding and vulnerability evidence.", "Assign owners to missing device coverage and relevant critical vulnerabilities; retain the mitigation evidence."],
+    "AFD-SEC-006": ["Inspect unmanaged-access monitoring policies and the associated alert queue.", "Confirm who receives and handles alerts; do not equate an empty or inaccessible queue with healthy monitoring."],
+    "AFD-COPILOT-001": ["Record the selected Copilot experiences and the business-approved tenant configuration.", "Compare current settings with that record before approving tenant-wide changes."],
+    "AFD-COPILOT-002": ["Record the business and privacy decision on web grounding for the pilot.", "Compare the applicable settings and assignments with the decision and retain owner approval."],
+    "AFD-COPILOT-003": ["List external connections, source owners, ingestion health and approved grounding scope.", "Review source permissions and ingestion failures before expanding connector availability."],
+    "AFD-COPILOT-004": ["Reconcile plugins and message extensions available to the pilot with the approved inventory.", "Record each integration's owner, approval and review date before removing or retaining it."],
+    "AFD-COPILOT-005": ["Inspect the approved Cloud Policy settings and resolve their assignments to pilot users.", "Record effective settings and exclusions, not merely the existence of a policy."],
+    "AFD-COPILOT-006": ["Record the feedback/telemetry decision, privacy reference and accountable owner.", "Compare the relevant setting with that decision and submit a dated attestation."],
+    "AFD-PPA-001": ["List in-scope environments and effective DLP policies, including connector groups and exclusions.", "Review business dependencies before changing connector classification or policy scope."],
+    "AFD-PPA-002": ["Record environment purpose, owner, security group and applicable DLP policy.", "Have the environment owner resolve missing assignments and document intentional exceptions."],
+    "AFD-PPA-003": ["Reconcile agent identifiers, environments, owners, business purposes and approval status.", "Obtain an owner decision for every unapproved or ownerless agent before changing availability."],
+    "AFD-PPA-004": ["Inspect each agent's authentication mode, connection identity, connectors and effective permissions.", "Have the connection owner remove unintended access; never include credential values in the evidence package."],
+    "AFD-PPA-005": ["List each agent's knowledge sources and tools with its approved purpose and access scope.", "Record the data/tool owners' review decisions and expiry in the attestation."],
+    "AFD-PPA-006": ["Inspect published agents, available channels, sharing and release approvals.", "Compare the current published version with the approved release and record any required withdrawal through normal change control."],
+    "AFD-ADOPT-001": ["Record each priority use case with its owner, target users, intended outcome and success measure.", "Have the program owner approve the register and provide it as structured attestation data."],
+    "AFD-ADOPT-002": ["Define pilot group membership, owner, entry criteria and exit criteria.", "Reconcile the register with the actual directory group and record the approved segmentation."],
+    "AFD-ADOPT-003": ["Record delivered training, its date, and the support intake, owner and response target.", "Have the adoption owner confirm that support is operating rather than merely planned."],
+    "AFD-ADOPT-004": ["Link each published use case to its Responsible AI review, accountable approver and expiry.", "Resolve missing or expired acceptance through the organization's governance process."],
+    "AFD-ADOPT-005": ["Collect dated usage evidence and record each business measure's owner, current value, target and measurement date.", "Distinguish measured value from a forecast; submit the measures alongside the report-backed review."],
+    "AFD-ADOPT-006": ["Record the most recent expansion review, the drift examined and the decisions taken.", "Assign follow-up owners and a review date; an invitation alone is not evidence that the review happened."]
+  });
+
+  // These evaluators have no production input path for the listed dependencies yet.
+  const UNCONNECTED_INPUTS = Object.freeze({
+    "AFD-LIC-005": "subscription renewal dates and accountable renewal owners",
+    "AFD-IAM-005": "the approved set of Copilot-integrated groups",
+    "AFD-IAM-006": "the approved emergency-access account identifiers",
+    "AFD-DEV-001": "per-user Microsoft 365 Apps channel/build evidence",
+    "AFD-DEV-003": "effective device update-policy assignments",
+    "AFD-DEV-006": "the effective client plugin allow-list",
+    "AFD-NET-002": "WebSocket and Teams media diagnostics from pilot locations",
+    "AFD-OPS-002": "Message Center action ownership",
+    "AFD-OPS-003": "ownership for active service-health warnings",
+    "AFD-EXO-002": "dated hybrid mail-flow and free/busy results",
+    "AFD-EXO-003": "mailbox-owner delegation reviews",
+    "AFD-EXO-004": "per-user Outlook readiness evidence",
+    "AFD-TEAMS-001": "effective meeting transcription policy assignments",
+    "AFD-TEAMS-002": "effective recording and retention policy evidence",
+    "AFD-TEAMS-004": "effective external and guest-access policy evidence",
+    "AFD-TEAMS-005": "effective Copilot meeting policy assignments",
+    "AFD-TEAMS-006": "effective Teams application policy evidence",
+    "AFD-SPO-001": "the customer-approved maximum sharing posture",
+    "AFD-SPO-002": "the approved in-scope site list",
+    "AFD-SPO-004": "the data owner's restricted resource list",
+    "AFD-SPO-005": "the approved Restricted SharePoint Search allowed-site list",
+    "AFD-SPO-006": "the approved grounding-site scope",
+    "AFD-SPO-007": "the customer-approved OneDrive default link settings",
+    "AFD-PURV-004": "validated audit-retention posture",
+    "AFD-PURV-007": "the premium monitoring and alert-review record",
+    "AFD-SEC-001": "the customer-approved Secure Score baseline",
+    "AFD-SEC-003": "a Defender for Cloud Apps service connection and review context",
+    "AFD-SEC-005": "a Defender for Endpoint service connection",
+    "AFD-SEC-006": "a Defender for Cloud Apps policy connection",
+    "AFD-COPILOT-001": "approved Copilot tenant settings",
+    "AFD-COPILOT-002": "the approved web-grounding decision and effective settings",
+    "AFD-COPILOT-003": "connector ownership, scope and ingestion-health records",
+    "AFD-COPILOT-004": "the approved Copilot plugin inventory",
+    "AFD-COPILOT-005": "effective Cloud Policy assignments",
+    "AFD-ADOPT-005": "the signed usage/value measurement record (the evaluator exists, but the attestation selector does not expose this partially automated control)"
+  });
+
+  function collectionGuidance(domain, control) {
+    if (UNCONNECTED_INPUTS[control.id]) {
+      return {
+        kind: "IntegrationRequired",
+        limitation: `The live pipeline does not yet supply ${UNCONNECTED_INPUTS[control.id]}. This can prevent automated completion; permissions or a rescan alone will not supply it.`,
+        steps: [
+          `Ask the ${domain.ownerRoles[0]} to retain ${UNCONNECTED_INPUTS[control.id]} with tenant, scope and observation date.`,
+          `Have the product integrator connect this evidence to ${control.id}. Do not edit the scan JSON or use an unrelated attestation to force a Pass.`
+        ]
+      };
+    }
+    if (control.automation === "Attested" || domain.id === "adoptionMeasurementGovernance") {
+      return {
+        kind: "SignedAttestationRequired",
+        limitation: "An attestation records an accountable human statement; it does not turn a policy decision into machine-observed proof.",
+        steps: [
+          `In Set up, select ${control.id} under Create a locally sealed attestation after loading an approved cohort.`,
+          "Provide the statement, structured supporting JSON, reference links and expiry; create the attestation and run a new tenant scan."
+        ]
+      };
+    }
+    if (domain.id === "powerPlatformAgents") {
+      return {
+        kind: "PowerPlatformEvidenceRequired",
+        limitation: "This release reads an imported package; it does not authenticate directly to Power Platform. Its template is an evidence format, not an automated collector.",
+        steps: [
+          "In Set up, prepare a Power Platform collection challenge and download the evidence template.",
+          "Have the Power Platform Administrator populate environments, dlpPolicies, connectors, agents, agentOwners, agentSharing and agentLifecycle from authenticated administrative exports; retain source dates, scope and errors.",
+          "Use the baseline tenant ID and current challenge, import the package before the challenge expires, then run a new tenant scan. Empty arrays or inferred values do not establish complete coverage."
+        ]
+      };
+    }
+    const workloads = { exchangeOnline: "exchangeOnline", sharePointOneDrive: "sharePointOnline", purviewCompliance: "purview", securityPosture: "exchangeOnline" };
+    if (workloads[domain.id] && (domain.id !== "securityPosture" || control.id === "AFD-SEC-002")) {
+      return {
+        kind: "AdminEvidenceRequired",
+        limitation: "The package supplements Graph evidence. Raw command output must match the evaluator's required fields; successful import alone does not close the control.",
+        steps: [
+          `In Set up, prepare an administrator collection challenge and download scanner/collect-admin-evidence.ps1 for workload ${workloads[domain.id]}.`,
+          `From the downloaded collector's folder, run: .\\collect-admin-evidence.ps1 -TenantId "<baseline tenant GUID>" -WorkspacePath "<local output folder>" -CollectionChallenge "<current challenge>" -Workloads "${workloads[domain.id]}". Replace each placeholder; add -SharePointAdminUrl "https://<tenant>-admin.sharepoint.com" for SharePoint.`,
+          `The required module is ${domain.id === "sharePointOneDrive" ? "Microsoft.Online.SharePoint.PowerShell" : "ExchangeOnlineManagement"}. Install it through your approved PowerShell module process if it is missing.`,
+          "Sign in to the intended tenant, retain command errors, import the generated package before the challenge expires, and rerun the tenant scan. Review any remaining evidence limitations."
+        ]
+      };
+    }
+    return {
+      kind: "LiveCollectionRequired",
+      limitation: domain.id === "networkConnectivity"
+        ? "Built-in probes represent the scanner host. Proxy, WebSocket, media and other pilot locations are not fully collected by these probes."
+        : "Successful authentication or an inventory count alone does not prove effective policy coverage.",
+      steps: [
+        "In Set up, connect and scan the intended tenant with the listed read permissions and an approved pilot cohort.",
+        `Inspect ${control.id} after collection. Retain scope, timestamps and errors; resolve the specific limitation rather than repeatedly rescanning unchanged inputs.`
+      ]
+    };
+  }
+
   function hasConclusiveCoverage(result) {
     const coverage = result?.coverage;
     return coverage?.complete === true &&
@@ -594,17 +770,19 @@
     const roles = domain.ownerRoles || [];
     const source = {
       title: override.title || profile.guidance.title,
-      url: override.url || profile.guidance.url
+      url: override.url || profile.guidance.url,
+      relationship: "Supporting Microsoft product documentation; not certification of this AI Flight Deck gate or threshold.",
+      verification: "Mapped reference; live page currency and support for each policy threshold are not asserted."
     };
+    const collection = collectionGuidance(domain, control);
+    const checklist = CONTROL_CHECKLISTS[control.id];
+    if (!checklist) throw new Error(`No implementation checklist exists for '${control.id}'.`);
     const steps = [
-      `Confirm the affected scope and accountable owner. Applicability: ${control.applicability}`,
-      category === "Evidence required"
-        ? `Connect or obtain the required evidence before making a decision: ${evidenceSources.join(", ")}.`
-        : `Review the collected ${status} evidence and affected users or resources before changing configuration.`,
-      `Open ${override.portal || profile.portal} (${override.portalUrl || profile.url}) and go to ${override.path || profile.path}.`,
-      control.remediation,
-      `Validate the result against this acceptance criterion: ${control.passCondition}`,
-      `Capture fresh evidence from ${evidenceSources.join(", ")} and rerun AI Flight Deck within ${control.freshnessHours} hours.`
+      `Confirm the affected resources and ${roles.join(" / ")} owner before changing configuration; preserve the current settings and agree a rollback or recovery procedure.`,
+      `Open ${override.portal || profile.portal} (${override.portalUrl || profile.url}) and go to ${override.path || profile.path}. Review the linked Microsoft guidance for the current administration experience.`,
+      ...checklist,
+      `Agree the treatment against the AI Flight Deck criterion: ${control.passCondition} Apply only the owner-approved change, or retain evidence of a justified exception.`,
+      `Recollect using the evidence instructions below within ${control.freshnessHours} hours. Confirm the affected control's result and remaining limitations before considering the work complete.`
     ];
     return {
       controlId: control.id,
@@ -616,6 +794,7 @@
       status,
       category,
       requiredOutcome: control.passCondition,
+      requirementOrigin: "AI Flight Deck rollout policy. Gates, thresholds and applicability require customer approval; they are not automatically Microsoft deployment prerequisites.",
       whyItMatters: control.description,
       responsibleRoles: roles,
       portal: override.portal || profile.portal,
@@ -633,6 +812,11 @@
         freshnessHours: control.freshnessHours
       },
       sources: [source],
+      collection,
+      affectedScope: {
+        resources: [...(result?.affectedResources || [])],
+        principals: [...(result?.affectedPrincipals || [])]
+      },
       currentEvidence: result
         ? {
             observedAt: result.observedAt || null,
@@ -742,7 +926,7 @@
     return String(value ?? "")
       .replace(/[\u0000-\u001F\u007F]/g, " ")
       .replace(/\\/g, "\\\\")
-      .replace(/([`*_[\]{}()#+.!|>~-])/g, "\\$1")
+      .replace(/([`*_[\]{}()#+.!|<>~-])/g, "\\$1")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -781,13 +965,21 @@
           `- **Responsible roles:** ${control.responsibleRoles.join(", ") || "Accountable owner required"}`,
           `- **Administration surface:** ${control.portal} — ${control.adminPath}`,
           `- **Required outcome:** ${control.requiredOutcome}`,
+          `- **Requirement origin:** ${control.requirementOrigin}`,
+          `- **Affected resources:** ${control.affectedScope.resources.length ? control.affectedScope.resources.map(markdownEscape).join(", ") : "No resource identifiers recorded; establish scope before making changes."}`,
+          `- **Affected principals:** ${control.affectedScope.principals.length ? control.affectedScope.principals.map(markdownEscape).join(", ") : "No principal identifiers recorded."}`,
+          `- **Read permissions:** ${control.prerequisites.permissions.join(", ") || "None listed"}`,
+          `- **Entitlement prerequisites (not a finding of missing licences):** ${control.prerequisites.licenses.join(", ") || "None listed"}`,
           "",
           "**Implementation steps:**",
           ""
         );
         control.steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`));
-        lines.push("", "**Authoritative Microsoft source:**", "");
+        lines.push("", "**Evidence collection and completion:**", "");
+        control.collection.steps.forEach((step, index) => lines.push(`${index + 1}. ${markdownEscape(step)}`));
+        lines.push("", `**Collection boundary:** ${control.collection.limitation}`, "", "**Microsoft guidance reference:**", "");
         control.sources.forEach(source => lines.push(`- [${markdownEscape(source.title)}](${source.url})`));
+        lines.push("", control.sources[0].relationship, control.sources[0].verification);
         lines.push("");
       }
     }
@@ -805,6 +997,8 @@
     DOMAIN_DOCUMENTATION,
     DOMAIN_PROFILES,
     CONTROL_OVERRIDES,
+    CONTROL_CHECKLISTS,
+    collectionGuidance,
     hasConclusiveCoverage,
     hasCurrentFreshness,
     isSatisfied,

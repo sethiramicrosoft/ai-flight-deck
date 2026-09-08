@@ -64,3 +64,48 @@ test("only complete fresh pass or bounded approved not-applicable evidence is co
     applicability: { applies: false, approvedBy: "Program owner", expiresAt: null }
   }, now), false);
 });
+
+test("absent licence inventory is unknown, not evidence of a missing entitlement", () => {
+  const control = catalog.domains[0].controls[0];
+  const input = { catalog, now, grantedPermissions: control.requiredPermissions };
+  const unknown = buildEvidenceCompletionPlan(input).controls.find(item => item.controlId === control.id);
+  assert.equal(unknown.state, "LiveCollectionRequired");
+  assert.equal(unknown.licenseInventoryStatus, "NotAssessed");
+  assert.deepEqual(unknown.missingLicenses, []);
+  const knownEmpty = buildEvidenceCompletionPlan({ ...input, availableLicenses: [] })
+    .controls.find(item => item.controlId === control.id);
+  assert.equal(knownEmpty.state, "MissingLicense");
+  assert.deepEqual(knownEmpty.missingLicenses, control.requiredLicenses);
+});
+
+test("completion retains each domain's accountable owner and explains unconnected evidence", () => {
+  const plan = buildEvidenceCompletionPlan({ catalog, now });
+  for (const domain of catalog.domains) {
+    for (const control of domain.controls) {
+      assert.equal(plan.controls.find(item => item.controlId === control.id).owner, domain.ownerRoles[0]);
+    }
+  }
+  assert.equal(plan.controls.find(item => item.controlId === "AFD-TEAMS-001").state, "IntegrationRequired");
+});
+
+test("observed errors are not mistaken for entitlement gaps merely because they mention licensed users", () => {
+  const controls = catalog.domains.flatMap(domain => domain.controls);
+  const permissions = [...new Set(controls.flatMap(control => control.requiredPermissions))];
+  const result = (controlId, code, description) => ({
+    controlId, status: "Unknown", limitations: [{ code, description }]
+  });
+  const plan = buildEvidenceCompletionPlan({
+    catalog, now, grantedPermissions: permissions,
+    controlResults: [
+      result("AFD-EXO-001", "COMMAND_UNAVAILABLE", "No mailbox inventory for licensed users."),
+      result("AFD-LIC-001", "LICENSE_REQUIRED", "Entitlement absent."),
+      result("AFD-TEAMS-001", "MISSING_PERMISSION_OR_ROLE", "Teams Administrator role required."),
+      result("AFD-COPILOT-003", "CONNECTOR_CONTEXT_MISSING", "Connector governance input missing.")
+    ]
+  });
+  const state = id => plan.controls.find(item => item.controlId === id).state;
+  assert.equal(state("AFD-EXO-001"), "AdminEvidenceRequired");
+  assert.equal(state("AFD-LIC-001"), "MissingLicense");
+  assert.equal(state("AFD-TEAMS-001"), "MissingPermission");
+  assert.equal(state("AFD-COPILOT-003"), "IntegrationRequired");
+});

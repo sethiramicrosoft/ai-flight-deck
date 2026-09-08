@@ -50,11 +50,11 @@ Flight Deck adds the decision and evidence workflow around them:
 | Named pilot cohort | Converts suggested candidates into an explicitly selected pilot with an accountable owner, then resolves every selected user against Microsoft Entra |
 | 13 domains and 77 controls | Normalizes licensing, identity, devices, network, service health, Exchange, Teams, SharePoint/OneDrive, Purview, security, Copilot configuration, Power Platform/agents, and adoption/governance |
 | Actionable evidence gaps | Reclassifies unresolved controls as a missing permission, licence, workload package, attestation, or recollection requirement instead of showing bare `Unknown` |
-| Evidence completion center | Shows the current mission and the five highest-priority blockers, then provides supported producer or import paths for every evidence class |
+| Evidence completion center | Shows the current mission and the five highest-priority blockers, links each to its expanded control instructions, and distinguishes available collection paths from inputs that still need integration |
 | Mission gates | Shows whether activation, safe pilot, scale, and assurance missions can advance and identifies the exact blocking controls |
 | Readiness-impact traces | Connects evidence source to control, affected mission, decision impact, and required correction when a full access graph is unavailable |
 | SharePoint access and sharing review | Converts public SharePoint sites and sampled Anyone or organization-wide sharing links into named, evidence-backed validation scenarios with bounded audience estimates, explicit limitations, and administrator actions |
-| Tenant-wide enablement plan | Produces a `Ready`, `Go with conditions`, or `No-go` recommendation and turns all 77 controls into accountable owners, administration paths, ordered implementation steps, acceptance criteria, and control-specific Microsoft sources |
+| Tenant-wide enablement plan | Produces a `Ready`, `Go with conditions`, or `No-go` recommendation and turns all 77 controls into accountable owners, administration paths, control-specific checklists, acceptance criteria, and supporting Microsoft documentation |
 | Evidence-bound corrections | Produces administrator action packages tied to the selected controls and signed baseline rather than claiming that changes were applied |
 | Before-and-after proof | Re-scans after remediation and distinguishes verified improvement, no material change, and regression |
 | Provenance and freshness | Retains source artifact hashes, report dates, collector identity, evidence limitations, and conflicts between imported and live evidence |
@@ -63,6 +63,39 @@ Flight Deck adds the decision and evidence workflow around them:
 In one sentence: **Microsoft tools tell you what they observed; AI Flight Deck
 tells you whether a specific pilot can launch, why it cannot, who must act, and
 whether the evidence proves the fix worked.**
+
+### Using the control instructions
+
+Select **View exact steps and references** on a Set up blocker to open and
+focus that control in the Decision page's plan, including when the previous filter
+would have hidden it. Every control includes its affected identifiers (when
+recorded), prerequisites, owner, two control-specific inspection/treatment
+steps, acceptance criterion, evidence collection instructions, and collection
+boundary. The same instructions and policy/source qualifications are included
+in the downloadable plan and control CSV.
+
+The 77-control catalogue is **AI Flight Deck rollout policy**, not an official
+Microsoft certification or universal prerequisite list. Linked Microsoft pages
+are supporting documentation; the application does not assert their live
+currency or that they mandate every custom threshold. Entitlement prerequisites
+are not displayed as missing licences simply because no complete entitlement
+inventory is available. In the completion API, omitted/null `availableLicenses`
+means unknown; an explicit array is the caller's complete normalized inventory.
+
+**Evidence integration required** means the production pipeline still lacks an
+input used by the evaluator, such as effective Teams policy assignments.
+Repeated rescans, additional consent, or an unrelated attestation do not supply
+that input. The Power Platform package remains a manually populated export
+format, not an authenticated collector. Owner approvals and local package seals
+do not prove effective permissions or complete workload coverage.
+
+Administrator packages retain their version 1.0.0 contract. The consumer accepts
+command-only entries produced by the shipped script only when the command has
+one purpose in that workload's query plan. Exact entries and exact errors take
+precedence. Multi-purpose commands such as `Get-SPOSite`,
+`Get-SPODataAccessGovernanceInsight` and `Get-AutoSensitivityLabelPolicy` still
+require the purpose-specific key. Collection requests now carry the scan tenant
+ID into package validation.
 
 ## How the SharePoint access and sharing review works
 

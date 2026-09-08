@@ -118,6 +118,85 @@ test("Graph requests pin a supported locale for locale-sensitive beta endpoints"
       url: "https://graph.microsoft.com/beta/policies/roleManagementPolicyAssignments",
       signal: new AbortController().signal
     });
+
+    test("unambiguous legacy command entries preserve exact-result and error precedence", async () => {
+      await withWorkspace(async workspace => {
+        const writePackage = (evidence, errors = {}) => fs.writeFileSync(
+          path.join(workspace, "admin-evidence.json"),
+          JSON.stringify({
+            schema: "ai-flight-deck/admin-evidence", version: "1.0.0",
+            tenantId: "tenant-1", producedAt: new Date().toISOString(), evidence, errors
+          })
+        );
+        const request = {
+          tenantId: "tenant-1", service: "exchangeOnline", command: "Get-EXOMailbox",
+          evidenceKey: "mailboxes", allowUnkeyed: true
+        };
+        const read = () => createAdminCommandAdapter(workspace, { verifyDocument: () => true })(request);
+        writePackage({ "exchangeOnline:Get-EXOMailbox": [{ id: "legacy" }] });
+        assert.deepEqual(await read(), [{ id: "legacy" }]);
+        writePackage({
+          "exchangeOnline:Get-EXOMailbox": [{ id: "legacy" }],
+          "exchangeOnline:Get-EXOMailbox:mailboxes": []
+        });
+        assert.deepEqual(await read(), []);
+        writePackage({ "exchangeOnline:Get-EXOMailbox": [{ id: "legacy" }] }, {
+          "exchangeOnline:Get-EXOMailbox:mailboxes": { code: "EXACT_FAILURE", message: "Exact query failed." }
+        });
+        await assert.rejects(read, error => error.code === "EXACT_FAILURE");
+        writePackage({}, {
+          "exchangeOnline:Get-EXOMailbox": { code: "LEGACY_FAILURE", message: "Command failed." }
+        });
+        await assert.rejects(read, error => error.code === "LEGACY_FAILURE");
+      });
+    });
+
+    test("shipped administrator producer keys are consumed by every governance query without ambiguous fallback", async () => {
+      const { CollectorRegistry } = require("./collector-runtime");
+      const { createGovernanceDomainCollectors } = require("./collectors/governance-domains");
+      const script = fs.readFileSync(path.join(__dirname, "scanner", "collect-admin-evidence.ps1"), "utf8");
+      // The producer's current operation blocks have no nested braces. Fail if that contract changes.
+      const entries = [...script.matchAll(/Add-Evidence (\w+) ([\w-]+) \{[^{}]*\}[ \t]*(\w+)?/g)];
+      assert.equal(entries.length, (script.match(/^\s+Add-Evidence /gm) || []).length);
+      assert.equal(entries.length, 31);
+      const evidence = Object.fromEntries(entries.map(([, service, command, key]) => {
+        const packageKey = `${service}:${command}${key ? `:${key}` : ""}`;
+        return [packageKey, [{ id: packageKey }]];
+      }));
+      await withWorkspace(async workspace => {
+        fs.writeFileSync(path.join(workspace, "admin-evidence.json"), JSON.stringify({
+          schema: "ai-flight-deck/admin-evidence", version: "1.0.0", tenantId: "tenant-1",
+          producedAt: new Date().toISOString(), evidence, errors: {}
+        }));
+        const adapter = createAdminCommandAdapter(workspace, { verifyDocument: () => true });
+        const requests = [];
+        const received = [];
+        const registry = new CollectorRegistry();
+        createGovernanceDomainCollectors({
+          graphRequest: async () => ({ value: [] }),
+          adminCommand: async request => {
+            requests.push(request);
+            const rows = await adapter(request);
+            received.push(rows[0].id);
+            return rows;
+          }
+        }).forEach(collector => registry.register(collector));
+        await registry.run({
+          context: {
+            tenantId: "tenant-1", actorId: "fixture-admin", observedAt: new Date().toISOString(),
+            cohort: { id: "pilot", approved: true, principalIds: ["user-1"] }
+          }
+        });
+        assert.equal(requests.length, entries.length);
+        assert.deepEqual(received.sort(), Object.keys(evidence).sort());
+        assert.ok(requests.every(request => request.tenantId === "tenant-1"));
+        for (const request of requests) {
+          const ambiguous = ["Get-SPOSite", "Get-SPODataAccessGovernanceInsight", "Get-AutoSensitivityLabelPolicy"]
+            .includes(request.command);
+          assert.equal(request.allowUnkeyed, !ambiguous, request.command);
+        }
+      });
+    });
     assert.equal(observed.headers["Accept-Language"], "en-US");
   } finally {
     global.fetch = originalFetch;

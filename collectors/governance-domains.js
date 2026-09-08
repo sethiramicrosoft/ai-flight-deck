@@ -197,13 +197,15 @@ async function graphSingle(adapter, query, budget, signal) {
   return { available: true, complete: true, source: query.source, data: response };
 }
 
-async function commandResult(adapter, query, budget, signal, limits) {
+async function commandResult(adapter, query, budget, signal, limits, tenantId) {
   throwIfAborted(signal);
   budget.consume();
   const response = await adapter({
     service: query.service,
     command: query.command,
     evidenceKey: query.key,
+    allowUnkeyed: query.allowUnkeyed === true,
+    tenantId,
     parameters: { ...(query.parameters || {}) },
     signal
   });
@@ -224,8 +226,13 @@ async function commandResult(adapter, query, budget, signal, limits) {
   };
 }
 
-async function executePlan(plan, adapters, budget, signal, limits) {
+async function executePlan(plan, adapters, budget, signal, limits, context) {
   const observations = {};
+  const commandCounts = new Map();
+  for (const query of plan.filter(item => item.adapter === "admin")) {
+    const key = `${query.service}:${query.command}`;
+    commandCounts.set(key, (commandCounts.get(key) || 0) + 1);
+  }
   for (const query of plan) {
     throwIfAborted(signal);
     const adapter = query.adapter === "graph" ? adapters.graphRequest : adapters.adminCommand;
@@ -243,7 +250,10 @@ async function executePlan(plan, adapters, budget, signal, limits) {
         ? (query.collection === false
           ? await graphSingle(adapter, query, budget, signal)
           : await graphCollection(adapter, query, budget, signal, limits))
-        : await commandResult(adapter, query, budget, signal, limits);
+        : await commandResult(adapter, {
+          ...query,
+          allowUnkeyed: commandCounts.get(`${query.service}:${query.command}`) === 1
+        }, budget, signal, limits, context.tenantId);
     } catch (error) {
       if (signal?.aborted) throwIfAborted(signal);
       observations[query.key] = failure(error, query.source);
@@ -1072,7 +1082,7 @@ function createCollector(domainId, dependencies, planFactory, normalizer) {
       };
     },
     async collect({ context, signal, budget }) {
-      return executePlan(planFactory(context), adapters, budget, signal, limits);
+      return executePlan(planFactory(context), adapters, budget, signal, limits, context);
     },
     async normalize({ observations, context, signal }) {
       throwIfAborted(signal);
