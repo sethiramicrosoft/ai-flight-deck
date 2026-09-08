@@ -159,18 +159,7 @@ async function collectWorkloadEvidence({
           }
           documents.powerPlatform = document;
         }
-        const errors = Object.keys(document.errors).length;
-        update(entry, { status: errors ? "collected-with-gaps" : "collected", errors,
-          resourceCounts: Object.entries(document.evidence).map(([resource, records]) => ({
-            resource, rows: Array.isArray(records) ? records.length : 0
-          })),
-          issues: Object.entries(document.errors).slice(0, 25).map(([resource, issue]) => ({
-            resource, code: issue?.code || "COLLECTION_ERROR",
-            message: String(issue?.message || "The source did not return usable evidence.")
-          })),
-          completedAt: now().toISOString(),
-          message: errors ? `${errors} collection errors recorded; unavailable data will not be treated as complete.` :
-            "Evidence collected. Observation validation is a separate step." });
+        update(entry, { ...summarizeWorkloadEvidence(document), completedAt: now().toISOString() });
       } catch (error) {
         if (signal?.aborted) throw signal.reason;
         const message = controller.signal.aborted ? `${entry.name} collection timed out.` : String(error.message);
@@ -206,4 +195,67 @@ async function collectWorkloadEvidence({
   }
 }
 
-module.exports = { WORKLOADS, PRODUCER_VERSIONS, selectedWorkloads, collectWorkloadEvidence, sharePointAdminUrl, collectorErrorFromOutput };
+function summarizeWorkloadEvidence(document) {
+  const metadata = document.collection?.resources;
+  const statuses = new Set(["collected", "partial", "failed", "unavailable"]);
+  const detailed = metadata && typeof metadata === "object" && Object.values(metadata).some(record =>
+    record && typeof record === "object" &&
+    (Object.hasOwn(record, "acquisitionStatus") || Object.hasOwn(record, "acquisitionErrors")));
+  const validRecord = record => record && statuses.has(record.acquisitionStatus) &&
+    Array.isArray(record.acquisitionErrors) && Array.isArray(record.issues);
+  const resourceNames = new Set([...Object.keys(document.evidence), ...Object.keys(document.errors),
+    ...Object.keys(metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata : {})]);
+  const resourceCounts = [...resourceNames].map(resource => ({
+    resource, rows: Array.isArray(document.evidence[resource]) ? document.evidence[resource].length : 0,
+    acquisitionStatus: validRecord(metadata?.[resource])
+      ? metadata[resource].acquisitionStatus : "not-recorded"
+  }));
+  const normalize = (resource, issue) => ({
+    resource, code: String(issue?.code || "COLLECTION_ERROR"),
+    message: String(issue?.message || "The source did not return usable evidence.")
+  });
+  if (!detailed) {
+    const issues = Object.entries(document.errors).map(([resource, issue]) => normalize(resource, issue));
+    return {
+      status: issues.length ? "collected-with-gaps" : "collected",
+      errors: issues.length, resourceCounts, issues: issues.slice(0, 25),
+      message: issues.length
+        ? `${issues.length} reported source issues. Per-query acquisition status was not recorded; review the details.`
+        : "Evidence collected. Observation validation is a separate step."
+    };
+  }
+  const issues = [];
+  const evidenceGaps = [];
+  const seen = new Set();
+  const append = (target, resource, issue) => {
+    const normalized = normalize(resource, issue);
+    const key = `${resource}\0${normalized.code}\0${normalized.message}`;
+    if (!seen.has(key)) { seen.add(key); target.push(normalized); }
+  };
+  for (const resource of resourceNames) {
+    const record = metadata?.[resource];
+    if (!validRecord(record)) {
+      append(issues, resource, { code: "ACQUISITION_STATUS_MISSING",
+        message: "The producer did not provide a valid acquisition outcome for this resource." });
+      continue;
+    }
+    for (const issue of record.acquisitionErrors) append(issues, resource, issue);
+    for (const issue of record.issues) append(evidenceGaps, resource, issue);
+  }
+  // A newly introduced producer error must not disappear merely because metadata omitted it.
+  for (const [resource, issue] of Object.entries(document.errors)) append(issues, resource, issue);
+  const counts = Object.fromEntries([...statuses].map(status =>
+    [status, resourceCounts.filter(resource => resource.acquisitionStatus === status).length]));
+  const allFailed = counts.failed > 0 && counts.collected === 0 && counts.partial === 0;
+  const hasGaps = issues.length || evidenceGaps.length || counts.partial || counts.unavailable;
+  return {
+    status: allFailed ? "failed" : hasGaps ? "collected-with-gaps" : "collected",
+    acquisitionSummary: counts, errors: issues.length,
+    evidenceGapCount: evidenceGaps.length, resourceCounts,
+    issues: issues.slice(0, 25), evidenceGaps: evidenceGaps.slice(0, 25),
+    message: `${counts.collected} dataset reads succeeded; ${counts.partial} partial; ${counts.failed} failed; ` +
+      `${counts.unavailable} unavailable. ${evidenceGaps.length} coverage or review gaps remain. Collection is not a readiness decision.`
+  };
+}
+
+module.exports = { WORKLOADS, PRODUCER_VERSIONS, selectedWorkloads, collectWorkloadEvidence, sharePointAdminUrl, collectorErrorFromOutput, summarizeWorkloadEvidence };

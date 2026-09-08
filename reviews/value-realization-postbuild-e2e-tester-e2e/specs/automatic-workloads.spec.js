@@ -48,8 +48,16 @@ test("existing-baseline collection needs one button, shows workload failures and
         { id: "purview", name: "Microsoft Purview", status: "collected", message: "Synthetic command evidence collected." },
         { id: "powerPlatform", name: "Power Platform and Copilot Studio", status: "collected-with-gaps",
           message: "Synthetic agent sharing coverage is incomplete.", errors: 1,
-          resourceCounts: [{ resource: "environments", rows: 2 }, { resource: "agents", rows: 1 }],
-          issues: [{ resource: "agentSharing", code: "COVERAGE_INCOMPLETE", message: "Synthetic effective sharing cannot be established." }] }
+          acquisitionSummary: { collected: 2, partial: 0, failed: 1, unavailable: 1 },
+          resourceCounts: [
+            { resource: "environments", rows: 2, acquisitionStatus: "collected" },
+            { resource: "apps", rows: 0, acquisitionStatus: "collected" },
+            { resource: "connections", rows: 0, acquisitionStatus: "failed" },
+            { resource: "agentSharing", rows: 0, acquisitionStatus: "unavailable" }
+          ],
+          issues: [{ resource: "connections", code: "PP_HTTP_403", message: "Synthetic connection read denied." }],
+          evidenceGapCount: 1,
+          evidenceGaps: [{ resource: "agentSharing", code: "COVERAGE_INCOMPLETE", message: "Synthetic effective sharing cannot be established." }] }
       ];
       job.collectionSummary = { requested: 4, collected: 2, withGaps: 1, failed: 1 };
     }
@@ -73,12 +81,18 @@ test("existing-baseline collection needs one button, shows workload failures and
     await expect(page.locator("#workload-progress")).toContainText("incomplete");
     const errorDetails = page.locator("#workload-progress details").filter({ hasText: "Collection errors" });
     await errorDetails.locator("summary").click();
-    await expect(errorDetails).toContainText("agentSharing: Synthetic effective sharing cannot be established. (COVERAGE_INCOMPLETE)");
+    await expect(errorDetails).toContainText("connections: Synthetic connection read denied. (PP_HTTP_403)");
+    await expect(errorDetails).not.toContainText("COVERAGE_INCOMPLETE");
     await errorDetails.locator("summary").click();
     const counts = page.locator("#workload-progress details").filter({ hasText: "Observed rows by query" });
     await counts.locator("summary").click();
     await expect(counts).toContainText("environments: 2");
+    await expect(counts).toContainText("apps: 0 rows; read succeeded");
     await counts.locator("summary").click();
+    const coverage = page.locator("#workload-progress details").filter({ hasText: "Coverage and review gaps" });
+    await coverage.locator("summary").click();
+    await expect(coverage).toContainText("agentSharing: Synthetic effective sharing cannot be established. (COVERAGE_INCOMPLETE)");
+    await coverage.locator("summary").click();
     expect(await page.locator('#workload-progress [data-status="failed"]').evaluate(
       element => getComputedStyle(element, "::before").content)).toBe('"!"');
     await expect(page.locator("#collect-workloads")).toBeEnabled();

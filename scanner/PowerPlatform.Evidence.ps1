@@ -5,6 +5,9 @@
 # https://learn.microsoft.com/powershell/module/microsoft.powerapps.administration.powershell/get-adminpowerappenvironment
 # https://learn.microsoft.com/powershell/module/microsoft.powerapps.administration.powershell/get-admindlppolicy
 # https://learn.microsoft.com/powershell/module/microsoft.powerapps.administration.powershell/get-adminpowerappconnector
+# https://learn.microsoft.com/powershell/module/microsoft.powerapps.administration.powershell/get-adminpowerapp
+# https://learn.microsoft.com/powershell/module/microsoft.powerapps.administration.powershell/get-adminflow
+# https://learn.microsoft.com/powershell/module/microsoft.powerapps.administration.powershell/get-adminpowerappconnection
 # https://learn.microsoft.com/power-apps/developer/data-platform/reference/entities/bot
 # https://learn.microsoft.com/power-apps/developer/data-platform/webapi/query/page-results
 # https://learn.microsoft.com/power-apps/developer/data-platform/webapi/reference/whoami
@@ -12,6 +15,10 @@
 # ## Lessons
 # Admin cmdlets expose neither page cursors nor an authoritative total.
 # Bot publication, record sharing and ownership are not governance approval.
+# CommonDataServiceDatabaseProvisioningState is formatted from environment.provisioningState
+# in module 2.0.216; "Succeeded" is NOT proof that a Dataverse database exists.
+# Its REST helper also swallows HTTP failures unless ThrowOnFailure is enabled in
+# both calling module scopes; otherwise a denied inventory can look successfully empty.
 
 function Get-PPField {
     param($Object, [string]$Path)
@@ -105,7 +112,9 @@ function Get-PPSafeError {
     # Never persist arbitrary service error bodies: they can contain request headers or secrets.
     $message = [string]$ErrorRecord.Exception.Message
     $code = if ($message -match '^PP_[A-Z0-9_]+$') { $message } else { 'PP_OPERATION_FAILED' }
-    if ($message -match '(?i)AADSTS65001|consent_required') { $code = 'PP_CONSENT_REQUIRED' }
+    $responseStatus = Get-PPField $ErrorRecord 'Exception.Response.StatusCode'
+    if ($null -ne $responseStatus -and [int]$responseStatus -ge 400 -and [int]$responseStatus -le 599) { $code = "PP_HTTP_$([int]$responseStatus)" }
+    elseif ($message -match '(?i)AADSTS65001|consent_required') { $code = 'PP_CONSENT_REQUIRED' }
     elseif ($message -match '(?i)AADSTS50076|interaction_required') { $code = 'PP_INTERACTIVE_AUTH_REQUIRED' }
     elseif ($message -match '(?i)forbidden|unauthorized|\b403\b') { $code = 'PP_HTTP_403' }
     $description = switch ($code) {
@@ -121,6 +130,11 @@ function Get-PPSafeError {
         'PP_ACTOR_MISMATCH' { 'The Dataverse sign-in principal differs from the Power Platform collector principal. No evidence from that context was accepted.' }
         'PP_REQUEST_LIMIT' { 'The configured operation/request budget was reached. Remaining resources are excluded, not empty.' }
         'PP_PAGE_LIMIT' { 'The page or item limit was reached before enumeration completed.' }
+        'PP_COMMAND_UNAVAILABLE' { 'The installed Microsoft administration module does not expose the required read command or its EnvironmentName parameter. This resource was not queried.' }
+        'PP_CONTEXT_INTERFACE_UNAVAILABLE' { 'The authenticated Power Platform context could not be revalidated for the environment-detail read. No detailed endpoint was accepted.' }
+        'PP_DATAVERSE_ENDPOINT_NOT_RETURNED' { 'Neither the environment list nor the exact environment-detail read returned a Dataverse organization endpoint. Database existence is unknown; the provisioning-state label is not proof of a database.' }
+        'PP_ENVIRONMENT_DETAIL_MISMATCH' { 'The environment-detail response did not identify exactly the requested environment. No endpoint or organization from that response was accepted.' }
+        'PP_ENVIRONMENT_DISCOVERY_FAILED' { 'Environment discovery failed, so no environment-scoped read could be attempted for this resource. See the environment acquisition error for the underlying failure.' }
         'PP_UNSUPPORTED_DATAVERSE_URL' { 'No supported commercial-cloud Dataverse organization URL was available. Sovereign clouds and non-Dataverse environments are not assumed supported.' }
         default { 'Automatic read-only collection could not verify this resource. Check workload availability, administrator role, delegated consent and the recorded safe error code; no export or JSON entry is required.' }
     }
@@ -128,19 +142,159 @@ function Get-PPSafeError {
 }
 
 function Add-PPProblem {
-    param($Document, [string[]]$Resources, [string]$Code, [string]$Message, [string]$EnvironmentId)
+    param($Document, [string[]]$Resources, [string]$Code, [string]$Message, [string]$EnvironmentId, [switch]$AcquisitionError)
     foreach ($resource in $Resources) {
         $problem = [ordered]@{ code = $Code; message = $Message }
         if ($EnvironmentId) { $problem.environmentId = $EnvironmentId }
         $Document.collection.resources[$resource].issues.Add($problem)
+        if ($AcquisitionError -and $Code -notmatch 'LIMIT$') {
+            $metadata = $Document.collection.resources[$resource]
+            $metadata.acquisitionErrors.Add([ordered]@{ code = $Code; message = $Message })
+            if ($Code -in @('PP_COMMAND_UNAVAILABLE', 'PP_CONTEXT_INTERFACE_UNAVAILABLE',
+                    'PP_DATAVERSE_ENDPOINT_NOT_RETURNED', 'PP_UNSUPPORTED_DATAVERSE_URL',
+                    'PP_BOT_TABLE_UNAVAILABLE', 'PP_LIFECYCLE_COLUMNS_UNAVAILABLE',
+                    'PP_ENVIRONMENT_DISCOVERY_FAILED', 'PP_HTTP_404')) {
+                $metadata.unavailableReads++
+            }
+            else { $metadata.failedReads++ }
+        }
         if ($Code -match 'LIMIT$|TOO_LARGE$') {
             $Document.collection.resources[$resource].truncated = $true
+            # An environment cap affects scoped inventories, not the independent DLP list read.
+            if ($Code -ne 'PP_ENVIRONMENT_LIMIT' -or $resource -ne 'dlpPolicies') {
+                $Document.collection.resources[$resource].acquisitionTruncated = $true
+            }
         }
         # Preserve first actual failure as the consumer-facing error; boundaries are added last.
         if (-not $Document.errors.Contains($resource)) {
             $Document.errors[$resource] = [ordered]@{ code = $Code; message = $Message }
         }
     }
+}
+
+function Add-PPAcquisitionSuccess {
+    param($Document, [string[]]$Resources)
+    foreach ($resource in $Resources) { $Document.collection.resources[$resource].successfulReads++ }
+}
+
+function Get-PPAcquisitionStatus {
+    param($Metadata)
+    if ($Metadata.acquisitionTruncated -or ($Metadata.successfulReads -gt 0 -and
+            ($Metadata.failedReads -gt 0 -or $Metadata.unavailableReads -gt 0))) { return 'partial' }
+    if ($Metadata.successfulReads -gt 0) { return 'collected' }
+    if ($Metadata.failedReads -gt 0) { return 'failed' }
+    return 'unavailable'
+}
+
+function Invoke-PPAdminInventoryRead {
+    param([string]$Command, [string]$Environment, [int]$Limit)
+    # Only documented read commands are accepted. The module owns service-audience token routing.
+    if ($Command -notin @('Get-AdminPowerApp', 'Get-AdminFlow', 'Get-AdminPowerAppConnection',
+            'Get-AdminPowerAppEnvironment', 'Get-AdminDlpPolicy', 'Get-AdminPowerAppConnector')) { throw 'PP_COMMAND_UNAVAILABLE' }
+    $cmdlet = Get-Command $Command -ErrorAction SilentlyContinue
+    if (-not $cmdlet -or ($Environment -and -not $cmdlet.Parameters.ContainsKey('EnvironmentName'))) { throw 'PP_COMMAND_UNAVAILABLE' }
+    $restCommand = Get-Command InvokeApi -All -ErrorAction SilentlyContinue |
+        Where-Object { $_.ScriptBlock.Module.Name -eq 'Microsoft.PowerApps.RestClientModule' } | Select-Object -First 1
+    if (-not $restCommand -or -not $restCommand.Parameters.ContainsKey('ThrowOnFailure')) { throw 'PP_COMMAND_UNAVAILABLE' }
+    # The administration module re-exports InvokeApi, so .Module is the facade;
+    # .ScriptBlock.Module identifies the REST function's actual parameter-default scope.
+    $restModule = $restCommand.ScriptBlock.Module
+    # Module 2.0.216 defaults to swallowing REST exceptions; formatter functions can then
+    # turn 403/429 into empty output. Supported PowerShell parameter defaults enable the
+    # shipped ThrowOnFailure switch in that module's session only, restored after each read.
+    $scopes = @($restModule)
+    if ($cmdlet.ScriptBlock.Module -and $cmdlet.ScriptBlock.Module -ne $restModule) { $scopes += $cmdlet.ScriptBlock.Module }
+    $savedScopes = New-Object 'System.Collections.Generic.List[object]'
+    try {
+        # Defaults bind in the calling scope: administration -> InvokeApi -> Invoke-Request.
+        foreach ($scopeModule in $scopes) {
+            $prior = & $scopeModule {
+                $existing = Get-Variable PSDefaultParameterValues -Scope Script -ErrorAction SilentlyContinue
+                $saved = @{ existed = [bool]$existing; value = if ($existing) { $existing.Value } else { $null } }
+                $settings = @{}
+                if ($existing -and $existing.Value) { foreach ($key in $existing.Value.Keys) { $settings[$key] = $existing.Value[$key] } }
+                $settings['InvokeApi:ThrowOnFailure'] = $true
+                $settings['Invoke-Request:ThrowOnFailure'] = $true
+                $settings['Disabled'] = $false
+                $script:PSDefaultParameterValues = $settings
+                $saved
+            }
+            $savedScopes.Add(@{ module = $scopeModule; prior = $prior })
+        }
+        $parameters = @{ ErrorAction = 'Stop'; Verbose = $false; Debug = $false }
+        if ($Environment) { $parameters.EnvironmentName = $Environment }
+        & $Command @parameters 3>$null 4>$null 5>$null 6>$null | Select-Object -First $Limit
+    }
+    finally {
+        foreach ($savedScope in $savedScopes) {
+            $scopeModule = $savedScope.module
+            & $scopeModule {
+                param($Saved)
+                if ($Saved.existed) { $script:PSDefaultParameterValues = $Saved.value }
+                else { Remove-Variable PSDefaultParameterValues -Scope Script -ErrorAction SilentlyContinue }
+            } $savedScope.prior
+        }
+    }
+}
+
+function Resolve-PPDataverseEnvironment {
+    param($Environment, $Identity, $Operations, $State, $Discovery)
+    $environmentId = [string](Get-PPField $Environment 'EnvironmentName')
+    $candidate = $Environment
+    $url = [string](Get-PPField $candidate 'Internal.properties.linkedEnvironmentMetadata.instanceUrl')
+    $usable = $false
+    if ($url) {
+        try { Assert-PPDataverseUrl $url | Out-Null; $usable = $true }
+        catch { $Discovery.listEndpointStatus = 'unsupportedOrMalformed' }
+    }
+    else { $Discovery.listEndpointStatus = 'notReturned' }
+    if ($usable) { $Discovery.listEndpointStatus = 'usable' }
+    $organization = [string](Get-PPField $candidate 'Internal.properties.linkedEnvironmentMetadata.resourceId')
+    if (-not $organization) { $organization = [string](Get-PPField $candidate 'OrganizationId') }
+    if (-not $usable -or -not $organization) {
+        $Discovery.detailLookupRequired = $true
+        if (-not $Operations.EnvironmentDetail) { throw 'PP_COMMAND_UNAVAILABLE' }
+        if (-not $Operations.ContextToken) { throw 'PP_CONTEXT_INTERFACE_UNAVAILABLE' }
+        $audience = 'https://service.powerapps.com/'
+        try {
+            Use-PPBudget $State
+            $contextToken = & $Operations.ContextToken $audience
+            Get-PPTokenIdentity $contextToken $Identity.tenantId $audience $Identity.actorId | Out-Null
+            Use-PPBudget $State
+            $Discovery.detailReadAttempted = $true
+            $details = @(& $Operations.EnvironmentDetail $environmentId)
+            Use-PPBudget $State
+            $contextToken = & $Operations.ContextToken $audience
+            Get-PPTokenIdentity $contextToken $Identity.tenantId $audience $Identity.actorId | Out-Null
+            $Discovery.contextValidatedBeforeAndAfter = $true
+            if ($details.Count -ne 1 -or
+                [string](Get-PPField $details[0] 'EnvironmentName') -cne $environmentId) {
+                throw 'PP_ENVIRONMENT_DETAIL_MISMATCH'
+            }
+            $Discovery.detailReadStatus = 'collected'
+            $candidate = $details[0]
+            $url = [string](Get-PPField $candidate 'Internal.properties.linkedEnvironmentMetadata.instanceUrl')
+            $organization = [string](Get-PPField $candidate 'Internal.properties.linkedEnvironmentMetadata.resourceId')
+            if (-not $organization) { $organization = [string](Get-PPField $candidate 'OrganizationId') }
+        }
+        catch {
+            $Discovery.detailReadStatus = 'failed'
+            $problem = Get-PPSafeError $_
+            $Discovery.detailError = $problem
+            throw $problem.code
+        }
+        finally { $contextToken = $null }
+    }
+    if (-not $url) { $Discovery.endpointStatus = 'notReturned'; throw 'PP_DATAVERSE_ENDPOINT_NOT_RETURNED' }
+    try { $origin = (Assert-PPDataverseUrl $url).GetLeftPart([UriPartial]::Authority) }
+    catch { $Discovery.endpointStatus = 'unsupportedOrMalformed'; throw 'PP_UNSUPPORTED_DATAVERSE_URL' }
+    if ($organization) { $organization = Assert-PPGuid $organization }
+    $Discovery.endpointStatus = 'usable'
+    $Discovery.source = if ($Discovery.detailReadAttempted) { 'environmentDetail' } else { 'environmentList' }
+    $Discovery.organizationIdReturned = [bool]$organization
+    # Only the validated origin is retained, never raw URLs, queries or credentials.
+    $Discovery.dataverseOrigin = $origin
+    return @{ origin = $origin; organizationId = $organization }
 }
 
 function Use-PPBudget {
@@ -194,6 +348,7 @@ function Get-PPPages {
     $rows = New-Object 'System.Collections.Generic.List[object]'
     $seen = New-Object 'System.Collections.Generic.HashSet[string]'
     $pages = 0
+    $successfulPages = 0
     $next = $Url
     $failure = $null
     try {
@@ -206,6 +361,7 @@ function Get-PPPages {
             $pages++
             $values = Get-PPField $page 'value'
             if ($null -eq $values -or $values -isnot [array]) { throw 'PP_INVALID_RESPONSE' }
+            $successfulPages++
             foreach ($row in $values) {
                 if ($rows.Count -ge $MaxItems) { throw 'PP_PAGE_LIMIT' }
                 $rows.Add($row)
@@ -215,7 +371,7 @@ function Get-PPPages {
         }
     }
     catch { $failure = Get-PPSafeError $_ }
-    return [ordered]@{ rows = $rows.ToArray(); pages = $pages; complete = ($null -eq $failure); error = $failure }
+    return [ordered]@{ rows = $rows.ToArray(); pages = $pages; successfulPages = $successfulPages; complete = ($null -eq $failure); error = $failure }
 }
 
 function New-PPLiveOperations {
@@ -226,9 +382,17 @@ function New-PPLiveOperations {
                 -ErrorAction Stop -Verbose:$false -Debug:$false 3>$null 4>$null 5>$null 6>$null | Out-Null
             Get-JwtToken -Audience $Audience -ErrorAction Stop -Verbose:$false -Debug:$false 3>$null 4>$null 5>$null 6>$null
         }
-        Environments = { param($Limit) Get-AdminPowerAppEnvironment -ErrorAction Stop -Verbose:$false -Debug:$false 3>$null 4>$null 5>$null 6>$null | Select-Object -First $Limit }
-        Policies = { param($Limit) Get-AdminDlpPolicy -ErrorAction Stop -Verbose:$false -Debug:$false 3>$null 4>$null 5>$null 6>$null | Select-Object -First $Limit }
-        Connectors = { param($Environment, $Limit) Get-AdminPowerAppConnector -EnvironmentName $Environment -ErrorAction Stop -Verbose:$false -Debug:$false 3>$null 4>$null 5>$null 6>$null | Select-Object -First $Limit }
+        Environments = { param($Limit) Invoke-PPAdminInventoryRead 'Get-AdminPowerAppEnvironment' '' $Limit }
+        ContextToken = { param($Audience) Get-JwtToken -Audience $Audience -ErrorAction Stop -Verbose:$false -Debug:$false 3>$null 4>$null 5>$null 6>$null }
+        EnvironmentDetail = {
+            param($Environment)
+            Invoke-PPAdminInventoryRead 'Get-AdminPowerAppEnvironment' $Environment 2
+        }
+        Policies = { param($Limit) Invoke-PPAdminInventoryRead 'Get-AdminDlpPolicy' '' $Limit }
+        Connectors = { param($Environment, $Limit) Invoke-PPAdminInventoryRead 'Get-AdminPowerAppConnector' $Environment $Limit }
+        Apps = { param($Environment, $Limit) Invoke-PPAdminInventoryRead 'Get-AdminPowerApp' $Environment $Limit }
+        Flows = { param($Environment, $Limit) Invoke-PPAdminInventoryRead 'Get-AdminFlow' $Environment $Limit }
+        Connections = { param($Environment, $Limit) Invoke-PPAdminInventoryRead 'Get-AdminPowerAppConnection' $Environment $Limit }
         Request = { param($Url, $Token, $Timeout, $PageSize) Invoke-PPHttpGet $Url $Token $Timeout $PageSize }
     }
 }
@@ -246,7 +410,7 @@ function Invoke-PPEvidenceCollection {
     $identity = Get-PPTokenIdentity $token $tenant $audience
     $token = $null
     $state = @{ operations = 0; maxRequests = $MaxRequests; maxPages = $MaxPages; pageSize = $PageSize; timeoutSeconds = $RequestTimeoutSeconds; sharedPrincipals = 0 }
-    $resources = @('environments', 'dlpPolicies', 'connectors', 'agents', 'agentOwners', 'agentSharing', 'agentLifecycle')
+    $resources = @('environments', 'dlpPolicies', 'connectors', 'agents', 'agentOwners', 'agentSharing', 'agentLifecycle', 'apps', 'flows', 'connections')
     $botResources = @('agents', 'agentOwners', 'agentSharing', 'agentLifecycle')
     $doc = [ordered]@{
         schema = 'ai-flight-deck/power-platform-evidence'; version = '1.0.0'
@@ -262,7 +426,8 @@ function Invoke-PPEvidenceCollection {
             physicalAdminHttpRequestCount = $null
             adminPagination = 'Module-managed/opaque: cmdlets expose neither page cursors nor totals. Item caps bound accepted output, not internal HTTP requests. The process deadline bounds opaque operations.'
             effectivePermissions = 'Caller-visible environments, DLP policies and custom connectors only. Dataverse row-level security applies independently per environment. Tenant-wide and organization-wide visibility are not proven.'
-            omittedSensitiveFields = @('configuration', 'authenticationconfiguration', 'applicationmanifestinformation', 'connector connectionParameters', 'credentials', 'tokens', 'bot content and transcripts')
+            omittedSensitiveFields = @('configuration', 'authenticationconfiguration', 'applicationmanifestinformation', 'connector connectionParameters', 'credentials', 'tokens', 'bot content and transcripts', 'flow definitions', 'unpublished app definitions', 'connection strings')
+            acquisitionStatusMeaning = 'collected means successful bounded reads within caller-visible scope, including zero rows. It does not establish tenant completeness, effective access or governance approval.'
             governanceBoundary = 'No business-purpose approval, publishing authorization, secret hygiene, DLP alignment, prompt-injection review or legal attestation is inferred from inventory.'
         }
     }
@@ -270,11 +435,14 @@ function Invoke-PPEvidenceCollection {
         $doc.evidence[$resource] = New-Object 'System.Collections.Generic.List[object]'
         $doc.collection.resources[$resource] = [ordered]@{
             returnedCount = 0; populationCount = $null; complete = $false
-            truncated = $false; excludedCount = $null
+            truncated = $false; excludedCount = $null; acquisitionTruncated = $false
+            acquisitionStatus = 'unavailable'; acquisitionErrors = (New-Object 'System.Collections.Generic.List[object]')
+            successfulReads = 0; failedReads = 0; unavailableReads = 0
             issues = (New-Object 'System.Collections.Generic.List[object]')
         }
     }
     $envRows = @()
+    $environmentStatuses = @{}
     try {
         Use-PPBudget $state
         $envRows = @(& $Operations.Environments ($MaxEnvironments + 1))
@@ -291,11 +459,27 @@ function Invoke-PPEvidenceCollection {
                 securityGroupId = ConvertTo-PPSafeScalar (Get-PPField $environment 'SecurityGroupId')
                 raw = Select-PPSafeFields $environment @('EnvironmentName', 'DisplayName', 'EnvironmentType', 'Location', 'OrganizationId', 'SecurityGroupId', 'CommonDataServiceDatabaseProvisioningState')
             })
+            $environmentStatus = [ordered]@{
+                environmentId = $id; botPages = 0; botsReturned = 0
+                inventoryCompleteWithinCallerScope = $false; unsupportedColumns = @()
+                resources = [ordered]@{}
+                discovery = [ordered]@{
+                    detailReadAttempted = $false; detailReadStatus = 'notAttempted'
+                    databaseExistence = 'unknown'
+                    provisioningStateMeaning = 'Generic environment provisioning state; not proof of Dataverse availability.'
+                }
+            }
+            $environmentStatuses[$id] = $environmentStatus
+            $doc.collection.environments.Add($environmentStatus)
         }
+        Add-PPAcquisitionSuccess $doc @('environments')
     }
     catch {
         $problem = Get-PPSafeError $_
         Add-PPProblem $doc $resources $problem.code $problem.message
+        Add-PPProblem $doc @('environments') $problem.code $problem.message -AcquisitionError
+        Add-PPProblem $doc @('connectors', 'agents', 'agentOwners', 'agentSharing', 'agentLifecycle', 'apps', 'flows', 'connections') `
+            'PP_ENVIRONMENT_DISCOVERY_FAILED' 'Environment discovery failed; no environment-scoped read was attempted for this resource.' -AcquisitionError
         $envRows = @()
     }
     try {
@@ -325,8 +509,9 @@ function Invoke-PPEvidenceCollection {
                 Add-PPProblem $doc @('dlpPolicies') 'PP_ITEM_LIMIT' 'DLP policy environment-filter entries were capped.'
             }
         }
+        Add-PPAcquisitionSuccess $doc @('dlpPolicies')
     }
-    catch { $problem = Get-PPSafeError $_; Add-PPProblem $doc @('dlpPolicies') $problem.code $problem.message }
+    catch { $problem = Get-PPSafeError $_; Add-PPProblem $doc @('dlpPolicies') $problem.code $problem.message -AcquisitionError }
     foreach ($environment in $envRows) {
         $envId = [string](Get-PPField $environment 'EnvironmentName')
         try {
@@ -343,19 +528,74 @@ function Invoke-PPEvidenceCollection {
                     raw = Select-PPSafeFields $connector @('ConnectorName', 'DisplayName', 'EnvironmentName', 'CreatedTime', 'LastModifiedTime')
                 })
             }
+            Add-PPAcquisitionSuccess $doc @('connectors')
         }
-        catch { $problem = Get-PPSafeError $_; Add-PPProblem $doc @('connectors') $problem.code $problem.message $envId }
+        catch { $problem = Get-PPSafeError $_; Add-PPProblem $doc @('connectors') $problem.code $problem.message $envId -AcquisitionError }
+    }
+    # These administration reads are independent of Dataverse. Run all environments before
+    # attempting any Dataverse sign-in, so a missing bot table cannot block app/flow/connection facts.
+    $inventoryPlans = @(
+        @{ resource = 'apps'; operation = 'Apps'; idField = 'AppName'; fields = @('AppName', 'DisplayName', 'EnvironmentName', 'CreatedTime', 'LastModifiedTime') },
+        @{ resource = 'flows'; operation = 'Flows'; idField = 'FlowName'; fields = @('FlowName', 'DisplayName', 'EnvironmentName', 'CreatedTime', 'LastModifiedTime', 'WorkflowEntityId') },
+        @{ resource = 'connections'; operation = 'Connections'; idField = 'ConnectionName'; fields = @('ConnectionName', 'ConnectorName', 'DisplayName', 'EnvironmentName', 'CreatedTime', 'LastModifiedTime') }
+    )
+    foreach ($environment in $envRows) {
+        $envId = [string](Get-PPField $environment 'EnvironmentName')
+        foreach ($plan in $inventoryPlans) {
+            $resource = $plan.resource
+            $startCount = $doc.evidence[$resource].Count
+            $scope = [ordered]@{ returnedCount = 0; acquisitionStatus = 'unavailable'; acquisitionErrors = @(); truncated = $false }
+            $environmentStatuses[$envId].resources[$resource] = $scope
+            $readSucceeded = $false
+            try {
+                if (-not $Operations[$plan.operation]) { throw 'PP_COMMAND_UNAVAILABLE' }
+                $remaining = $MaxItems - $startCount
+                if ($remaining -le 0) { throw 'PP_PAGE_LIMIT' }
+                Use-PPBudget $state
+                $rows = @(& $Operations[$plan.operation] $envId ($remaining + 1))
+                $readSucceeded = $true
+                if ($rows.Count -gt $remaining) {
+                    $scope.truncated = $true
+                    Add-PPProblem $doc @($resource) 'PP_ITEM_LIMIT' 'Administration inventory output was capped across the collection.' $envId
+                }
+                foreach ($row in @($rows | Select-Object -First $remaining)) {
+                    $nativeId = [string](Get-PPField $row $plan.idField)
+                    $rowEnvironment = [string](Get-PPField $row 'EnvironmentName')
+                    if (-not $nativeId -or ($rowEnvironment -and $rowEnvironment -cne $envId)) { throw 'PP_INVALID_RESPONSE' }
+                    $entry = [ordered]@{
+                        id = "${envId}:$(ConvertTo-PPSafeScalar $nativeId)"; environmentId = $envId
+                        raw = Select-PPSafeFields $row $plan.fields; effectiveAccess = 'unknown'
+                    }
+                    if ($resource -eq 'flows') { $entry.state = ConvertTo-PPSafeScalar (Get-PPField $row 'Internal.properties.state') }
+                    $doc.evidence[$resource].Add($entry)
+                }
+                Add-PPAcquisitionSuccess $doc @($resource)
+                $scope.acquisitionStatus = if ($scope.truncated) { 'partial' } else { 'collected' }
+            }
+            catch {
+                $problem = Get-PPSafeError $_
+                Add-PPProblem $doc @($resource) $problem.code $problem.message $envId -AcquisitionError
+                $scope.acquisitionErrors = @(if ($problem.code -notmatch 'LIMIT$') { $problem })
+                if ($readSucceeded -and $doc.evidence[$resource].Count -gt $startCount) {
+                    Add-PPAcquisitionSuccess $doc @($resource)
+                    $scope.acquisitionStatus = 'partial'
+                }
+                elseif ($problem.code -in @('PP_COMMAND_UNAVAILABLE','PP_HTTP_404')) { $scope.acquisitionStatus = 'unavailable' }
+                elseif ($problem.code -match 'LIMIT$') { $scope.truncated = $true; $scope.acquisitionStatus = 'partial' }
+                else { $scope.acquisitionStatus = 'failed' }
+            }
+            $scope.returnedCount = $doc.evidence[$resource].Count - $startCount
+        }
     }
     foreach ($environment in $envRows) {
         $envId = [string](Get-PPField $environment 'EnvironmentName')
-        $environmentStatus = [ordered]@{ environmentId = $envId; botPages = 0; botsReturned = 0; inventoryCompleteWithinCallerScope = $false; unsupportedColumns = @() }
-        $doc.collection.environments.Add($environmentStatus)
+        $environmentStatus = $environmentStatuses[$envId]
         $token = $null
         try {
             $remaining = $MaxItems - $doc.evidence.agents.Count
             if ($remaining -le 0) { throw 'PP_PAGE_LIMIT' }
-            $url = [string](Get-PPField $environment 'Internal.properties.linkedEnvironmentMetadata.instanceUrl')
-            $origin = (Assert-PPDataverseUrl $url).GetLeftPart([UriPartial]::Authority)
+            $resolved = Resolve-PPDataverseEnvironment $environment $identity $Operations $state $environmentStatus.discovery
+            $origin = $resolved.origin
             Use-PPBudget $state
             $token = & $Operations.SignIn $tenant "$origin/"
             Get-PPTokenIdentity $token $tenant "$origin/" $identity.actorId | Out-Null
@@ -363,7 +603,7 @@ function Invoke-PPEvidenceCollection {
             $who = & $Operations.Request "$origin/api/data/v9.2/WhoAmI" $token $state.timeoutSeconds $PageSize
             $userId = Assert-PPGuid ([string](Get-PPField $who 'UserId'))
             $organizationId = Assert-PPGuid ([string](Get-PPField $who 'OrganizationId'))
-            $expectedOrg = [string](Get-PPField $environment 'OrganizationId')
+            $expectedOrg = $resolved.organizationId
             if ($expectedOrg -and (Assert-PPGuid $expectedOrg) -ne $organizationId) { throw 'PP_ORGANIZATION_MISMATCH' }
             $environmentStatus.dataverseUserId = $userId
             $environmentStatus.dataverseOrganizationId = $organizationId
@@ -381,7 +621,16 @@ function Invoke-PPEvidenceCollection {
             $environmentStatus.botPages = $page.pages
             $environmentStatus.botsReturned = $page.rows.Count
             $environmentStatus.inventoryCompleteWithinCallerScope = $page.complete
-            if ($page.error) { Add-PPProblem $doc $botResources $page.error.code $page.error.message $envId }
+            if ($page.error) { Add-PPProblem $doc $botResources $page.error.code $page.error.message $envId -AcquisitionError }
+            $agentReadRecorded = $false
+            if ($page.successfulPages -gt 0 -and $page.rows.Count -eq 0) {
+                Add-PPAcquisitionSuccess $doc @('agents')
+                $agentReadRecorded = $true
+            }
+            if ($page.complete -and $page.rows.Count -eq 0) {
+                # A successful empty bot query has no applicable owner/lifecycle/share records.
+                Add-PPAcquisitionSuccess $doc @('agentOwners', 'agentLifecycle', 'agentSharing')
+            }
             foreach ($bot in $page.rows) {
                 $botId = Assert-PPGuid ([string](Get-PPField $bot 'botid'))
                 # Composite IDs avoid collisions when solutions carry the same bot ID between environments.
@@ -391,6 +640,10 @@ function Invoke-PPEvidenceCollection {
                     name = ConvertTo-PPSafeScalar (Get-PPField $bot 'name')
                     raw = Select-PPSafeFields $bot $columns
                 })
+                if (-not $agentReadRecorded) {
+                    Add-PPAcquisitionSuccess $doc @('agents')
+                    $agentReadRecorded = $true
+                }
                 $owner = [string](Get-PPField $bot '_ownerid_value')
                 if ($owner) {
                     $ownerAnnotation = $bot.PSObject.Properties['_ownerid_value@Microsoft.Dynamics.CRM.lookuplogicalname']
@@ -399,13 +652,18 @@ function Invoke-PPEvidenceCollection {
                         ownerIdNamespace = 'Dataverse'; ownerType = if ($ownerAnnotation) { ConvertTo-PPSafeScalar $ownerAnnotation.Value } else { $null }
                         source = 'bot._ownerid_value'
                     })
+                    Add-PPAcquisitionSuccess $doc @('agentOwners')
                 }
-                else { Add-PPProblem $doc @('agentOwners') 'PP_OWNER_UNAVAILABLE' 'Dataverse did not return a readable record owner for every bot.' $envId }
+                else { Add-PPProblem $doc @('agentOwners') 'PP_OWNER_UNAVAILABLE' 'Dataverse did not return a readable record owner for every bot.' $envId -AcquisitionError }
                 $doc.evidence.agentLifecycle.Add([ordered]@{
                     agentId = $id; environmentId = $envId
                     raw = Select-PPSafeFields $bot @('statecode', 'statuscode', 'publishedon', '_publishedby_value', 'createdon', 'modifiedon')
                     publishingApproval = 'unknown'; source = 'Dataverse bot metadata; publication is not approval'
                 })
+                if ($available -contains 'statecode' -and $available -contains 'statuscode') {
+                    Add-PPAcquisitionSuccess $doc @('agentLifecycle')
+                }
+                else { Add-PPProblem $doc @('agentLifecycle') 'PP_LIFECYCLE_COLUMNS_UNAVAILABLE' 'Dataverse did not expose the bot state/status metadata in this environment.' $envId -AcquisitionError }
                 try {
                     Use-PPBudget $state
                     $target = [uri]::EscapeDataString(('{ "@odata.id": "bots(' + $botId + ')" }'))
@@ -426,13 +684,14 @@ function Invoke-PPEvidenceCollection {
                         raw = Select-PPSafeFields $bot @('accesscontrolpolicy', 'authenticationmode', 'authorizedsecuritygroupids')
                         publicExposure = 'unknown'; effectiveAccess = 'unknown'
                     })
+                    Add-PPAcquisitionSuccess $doc @('agentSharing')
                 }
-                catch { $problem = Get-PPSafeError $_; Add-PPProblem $doc @('agentSharing') $problem.code $problem.message $envId }
+                catch { $problem = Get-PPSafeError $_; Add-PPProblem $doc @('agentSharing') $problem.code $problem.message $envId -AcquisitionError }
             }
         }
         catch {
             $problem = Get-PPSafeError $_
-            Add-PPProblem $doc $botResources $problem.code $problem.message $envId
+            Add-PPProblem $doc $botResources $problem.code $problem.message $envId -AcquisitionError
             $doc.collection.excludedEnvironments.Add(@{ environmentId = $envId; reason = $problem.code; scope = 'Dataverse evidence or remaining records' })
         }
         finally { $token = $null }
@@ -445,12 +704,16 @@ function Invoke-PPEvidenceCollection {
         agentOwners = 'Dataverse record ownership is not an accountable business-owner approval. Team membership and complete organization-level bot visibility are not proven.'
         agentSharing = 'Explicit Dataverse shares and bot access/authentication modes do not establish effective role/team/inherited access, runtime channel exposure or publishing approval.'
         agentLifecycle = 'Bot state, status, publisher and publication dates are facts, not an authorized publishing decision or legal approval. Approval remains unknown.'
+        apps = 'Administration app inventory is caller-visible and module-paginated, not proof of tenant completeness, effective sharing, bot coverage or approval.'
+        flows = 'Administration flow inventory is caller-visible; deleted flows and EUDB noncompliant flows are not explicitly included. Definitions, run history, secrets, effective access and approval are not evaluated.'
+        connections = 'Administration connection inventory does not reveal or validate credentials, effective permissions, connection health or agent usage. No connection parameters are retained.'
     }
     foreach ($resource in $resources) {
         $count = $doc.evidence[$resource].Count
         if ($count -eq 0) { Add-PPProblem $doc @($resource) 'PP_NO_VERIFIABLE_RECORDS' 'No verifiable records were collected for this resource; this does not establish absence or compliance.' }
         Add-PPProblem $doc @($resource) 'PP_INCOMPLETE_EVIDENCE' $boundaries[$resource]
         $doc.collection.resources[$resource].returnedCount = $count
+        $doc.collection.resources[$resource].acquisitionStatus = Get-PPAcquisitionStatus $doc.collection.resources[$resource]
         $doc.evidence[$resource] = $doc.evidence[$resource].ToArray()
     }
     $doc.collection.operationsAndExplicitRequests = $state.operations

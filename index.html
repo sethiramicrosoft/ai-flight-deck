@@ -4595,7 +4595,11 @@
           counts.append(summary);
           for (const resource of workload.resourceCounts) {
             const row = document.createElement("p");
-            row.textContent = `${resource.resource}: ${resource.rows}`;
+            const status = {
+              collected: "read succeeded", partial: "partial read", failed: "read failed",
+              unavailable: "not available", "not-recorded": "read outcome not recorded"
+            }[resource.acquisitionStatus] || "read outcome not recorded";
+            row.textContent = `${resource.resource}: ${resource.rows} rows; ${status}`;
             counts.append(row);
           }
           content.append(counts);
@@ -4603,11 +4607,23 @@
         if (workload.issues?.length) {
           const details = document.createElement("details");
           const summary = document.createElement("summary");
-          summary.textContent = `Collection errors (${workload.issues.length} of ${workload.errors})`;
+          summary.textContent = `${workload.acquisitionSummary ? "Collection errors" : "Reported source issues"} (${workload.issues.length} of ${workload.errors})`;
           details.append(summary);
           for (const issue of workload.issues) {
             const description = document.createElement("p");
             description.textContent = `${issue.resource}: ${issue.message} (${issue.code})`;
+            details.append(description);
+          }
+          content.append(details);
+        }
+        if (workload.evidenceGaps?.length) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = `Coverage and review gaps (${workload.evidenceGaps.length} of ${workload.evidenceGapCount})`;
+          details.append(summary);
+          for (const gap of workload.evidenceGaps) {
+            const description = document.createElement("p");
+            description.textContent = `${gap.resource}: ${gap.message} (${gap.code})`;
             details.append(description);
           }
           content.append(details);

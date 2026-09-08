@@ -484,13 +484,15 @@ tenant-wide access.
 
 The app launches `scanner/collect-power-platform-evidence.ps1` with the baseline
 tenant and ingests its authenticated output automatically. The package retains
-the seven-resource contract: environments, DLP policies, connectors, agents,
-agent owners, sharing and lifecycle. Unsupported or inaccessible resources
+the original seven-resource contract: environments, DLP policies, connectors,
+agents, agent owners, sharing and lifecycle. It also collects app, flow and
+connection inventories independently of Dataverse. Unsupported or inaccessible resources
 receive explicit errors instead of fabricated approval flags or empty-array
 claims of complete coverage.
 
 The supported path uses the pinned Microsoft PowerApps administration module
-for environments, legacy DLP policies and custom connectors, then each
+for environments, legacy DLP policies, custom connectors, apps, flows and
+connections across the accessible environments, then each
 accessible environment's Dataverse Web API for bots, record owners, explicit
 shares and lifecycle metadata. It checks resource-specific token tenant/actor
 bindings, validates Dataverse hosts and pagination links, and bounds collection
@@ -500,6 +502,28 @@ internal HTTP request count is not asserted. Standard connector coverage,
 effective role/team/inherited sharing, business approvals and tenant-wide
 visibility are not proven. These boundaries stay explicit even when rows are
 successfully returned.
+
+When list metadata is insufficient, the collector reads details for that exact
+environment and revalidates its authenticated context before accepting a
+Dataverse endpoint. It never guesses a URL. A missing endpoint means database
+availability is unknown, not that Dataverse does not exist: the module's
+`CommonDataServiceDatabaseProvisioningState` label reflects generic environment
+provisioning, not database existence.
+
+Each dataset records a read outcome: collected, partial, failed or unavailable.
+A successful empty read is distinct from a denied request. The workload panel
+separates collection errors from coverage and review gaps; legacy packages
+without recorded acquisition status remain explicitly labelled. The pinned
+module's REST failure propagation is enabled temporarily and restored after
+each read so a swallowed HTTP error cannot masquerade as a successful empty list.
+App/flow definitions, connection credentials and connection strings are excluded.
+
+These collection choices build on the separate non-Dataverse service paths in
+[Microsoft's reference collector](https://github.com/microsoft/m365-copilot-automated-readiness-assessment/blob/f542406ffba2066d943643de8d7a87b755b98cab/Core/get_power_platform_client.py).
+Unlike its selected-environment approach, this collector visits accessible
+environments within explicit bounds. It does not adopt empty-on-error fallbacks
+or infer bot coverage from app/flow inventory. These extra inventories are
+observations; they do not add authority contracts or automatically clear controls.
 
 Workload scripts run under Windows PowerShell 5.1, independently of the Graph
 scanner's preferred PowerShell host. Execution-policy bypass is process-local;

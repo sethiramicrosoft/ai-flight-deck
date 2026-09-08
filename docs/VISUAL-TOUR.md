@@ -63,6 +63,13 @@ saved with the assessment. Sign-in, MFA, consent and genuine owner approvals
 remain human actions. Successful collection does not override missing
 observation-validation contracts or prove complete effective access.
 
+Power Platform apps, flows and connections are collected even when Dataverse
+bot discovery is unavailable. Dataset row counts distinguish successful empty
+reads from failures or unavailable sources. Collection errors and coverage/review
+gaps have separate disclosures. If an environment list omits its Dataverse
+endpoint, the app attempts an exact-environment detail read automatically;
+it does not interpret the provisioning-state label as proof of a database.
+
 The local service rejects stale, malformed, cross-tenant, replayed, or
 unsupported packages before they can affect a control result.
 

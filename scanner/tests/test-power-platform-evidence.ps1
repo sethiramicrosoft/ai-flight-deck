@@ -36,7 +36,12 @@ function New-PPTestOperations {
     $script:requests = New-Object 'System.Collections.Generic.List[string]'
     return @{
         SignIn = { param($Tenant, $Audience) New-PPTestToken $Audience }
+        ContextToken = { param($Audience) New-PPTestToken $Audience }
+        EnvironmentDetail = { param($Environment) New-PPTestEnvironment $Environment }
         Environments = { param($Limit) New-PPTestEnvironment }
+        Apps = { param($Environment,$Limit) [pscustomobject]@{AppName='app-1';EnvironmentName=$Environment;DisplayName='Synthetic app';UnpublishedAppDefinition='SYNTHETIC-SECRET'} }
+        Flows = { param($Environment,$Limit) [pscustomobject]@{FlowName='flow-1';EnvironmentName=$Environment;Internal=@{properties=@{state='Started';definition='SYNTHETIC-SECRET'}}} }
+        Connections = { param($Environment,$Limit) [pscustomobject]@{ConnectionName='connection-1';ConnectorName='shared-example';EnvironmentName=$Environment;Internal=@{connectionString='SYNTHETIC-SECRET'}} }
         Policies = {
             param($Limit)
             [pscustomobject]@{
@@ -100,11 +105,13 @@ Test-PPCase 'Real interface fixture produces all seven arrays with actual identi
     Assert-PPTest ($doc.tenantId -eq $script:tenant -and $doc.actorId -eq $script:actor) 'Wrong identity'
     Assert-PPTest ($doc.schema -eq 'ai-flight-deck/power-platform-evidence' -and $doc.version -eq '1.0.0') 'Wrong schema'
     Assert-PPTest ($doc.producerVersion -eq '1.0.0' -and $doc.collectionChallenge -eq ('a'*40)) 'Wrong producer'
-    foreach ($key in @('environments','dlpPolicies','connectors','agents','agentOwners','agentSharing','agentLifecycle')) {
+    foreach ($key in @('environments','dlpPolicies','connectors','agents','agentOwners','agentSharing','agentLifecycle','apps','flows','connections')) {
         Assert-PPTest ($doc.evidence[$key] -is [array]) "$key is not an array"
         Assert-PPTest ($doc.evidence[$key].Count -eq 1) "$key did not collect its row"
         Assert-PPTest ($doc.errors.Contains($key)) "$key lacks visibility/semantic boundary"
         Assert-PPTest (-not $doc.collection.resources[$key].complete) "$key is falsely complete"
+        Assert-PPTest ($doc.collection.resources[$key].acquisitionStatus -eq 'collected') "$key successful read was misclassified"
+        Assert-PPTest ($doc.collection.resources[$key].acquisitionErrors.Count -eq 0) "$key coverage caveat was classified as an acquisition error"
     }
     Assert-PPTest ($doc.evidence.agentOwners[0].ownerType -eq 'team') 'Owner type lost'
     Assert-PPTest ($doc.collection.environments[0].inventoryCompleteWithinCallerScope) 'Completed in-scope pages lost'
@@ -206,6 +213,170 @@ Test-PPCase 'Live HTTP helper uses GET only, bounded responses and no redirects'
     $source=Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\PowerPlatform.Evidence.ps1') -Raw
     Assert-PPTest ($source -match '\.GetAsync\(' -and $source -match 'AllowAutoRedirect = \$false' -and $source -match 'PP_RESPONSE_TOO_LARGE') 'HTTP safety boundary missing'
     Assert-PPTest ($source -notmatch '\.(Post|Put|Patch|Delete)Async\(') 'Tenant mutation added'
+}
+Test-PPCase 'Apps flows and connections collect across environments without Dataverse' {
+    $ops = New-PPTestOperations
+    $ops.Environments = { param($Limit) New-PPTestEnvironment 'one' ''; New-PPTestEnvironment 'two' '' }
+    $ops.EnvironmentDetail = { param($Environment) New-PPTestEnvironment $Environment '' }
+    $doc = Invoke-PPTestCollection $ops
+    foreach ($resource in @('apps','flows','connections')) {
+        Assert-PPTest ($doc.evidence[$resource].Count -eq 2) "$resource only used the first environment"
+        Assert-PPTest ($doc.collection.resources[$resource].acquisitionStatus -eq 'collected') "$resource was blocked by Dataverse"
+        Assert-PPTest ($doc.collection.resources[$resource].acquisitionErrors.Count -eq 0) "$resource inherited a Dataverse error"
+        foreach ($scope in $doc.collection.environments) { Assert-PPTest ($scope.resources[$resource].returnedCount -eq 1) "$resource lacks per-environment counts" }
+    }
+    Assert-PPTest ($doc.collection.resources.agents.acquisitionStatus -eq 'unavailable') 'Missing endpoint was not distinguished from denied access'
+    Assert-PPTest ($doc.errors.agents.code -eq 'PP_DATAVERSE_ENDPOINT_NOT_RETURNED') 'Endpoint absence was misreported as invalid URL'
+    Assert-PPTest ($script:requests.Count -eq 0) 'Guessed a Dataverse endpoint'
+    Assert-PPTest (($doc | ConvertTo-Json -Depth 30) -notmatch 'SYNTHETIC-SECRET') 'Inventory leaked definitions or connection strings'
+}
+Test-PPCase 'Detailed endpoint discovery revalidates identity and retains safe discovery facts' {
+    $ops = New-PPTestOperations
+    $ops.Environments = {
+        param($Limit)
+        $row = New-PPTestEnvironment 'environment-1' ''
+        $row.OrganizationId = $null
+        $row | Add-Member -NotePropertyName CommonDataServiceDatabaseProvisioningState -NotePropertyValue 'Succeeded'
+        $row
+    }
+    $script:detailCalls = 0
+    $ops.EnvironmentDetail = {
+        param($Environment)
+        $script:detailCalls++
+        Assert-PPTest ($Environment -eq 'environment-1') 'Detail was not scoped to requested environment'
+        $row=New-PPTestEnvironment $Environment
+        $row.OrganizationId=$null
+        $row.Internal.properties.linkedEnvironmentMetadata.resourceId=$script:org
+        $row
+    }
+    $doc = Invoke-PPTestCollection $ops
+    $discovery=$doc.collection.environments[0].discovery
+    Assert-PPTest ($script:detailCalls -eq 1 -and $doc.evidence.agents.Count -eq 1) 'Detail endpoint was not used'
+    Assert-PPTest ($discovery.contextValidatedBeforeAndAfter -and $discovery.source -eq 'environmentDetail') 'Detail binding provenance missing'
+    Assert-PPTest ($discovery.databaseExistence -eq 'unknown') 'Generic provisioning state became database proof'
+    Assert-PPTest ($doc.collection.resources.agents.acquisitionStatus -eq 'collected') 'Successful detailed acquisition incorrectly failed'
+}
+Test-PPCase 'Detailed endpoint access denial remains failed while other inventories succeed' {
+    $ops=New-PPTestOperations
+    $ops.Environments={ param($Limit) New-PPTestEnvironment 'environment-1' '' }
+    $ops.EnvironmentDetail={ param($Environment) throw 'PP_HTTP_403' }
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.collection.resources.agents.acquisitionStatus -eq 'failed') 'Denied lookup misclassified as database absence'
+    Assert-PPTest ($doc.collection.resources.agents.acquisitionErrors[0].code -eq 'PP_HTTP_403') 'Lookup error missing'
+    Assert-PPTest ($doc.collection.resources.apps.acquisitionStatus -eq 'collected') 'Dataverse failure blocked apps'
+    Assert-PPTest ($script:requests.Count -eq 0) 'Denied lookup was followed by a guessed endpoint'
+}
+Test-PPCase 'Cross-environment detail and changed tenant context are rejected' {
+    $ops=New-PPTestOperations
+    $ops.Environments={ param($Limit) New-PPTestEnvironment 'environment-1' '' }
+    $ops.EnvironmentDetail={ param($Environment) New-PPTestEnvironment 'another-environment' }
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.errors.agents.code -eq 'PP_ENVIRONMENT_DETAIL_MISMATCH' -and $script:requests.Count -eq 0) 'Wrong environment detail accepted'
+    $script:contextReads=0
+    $ops.EnvironmentDetail={ param($Environment) New-PPTestEnvironment $Environment }
+    $ops.ContextToken={
+        param($Audience)
+        $script:contextReads++
+        if($script:contextReads -eq 1){New-PPTestToken $Audience}else{New-PPTestToken $Audience 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'}
+    }
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.errors.agents.code -eq 'PP_TENANT_MISMATCH' -and $script:requests.Count -eq 0) 'Changed post-read tenant context accepted'
+}
+Test-PPCase 'Malformed detailed URLs do not leak query secrets or become absent database claims' {
+    $ops=New-PPTestOperations
+    $ops.Environments={ param($Limit) New-PPTestEnvironment 'environment-1' '' }
+    $ops.EnvironmentDetail={ param($Environment) New-PPTestEnvironment $Environment 'https://synthetic.crm.dynamics.com/?token=SYNTHETIC-SECRET' }
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.errors.agents.code -eq 'PP_UNSUPPORTED_DATAVERSE_URL') 'Malformed URL was treated as absent database'
+    Assert-PPTest (($doc | ConvertTo-Json -Depth 30) -notmatch 'SYNTHETIC-SECRET') 'Detailed URL query leaked'
+}
+Test-PPCase 'Successful empty acquisition differs from failed query and missing interface' {
+    $ops=New-PPTestOperations
+    $ops.Apps={param($Environment,$Limit)}
+    $ops.Flows={param($Environment,$Limit) throw 'PP_HTTP_403'}
+    $ops.Remove('Connections')
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.collection.resources.apps.acquisitionStatus -eq 'collected' -and $doc.evidence.apps.Count -eq 0) 'Successful empty query not collected'
+    Assert-PPTest ($doc.collection.resources.apps.acquisitionErrors.Count -eq 0) 'Successful empty query gained a retrieval error'
+    Assert-PPTest ($doc.collection.resources.flows.acquisitionStatus -eq 'failed' -and $doc.evidence.flows.Count -eq 0) 'Failed query looks empty-successful'
+    Assert-PPTest ($doc.collection.resources.connections.acquisitionStatus -eq 'unavailable') 'Missing interface looks empty-successful'
+    Assert-PPTest ($doc.collection.resources.connections.acquisitionErrors[0].code -eq 'PP_COMMAND_UNAVAILABLE') 'Missing command lacks precise safe error'
+    foreach($resource in $doc.collection.resources.Keys) {
+        Assert-PPTest ($doc.collection.resources[$resource].acquisitionStatus -in @('collected','partial','failed','unavailable')) 'Unexpected status enum'
+        foreach($error in $doc.collection.resources[$resource].acquisitionErrors) { Assert-PPTest ($error.Count -eq 2 -and $error.Contains('code') -and $error.Contains('message')) 'Acquisition error has unsafe or ambiguous fields' }
+    }
+}
+Test-PPCase 'An environment failure and successful empty peer yield partial acquisition' {
+    $ops=New-PPTestOperations
+    $ops.Environments={param($Limit) New-PPTestEnvironment 'one';New-PPTestEnvironment 'two'}
+    $ops.Apps={param($Environment,$Limit) if($Environment -eq 'one'){throw 'PP_HTTP_403'}}
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.evidence.apps.Count -eq 0 -and $doc.collection.resources.apps.acquisitionStatus -eq 'partial') 'Status was inferred only from row count'
+    Assert-PPTest ($doc.collection.environments[0].resources.apps.acquisitionStatus -eq 'failed') 'Failed environment scope lost'
+    Assert-PPTest ($doc.collection.environments[1].resources.apps.acquisitionStatus -eq 'collected') 'Empty successful environment scope lost'
+}
+Test-PPCase 'Administration item and request limits bound new data and detailed discovery' {
+    $ops=New-PPTestOperations
+    $ops.Apps={param($Environment,$Limit) [pscustomobject]@{AppName='one'};[pscustomobject]@{AppName='two'}}
+    $doc=Invoke-PPTestCollection $ops 50 1
+    Assert-PPTest ($doc.evidence.apps.Count -eq 1 -and $doc.collection.resources.apps.acquisitionStatus -eq 'partial') 'App truncation was not recorded'
+    $ops=New-PPTestOperations
+    $script:detailCalls=0
+    $ops.Environments={param($Limit) New-PPTestEnvironment 'environment-1' ''}
+    $ops.EnvironmentDetail={param($Environment) $script:detailCalls++;New-PPTestEnvironment $Environment}
+    $doc=Invoke-PPTestCollection $ops 50 2000 6
+    Assert-PPTest ($doc.collection.operationsAndExplicitRequests -eq 6 -and $script:detailCalls -eq 0) 'Budget allowed an unbounded discovery read'
+    Assert-PPTest ($doc.collection.resources.agents.acquisitionStatus -eq 'partial') 'Budget truncation not reflected in acquisition'
+}
+Test-PPCase 'Successful empty bot query is collected but still not readiness evidence' {
+    $ops=New-PPTestOperations; $base=$ops.Request
+    $ops.Request={
+        param($Url,$Token,$Timeout,$PageSize)
+        if($Url -match '/bots\?'){return [pscustomobject]@{value=@()}}
+        & $base $Url $Token $Timeout $PageSize
+    }.GetNewClosure()
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.collection.resources.agents.acquisitionStatus -eq 'collected' -and $doc.evidence.agents.Count -eq 0) 'Empty bot query falsely failed'
+    Assert-PPTest ($doc.collection.resources.agents.acquisitionErrors.Count -eq 0 -and $doc.errors.Contains('agents')) 'Acquisition and readiness boundaries collapsed'
+}
+Test-PPCase 'Failed discovery prevents dependent reads but does not poison independent DLP acquisition' {
+    $ops=New-PPTestOperations
+    $ops.Environments={param($Limit) throw 'PP_HTTP_403'}
+    $ops.Apps={throw 'Must not execute without environments'}
+    $doc=Invoke-PPTestCollection $ops
+    Assert-PPTest ($doc.collection.resources.environments.acquisitionStatus -eq 'failed') 'Environment read failure lost'
+    Assert-PPTest ($doc.collection.resources.apps.acquisitionStatus -eq 'unavailable') 'Unattempted dependent read claimed to fail directly'
+    Assert-PPTest ($doc.collection.resources.dlpPolicies.acquisitionStatus -eq 'collected' -and $doc.collection.resources.dlpPolicies.acquisitionErrors.Count -eq 0) 'Independent DLP read inherited acquisition failure'
+}
+Test-PPCase 'Microsoft swallowed REST failures are forced to throw and module defaults restored' {
+    # In-memory module only: models the shipped helper's default swallow behavior without auth or HTTP.
+    $module = New-Module -Name Microsoft.PowerApps.RestClientModule -ScriptBlock {
+        $script:PSDefaultParameterValues=@{'preserved:key'='unchanged';Disabled=$true}
+        function InvokeApi {
+            [CmdletBinding()]param([switch]$ThrowOnFailure)
+            if($ThrowOnFailure){throw 'PP_HTTP_403'}
+            return [pscustomobject]@{error='would-be-swallowed';value=@()}
+        }
+        Export-ModuleMember -Function InvokeApi
+    }
+    $facade = New-Module -Name Microsoft.PowerApps.Administration.PowerShell -ArgumentList $module -ScriptBlock {
+        param($RestModule)
+        Import-Module $RestModule
+        function Get-AdminPowerApp {
+            [CmdletBinding()]param([string]$EnvironmentName)
+            $reply=InvokeApi
+            $reply.value
+        }
+        Export-ModuleMember -Function InvokeApi,Get-AdminPowerApp
+    }
+    Import-Module $facade -Force
+    try {
+        Assert-PPTest ((Get-Command InvokeApi).ModuleName -eq 'Microsoft.PowerApps.Administration.PowerShell') 'Fixture does not reproduce Microsoft facade re-export'
+        Assert-PPThrows { Invoke-PPAdminInventoryRead 'Get-AdminPowerApp' 'synthetic' 2 } 'PP_HTTP_403'
+        $defaults=& $module { $script:PSDefaultParameterValues }
+        Assert-PPTest ($defaults.Count -eq 2 -and $defaults['Disabled'] -eq $true -and $defaults['preserved:key'] -eq 'unchanged') 'Module defaults were not restored after failure'
+    }
+    finally { Remove-Module $facade -Force; Remove-Module $module -Force -ErrorAction SilentlyContinue }
 }
 Write-Host "$script:passed passed; $script:failed failed."
 if ($script:failed) { exit 1 }
