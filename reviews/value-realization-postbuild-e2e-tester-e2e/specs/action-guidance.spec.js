@@ -41,9 +41,9 @@ test("control guidance navigation, policy boundaries and exports work on desktop
   await expect(page.locator("#enablement-AFD-TEAMS-001 .control-badge")).toHaveText("Evidence integration required");
   await expect(page.locator("#enablement-AFD-TEAMS-001")).toContainText("permissions or a rescan alone");
   await page.evaluate(() => openControlPlaybook("AFD-PPA-001"));
-  await expect(page.locator("#enablement-AFD-PPA-001")).toContainText("not an automated collector");
+  await expect(page.locator("#enablement-AFD-PPA-001")).toContainText("Collect workload evidence");
   await page.evaluate(() => openControlPlaybook("AFD-EXO-001"));
-  await expect(page.locator("#enablement-AFD-EXO-001")).toContainText('-Workloads "exchangeOnline"');
+  await expect(page.locator("#enablement-AFD-EXO-001")).toContainText("exchangeOnline automatically");
 
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#download-enablement-plan").click();
@@ -54,6 +54,6 @@ test("control guidance navigation, policy boundaries and exports work on desktop
   expect(markdown).not.toContain("Authoritative Microsoft source");
   const csv = await page.evaluate(() => controlsCsv());
   expect(csv).toContain('"Requirement Origin","Evidence Collection Steps","Collection Boundary"');
-  expect(csv).toContain("not an automated collector");
+  expect(csv).toContain("Collect workload evidence");
   expect(errors).toEqual([]);
 });

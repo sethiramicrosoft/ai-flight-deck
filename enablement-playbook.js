@@ -677,11 +677,11 @@
     if (domain.id === "powerPlatformAgents") {
       return {
         kind: "PowerPlatformEvidenceRequired",
-        limitation: "This release reads an imported package; it does not authenticate directly to Power Platform. Its template is an evidence format, not an automated collector.",
+        limitation: "Authenticated collection preserves unavailable resources, partial coverage, and unsupported observation-validation paths as gaps. Collection does not prove effective enforcement or owner approval.",
         steps: [
-          "In Set up, prepare a Power Platform collection challenge and download the evidence template.",
-          "Have the Power Platform Administrator populate environments, dlpPolicies, connectors, agents, agentOwners, agentSharing and agentLifecycle from authenticated administrative exports; retain source dates, scope and errors.",
-          "Use the baseline tenant ID and current challenge, import the package before the challenge expires, then run a new tenant scan. Empty arrays or inferred values do not establish complete coverage."
+          "In Set up, select Connect and scan tenant, or Collect workload evidence to update the existing baseline.",
+          "Complete the Microsoft Power Platform sign-in prompt with the listed administrative access. The app runs the connector and saves and processes its evidence automatically.",
+          "Review the workload outcome and this control's source errors. Resolve the specific access or unsupported-evidence issue; no JSON template, export, or file upload is required."
         ]
       };
     }
@@ -689,12 +689,11 @@
     if (workloads[domain.id] && (domain.id !== "securityPosture" || control.id === "AFD-SEC-002")) {
       return {
         kind: "AdminEvidenceRequired",
-        limitation: "The package supplements Graph evidence. Raw command output must match the evaluator's required fields; successful import alone does not close the control.",
+        limitation: "Automatic workload collection supplements Graph evidence. Command output must match the evaluator and validation contract; successful collection alone does not close the control.",
         steps: [
-          `In Set up, prepare an administrator collection challenge and download scanner/collect-admin-evidence.ps1 for workload ${workloads[domain.id]}.`,
-          `From the downloaded collector's folder, run: .\\collect-admin-evidence.ps1 -TenantId "<baseline tenant GUID>" -WorkspacePath "<local output folder>" -CollectionChallenge "<current challenge>" -Workloads "${workloads[domain.id]}". Replace each placeholder; add -SharePointAdminUrl "https://<tenant>-admin.sharepoint.com" for SharePoint.`,
-          `The required module is ${domain.id === "sharePointOneDrive" ? "Microsoft.Online.SharePoint.PowerShell" : "ExchangeOnlineManagement"}. Install it through your approved PowerShell module process if it is missing.`,
-          "Sign in to the intended tenant, retain command errors, import the generated package before the challenge expires, and rerun the tenant scan. Review any remaining evidence limitations."
+          `In Set up, select Collect workload evidence to run ${workloads[domain.id]} automatically against the baseline tenant. A new tenant scan also runs the workload collectors.`,
+          "Complete the workload's Microsoft sign-in and consent prompts. The app prepares missing connectors, discovers the SharePoint administration URL, runs read-only commands, and processes the results.",
+          "Review command errors and remaining evidence limitations. No shell commands, copied challenges, or uploaded evidence files are required."
         ]
       };
     }

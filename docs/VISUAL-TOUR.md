@@ -18,7 +18,7 @@ signature, or high confidence value is not automatically a passed control.
 
 ### Choose the evidence path
 
-Start a read-only tenant scan, import an existing AI Flight Deck artifact, or
+Start a read-only tenant scan with automatic workload collection, import an existing AI Flight Deck artifact, or
 bring in evidence from the Microsoft 365 Copilot Readiness report and
 Microsoft's automated readiness assessment.
 
@@ -52,10 +52,16 @@ steps and references** to open that control's detailed instructions.
 Some controls cross administration boundaries that Microsoft Graph cannot
 cover by itself.
 
-For Exchange Online, SharePoint Online, and Purview, create a tenant-bound,
-one-time challenge and run the supplied read-only PowerShell collector. For
-Power Platform and Copilot Studio, populate the versioned evidence contract
-from authenticated administrative exports.
+Select **Connect and scan tenant**, or **Collect workload evidence** for an
+existing baseline. The app prepares connectors, opens workload authentication,
+runs Exchange Online, SharePoint Online, Purview and Power Platform / Copilot
+Studio collection, and processes the results. No operator-run scripts or
+hand-filled export packages are required.
+
+Workload progress and specific collection failures appear in Set up and are
+saved with the assessment. Sign-in, MFA, consent and genuine owner approvals
+remain human actions. Successful collection does not override missing
+observation-validation contracts or prove complete effective access.
 
 The local service rejects stale, malformed, cross-tenant, replayed, or
 unsupported packages before they can affect a control result.

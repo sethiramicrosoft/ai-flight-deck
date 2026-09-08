@@ -197,9 +197,10 @@ means unknown; an explicit array is the caller's complete normalized inventory.
 **Evidence integration required** means the production pipeline still lacks an
 input used by the evaluator, such as effective Teams policy assignments.
 Repeated rescans, additional consent, or an unrelated attestation do not supply
-that input. The Power Platform package remains a manually populated export
-format, not an authenticated collector. Owner approvals and local package seals
-do not prove effective permissions or complete workload coverage.
+that input. The app now launches authenticated workload collectors and ingests
+their results itself; operators do not assemble export packages. Owner approvals
+and local package seals still do not prove effective permissions or complete
+workload coverage.
 
 Administrator packages retain their version 1.0.0 contract. The consumer accepts
 command-only entries produced by the shipped script only when the command has
@@ -210,6 +211,13 @@ require the purpose-specific key. Collection requests now carry the scan tenant
 ID into package validation.
 
 ## How the SharePoint access and sharing review works
+
+**Export report** downloads `ai-flight-deck-sharing-review.csv`, ready to open
+in Excel. It includes one row per finding/resource, severity, access-review
+reason, recommended action, evidence references, selected corrections and
+verification limitations. UTF-8 text, quoted multiline fields and spreadsheet
+formula protection are supported. Machine-readable remediation bindings and
+verification artifacts retain their separate JSON formats.
 
 The Assessment page does not treat every sharing signal as confirmed sensitive
 data exposure. It separates four questions:
@@ -410,76 +418,94 @@ stops the local service.
 4. Copy the one-time code displayed in Flight Deck.
 5. Enter the code on Microsoft's sign-in page.
 6. Sign in with the approved Microsoft 365 tenant account.
-7. Review the requested delegated permissions. The scanner requests read-only
-   access and does not request tenant write permissions.
+7. Review the requested delegated permissions. Graph requests read access.
+   Workload connectors use Microsoft's administration clients; their consent
+   can be broader than the read-only commands this tool executes.
 8. If tenant-wide admin consent is required, ask an authorized administrator
    to approve the displayed permissions.
 9. Return to Flight Deck and leave the launcher window open until the scan
    finishes.
 10. Flight Deck opens **Assessment** automatically when the baseline is ready.
 
-The first run may take longer because the Microsoft Graph authentication module
-is installed before sign-in.
+The first run may take longer because missing Microsoft authentication and
+administration modules are installed for the current Windows user.
 
 ### Complete evidence the Graph scan cannot collect
 
-The live scan remains the primary authenticated path. Use the **Evidence
-completion center** on **Set up** (the first navigation tab) for controls
-that cross a separate Microsoft 365 administration boundary.
+**Connect and scan tenant** now runs Graph and the four workload collections
+automatically. **Collect workload evidence** updates an existing verified
+baseline without repeating its SharePoint sharing inventory. Complete each
+Microsoft service's sign-in, MFA, or consent prompt when requested; the app
+handles prerequisites, execution, temporary output, local ingestion and
+assessment refresh. There are no required script downloads, administrator
+exports, copied collection challenges or hand-filled workload JSON templates.
+
+Per-workload outcomes remain visible in Set up and are saved with the assessment.
+One service's role denial or missing module does not prevent other services from
+being attempted. Each workload has a 15-minute deadline and collection can be
+cancelled. Producer output is limited to 12 MB per workload; over-limit output
+is an explicit gap, not silently truncated evidence. The default scan attempts
+all four workloads. Availability still
+depends on tenant licensing, roles, service support and local installation policy.
 
 #### Exchange Online, SharePoint Online, and Purview
 
-Install the required Microsoft administration modules for the current Windows
-user:
+The app launches `scanner/collect-admin-evidence.ps1` once per service, using
+`ExchangeOnlineManagement` or `Microsoft.Online.SharePoint.PowerShell`. It
+discovers the commercial SharePoint administration URL through the Graph
+organization and root site, bound to the baseline tenant. It never passes the
+Graph access token to a workload connector.
 
-```powershell
-Install-Module ExchangeOnlineManagement -Scope CurrentUser
-Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser
-```
+Producer output must match the current collection challenge, expected tenant,
+supported producer/version and freshness contract. A workload cannot supply
+another service's command keys. The app combines only the current run's admin
+outputs, retains collection errors and per-service identity/timestamps, and
+protects the result with the local workspace integrity key. An unsuccessful
+current collection cannot silently substitute a previous successful result.
 
-On **Set up**, in the Evidence completion center, select **Create collection
-challenge**. Then run the shipped
-read-only producer with the tenant ID shown by the live scan, the one-time
-challenge, and the tenant's SharePoint administration URL:
-
-```powershell
-.\scanner\collect-admin-evidence.ps1 `
-  -TenantId "<tenant-guid>" `
-  -WorkspacePath "$env:LOCALAPPDATA\AI Flight Deck\live-test" `
-  -CollectionChallenge "<one-time-challenge>" `
-  -SharePointAdminUrl "https://<tenant>-admin.sharepoint.com"
-```
-
-The challenge is valid for 30 minutes and can be used once. The producer opens
-the workload sign-in experiences, executes the bounded read commands used by
-Flight Deck, records command-level failures, and writes
-`admin-evidence.<timestamp>.json`. Import that file in the Evidence completion
-center. The local service validates its producer identity, one-time challenge,
-schema, verified-baseline tenant, object shape, and 24-hour freshness, then
-seals it before the next scan can consume it.
-
-If an individual administration command fails, the producer continues with the
-remaining commands and records the exact failure in the package's `errors`
-map. Importing a partially collected package is supported: affected controls
-remain evidence gaps with the command failure, while independently collected
-controls can still be evaluated.
+The schema stays at 1.0.0; the automated administrator producer is 1.1.0.
+Command boundaries, counts, module versions and cleanup failures are retained.
+Exchange and Purview bind the service's reported tenant and signed-in account.
+SharePoint's administration module does not expose those identities: they remain
+null and `tenantVerified` remains false. Its connected administration URL must
+match the Graph-derived target. The aggregate does not invent a common service
+actor. Neither this URL binding nor local integrity sealing proves effective
+tenant-wide access.
 
 #### Power Platform and Copilot Studio
 
-Set up displays **Before you scan: some evidence requires manual work** above
-the scan button, with a direct blank-template download and a link to the
-visible five-step import instructions. Those instructions identify the
-administrator's role, seven evidence lists, fields to replace, 30-minute
-challenge window, rescan step, and the limits of imported evidence.
+The app launches `scanner/collect-power-platform-evidence.ps1` with the baseline
+tenant and ingests its authenticated output automatically. The package retains
+the seven-resource contract: environments, DLP policies, connectors, agents,
+agent owners, sharing and lifecycle. Unsupported or inaccessible resources
+receive explicit errors instead of fabricated approval flags or empty-array
+claims of complete coverage.
 
-Download
-[`schema/power-platform-evidence.template.v1.json`](schema/power-platform-evidence.template.v1.json),
-select **Create collection challenge** for Power Platform, then replace the
-challenge, tenant, actor, timestamp, and seven evidence arrays with current
-authenticated exports before importing it. The
-required arrays are environments, DLP policies, connectors, agents, agent
-owners, sharing, and lifecycle. Cross-tenant, stale, malformed, or unsealed
-packages are rejected.
+The supported path uses the pinned Microsoft PowerApps administration module
+for environments, legacy DLP policies and custom connectors, then each
+accessible environment's Dataverse Web API for bots, record owners, explicit
+shares and lifecycle metadata. It checks resource-specific token tenant/actor
+bindings, validates Dataverse hosts and pagination links, and bounds collection
+to 50 environments, 2,000 rows per resource, 500 explicit operations and 20 pages
+per query by default. Administration-module pagination is opaque and its
+internal HTTP request count is not asserted. Standard connector coverage,
+effective role/team/inherited sharing, business approvals and tenant-wide
+visibility are not proven. These boundaries stay explicit even when rows are
+successfully returned.
+
+Workload scripts run under Windows PowerShell 5.1, independently of the Graph
+scanner's preferred PowerShell host. Execution-policy bypass is process-local;
+the app does not change persisted policy or override organization-enforced
+restrictions.
+
+Successful collection is **not** automatic authority admission. The bounded
+validator still admits only the source contracts listed above. Missing
+observation-validation paths remain Unknown; authenticating or resealing data
+does not implement those contracts.
+
+Existing offline import controls remain in a collapsed **Advanced: import an
+existing evidence package (optional)** section. They are not part of the normal
+collection flow; their one-time challenge and freshness rules remain enforced.
 
 #### Accountable governance attestations
 

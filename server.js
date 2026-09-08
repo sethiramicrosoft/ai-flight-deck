@@ -28,13 +28,14 @@ const {
   createSignedAttestation,
   verifySignedAttestation
 } = require("./attestation-evidence");
-const { validateEvidencePackage } = require("./collector-adapters");
+const { validateEvidencePackage, graphRequest } = require("./collector-adapters");
+const { selectedWorkloads, collectWorkloadEvidence, PRODUCER_VERSIONS } = require("./workload-collection");
 const { buildEvidenceCompletionPlan } = require("./evidence-completion");
 const { validateAssessmentAuthority } = require("./evidence-authority");
 
 const DEFAULT_PORT = 8080;
 const MAX_LOG_LENGTH = 50000;
-const ALLOWED_ACTIONS = new Set(["baseline", "verify"]);
+const ALLOWED_ACTIONS = new Set(["baseline", "verify", "workloads"]);
 const GRAPH_CLI_CLIENT_ID = "14d82eec-204b-4c2f-b7e8-296a70dab67e";
 const GRAPH_SCOPE_LIST = [
   "openid",
@@ -151,10 +152,12 @@ function runPowerShell(job, executable, args, extraEnv = {}, signal) {
       reject(signal.reason || new Error("Workflow cancelled."));
       return;
     }
+    const environment = { ...process.env, NO_COLOR: "1" };
+    delete environment.FLIGHT_DECK_GRAPH_ACCESS_TOKEN;
     const child = spawn(executable, args, {
       cwd: path.resolve(__dirname, ".."),
       windowsHide: false,
-      env: { ...process.env, ...extraEnv, NO_COLOR: "1" }
+      env: { ...environment, ...extraEnv }
     });
     job.pid = child.pid;
     child.stdout.on("data", chunk => appendLog(job, chunk.toString()));
@@ -250,9 +253,17 @@ function readJwtClaim(token, claim) {
 function createWorkflowRunner({
   workspace = defaultWorkspace(),
   executable = resolvePowerShell(),
+  workloadExecutable = path.join(process.env.SystemRoot || "C:\\Windows",
+    "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
   verifyAttestation,
   verifyEvidencePackage,
-  attestationIntegrity
+  attestationIntegrity,
+  storeAutomaticEvidence,
+  readBaseline,
+  executePowerShell = runPowerShell,
+  acquireToken = acquireGraphToken,
+  collectWorkloads = collectWorkloadEvidence,
+  collectEstateEvidence = collectEstate
 } = {}) {
   const workflowScript = path.join(__dirname, "scanner", "test-live-tenant.ps1");
   let cachedToken = null;
@@ -271,7 +282,7 @@ function createWorkflowRunner({
 
   async function enrichEstateEvidence(rawToken, artifactPath, signal, job) {
     const scan = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
-    const enriched = await collectEstate({
+    const enriched = await collectEstateEvidence({
       rawToken,
       workspace,
       scan,
@@ -280,20 +291,24 @@ function createWorkflowRunner({
       verifyEvidencePackage,
       attestationIntegrity
     });
+    if (job.workloads) enriched.workloadCollection = {
+      collectedAt: new Date().toISOString(),
+      summary: job.collectionSummary,
+      workloads: job.workloads
+    };
     writeJsonAtomic(artifactPath, enriched);
     appendLog(job,
       `Estate collectors attempted all 13 domains and evaluated ` +
       `${enriched.estateAssessment.evaluatedControls} of 77 controls.\n`);
   }
 
-  return async (job, action, signal) => {
-    appendLog(job, "Preparing the Microsoft Graph connector...\n");
-    await runPowerShell(job, executable, installCommand, {}, signal);
+  async function withGraph(job, signal, operation, expectedTenant) {
     if (!cachedToken || cachedToken.expiresAt - Date.now() < 5 * 60 * 1000) {
       appendLog(job, "Requesting Microsoft sign-in...\n");
-      cachedToken = await acquireGraphToken(job, signal);
-    } else {
-      appendLog(job, "Reusing the current in-memory Microsoft sign-in.\n");
+      cachedToken = await acquireToken(job, signal);
+    }
+    if (expectedTenant && cachedToken.tenantId.toLowerCase() !== expectedTenant.toLowerCase()) {
+      throw new Error("Sign in to the tenant identified by the baseline. Workload collection was not started.");
     }
     const binding = {
       tenantId: cachedToken.tenantId,
@@ -307,48 +322,45 @@ function createWorkflowRunner({
       rawToken: cachedToken.value,
       expiresAt: cachedToken.expiresAt
     });
-    if (action === "baseline") {
-      appendLog(job, "Starting the read-only baseline scan...\n");
-      await consentBroker.withTokenHandle(tokenHandle, binding, rawToken =>
-        runPowerShell(job, executable, [
-          "-NoProfile",
-          "-File",
-          workflowScript,
-          "-Phase",
-          "Baseline",
-          "-WorkspacePath",
-          workspace,
-          "-AuthMode",
-          "AccessToken"
-        ], { FLIGHT_DECK_GRAPH_ACCESS_TOKEN: rawToken }, signal)
-          .then(() => enrichEstateEvidence(
-            rawToken,
-            path.join(workspace, "baseline-scan.json"),
-            signal,
-            job
-          )));
-      return "baseline";
-    }
+    return consentBroker.withTokenHandle(tokenHandle, binding, operation);
+  }
 
-    appendLog(job, "Starting post-change verification...\n");
-    await consentBroker.withTokenHandle(tokenHandle, binding, rawToken =>
-      runPowerShell(job, executable, [
-        "-NoProfile",
-        "-File",
-        workflowScript,
-        "-Phase",
-        "Verification",
-        "-WorkspacePath",
-        workspace
-      ], { FLIGHT_DECK_GRAPH_ACCESS_TOKEN: rawToken }, signal)
-        .then(() => enrichEstateEvidence(
-          rawToken,
-          path.join(workspace, "verification-scan.json"),
-          signal,
-          job
-        )));
+  return async (job, action, signal) => {
+    const baseline = action === "workloads" ? readBaseline() : null;
+    const expectedTenant = baseline?.tenant?.tenantId || baseline?.tenant?.id;
+    appendLog(job, "Preparing the Microsoft Graph connector...\n");
+    await executePowerShell(job, executable, installCommand, {}, signal);
+    const artifactPath = path.join(workspace,
+      action === "verify" ? "verification-scan.json" : "baseline-scan.json");
+    if (action !== "workloads") {
+      appendLog(job, `Starting the read-only ${action === "baseline" ? "baseline" : "verification"} scan...\n`);
+      await withGraph(job, signal, rawToken =>
+        executePowerShell(job, executable, [
+          "-NoProfile", "-File", workflowScript, "-Phase",
+          action === "baseline" ? "Baseline" : "Verification",
+          "-WorkspacePath", workspace, "-AuthMode", "AccessToken"
+        ], { FLIGHT_DECK_GRAPH_ACCESS_TOKEN: rawToken }, signal), expectedTenant);
+    }
+    const scan = baseline || JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+    const tenantId = scan.tenant?.tenantId || scan.tenant?.id;
+    if (!tenantId) throw new Error("The scan does not identify its tenant.");
+    if (selectedWorkloads(job.selectedWorkloads).length) {
+      appendLog(job, "Starting automatic workload collection. Complete Microsoft workload sign-in when prompted; no exports or scripts are required.\n");
+      const documents = await withGraph(job, signal, rawToken => collectWorkloads({
+        workspace, tenantId, actorId: readJwtClaim(rawToken, "oid"), job, signal,
+        graphRequest: request => withGraph(job, request.signal || signal,
+          token => graphRequest(token)(request), tenantId),
+        workloads: job.selectedWorkloads,
+        execute: (args, workloadSignal) => executePowerShell(job, workloadExecutable, args, {}, workloadSignal)
+      }), tenantId);
+      signal.throwIfAborted();
+      storeAutomaticEvidence(documents, tenantId);
+    }
+    await withGraph(job, signal,
+      rawToken => enrichEstateEvidence(rawToken, artifactPath, signal, job), tenantId);
+    if (action !== "verify") return "baseline";
     appendLog(job, "Comparing the baseline and verification evidence...\n");
-    await runPowerShell(job, executable, [
+    await executePowerShell(job, executable, [
       "-NoProfile",
       "-File",
       workflowScript,
@@ -376,7 +388,8 @@ function createApp({
   port = DEFAULT_PORT,
   root = __dirname,
   workspace = defaultWorkspace(),
-  workflowRunner = null
+  workflowRunner = null,
+  workflowDependencies = {}
 } = {}) {
   const jobs = new Map();
   const jobControllers = new Map();
@@ -415,7 +428,29 @@ function createApp({
     }
   }
 
+  function storeAutomaticEvidence(documents, tenantId) {
+    for (const [kind, document] of Object.entries(documents)) {
+      if (!["admin", "powerPlatform"].includes(kind)) throw new Error("Unsupported automatic evidence kind.");
+      const name = kind === "admin" ? "admin" : "power-platform";
+      validateEvidencePackage(document, {
+        schema: `ai-flight-deck/${name}-evidence`, tenantId,
+        maximumAgeHours: 24, fileName: `${kind} automatic evidence`
+      });
+      if (document.producerId !== `ai-flight-deck/${name}-evidence-collector` ||
+          document.producerVersion !== PRODUCER_VERSIONS[kind]) {
+        throw new Error("Unsupported automatic evidence producer.");
+      }
+      const envelope = createEvidenceEnvelope({
+        tenant: tenantId, producer: `ai-flight-deck/${kind}-evidence-collection`,
+        generatedAt: document.producedAt, payload: document, keyId: integrityKeyId, key: integrityKey
+      });
+      writeJsonAtomic(evidencePackagePaths[kind], document);
+      writeJsonAtomic(evidencePackageEnvelopePaths[kind], envelope);
+    }
+  }
+
   const runWorkflow = workflowRunner || createWorkflowRunner({
+    ...workflowDependencies,
     workspace,
     verifyAttestation: record => verifySignedAttestation(record, {
       key: integrityKey,
@@ -423,7 +458,9 @@ function createApp({
       now: new Date()
     }),
     verifyEvidencePackage,
-    attestationIntegrity: { key: integrityKey, keyId: integrityKeyId }
+    attestationIntegrity: { key: integrityKey, keyId: integrityKeyId },
+    storeAutomaticEvidence,
+    readBaseline: () => readVerifiedArtifact("baseline")
   });
   let activeJobId = null;
   const artifactPaths = {
@@ -531,13 +568,13 @@ function createApp({
     return { baseline, tenantId };
   }
 
-  async function startJob(action) {
+  async function startJob(action, workloads) {
     if (!ALLOWED_ACTIONS.has(action)) {
       throw new Error("Unsupported workflow action.");
     }
     if (activeJobId) {
       const active = jobs.get(activeJobId);
-      if (active && active.status === "running") {
+      if (active && ["running", "cancelling"].includes(active.status)) {
         throw new Error("Another tenant workflow is already running.");
       }
     }
@@ -545,6 +582,7 @@ function createApp({
     const job = {
       id,
       action,
+      selectedWorkloads: selectedWorkloads(workloads),
       status: "running",
       result: null,
       error: null,
@@ -592,6 +630,7 @@ function createApp({
           json(res, 200, {
             service: "ai-flight-deck-local",
             ready: true,
+            automaticWorkloadCollection: true,
             activeJobId,
             artifacts: {
               baseline: fs.existsSync(artifactPaths.baseline),
@@ -652,9 +691,9 @@ function createApp({
           const schema = input.kind === "admin"
             ? "ai-flight-deck/admin-evidence"
             : "ai-flight-deck/power-platform-evidence";
-          const expectedProducer = input.kind === "admin"
-            ? "ai-flight-deck/admin-evidence-collector"
-            : "ai-flight-deck/power-platform-evidence-template";
+          const expectedProducers = input.kind === "admin"
+            ? ["ai-flight-deck/admin-evidence-collector"]
+            : ["ai-flight-deck/power-platform-evidence-template", "ai-flight-deck/power-platform-evidence-collector"];
           const { tenantId } = verifiedBaselineContext();
           const challenge = evidenceChallenges.get(document?.collectionChallenge);
           if (!challenge ||
@@ -665,8 +704,9 @@ function createApp({
               "The evidence package does not contain a current one-time collection challenge."
             );
           }
-          if (document.producerId !== expectedProducer ||
-              document.producerVersion !== "1.0.0") {
+          const supportedVersions = input.kind === "admin" ? ["1.0.0", PRODUCER_VERSIONS.admin] : ["1.0.0"];
+          if (!expectedProducers.includes(document.producerId) ||
+              !supportedVersions.includes(document.producerVersion)) {
             throw new Error("The evidence package producer identity is not supported.");
           }
           validateEvidencePackage(document, {
@@ -885,7 +925,8 @@ function createApp({
         if (req.method === "POST" && pathname === "/api/jobs") {
           if (!requireTrustedUiMutation(req, res)) return;
           const input = await readJsonBody(req, 4096);
-          const job = await startJob(input.action);
+          if (input.action === "workloads") verifiedBaselineContext();
+          const job = await startJob(input.action, input.workloads);
           json(res, 202, { id: job.id, status: job.status });
           return;
         }

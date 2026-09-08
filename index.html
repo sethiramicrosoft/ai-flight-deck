@@ -876,6 +876,11 @@
     .guide-checklist { display: grid; gap: 9px; margin: 14px 0 0; padding: 0; list-style: none; }
     .guide-checklist li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; color: var(--cp-text-muted); line-height: 1.45; }
     .guide-checklist li::before { content: "✓"; color: var(--cp-success); font-weight: 800; }
+    #workload-progress li::before { content: "\2022"; color: var(--cp-text-muted); }
+    #workload-progress li[data-status="collected"]::before { content: "\2713"; color: var(--cp-success); }
+    #workload-progress li[data-status="collected-with-gaps"]::before { content: "!"; color: var(--cp-warning); }
+    #workload-progress li[data-status="failed"]::before { content: "!"; color: var(--cp-danger); }
+    #workload-progress li { min-width: 0; overflow-wrap: anywhere; }
     .decision-panel {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -1099,7 +1104,7 @@
         <div class="actions">
           <button class="btn" id="import-button">Import existing scan</button>
           <input type="file" id="scan-file" accept=".json,application/json" hidden>
-          <button class="btn" id="export-button">Export report</button>
+          <button class="btn" id="export-button">Export report (CSV)</button>
           <button class="btn icon-btn" id="theme-button" aria-label="Toggle color theme">◐</button>
         </div>
       </header>
@@ -1340,19 +1345,15 @@
           <article class="card">
             <p class="eyebrow">Step 1 of 4</p>
             <h2>Set up an estate-wide Copilot readiness assessment</h2>
-            <p class="subtitle">Choose a path: import Microsoft's readiness evidence for a fast start, run the live read-only scan, or combine both for the strongest pilot decision.</p>
-            <div class="source-status" id="manual-evidence-notice" style="margin-top:12px" aria-labelledby="manual-evidence-notice-title">
-              <strong id="manual-evidence-notice-title">Before you scan: some evidence requires manual work</strong>
-              <p>The scan collects supported read-only data. It does not complete every workload or automatically fill the evidence templates.</p>
-              <p><strong>Power Platform:</strong> An administrator must gather exports, fill in the blank JSON template, and import it. There is no automatic Power Platform collector in this version.</p>
-              <div class="actions">
-                <a class="btn" href="schema/power-platform-evidence.template.v1.json" download>Download blank JSON template</a>
-                <button class="btn" type="button" data-scroll="power-platform-manual-evidence">How to fill and import it</button>
-              </div>
-              <p><strong>Exchange, SharePoint and Purview:</strong> Administrators run the separate PowerShell collector and import its output. <strong>Owner reviews:</strong> Accountable owners provide statements and supporting evidence. Missing or unvalidated evidence stays unresolved.</p>
+            <p class="subtitle">Connect to your tenant. The app runs the read-only collectors, processes the evidence, and shows the remaining readiness gaps.</p>
+            <div class="source-status" id="automatic-workload-notice" style="margin-top:12px" aria-labelledby="automatic-workload-title">
+              <strong id="automatic-workload-title">Automatic workload collection</strong>
+              <p>Exchange Online, SharePoint Online, Microsoft Purview, and Power Platform / Copilot Studio run from the app alongside the Graph scan. Missing connectors are installed for your Windows user. Evidence is saved and processed automatically: no scripts to run, exports to assemble, or JSON templates to fill.</p>
+              <p>Complete Microsoft's sign-in, MFA, or consent prompts for each service when requested. Your account still needs the relevant workload access. Collection errors and unsupported observations remain visible gaps, never automatic Pass results. Accountable owner decisions still require human approval.</p>
             </div>
             <div class="actions" style="margin-top:18px">
               <button class="btn primary" id="connect-scan">Connect and scan tenant</button>
+              <button class="btn" id="collect-workloads" type="button" disabled>Collect workload evidence</button>
               <button class="btn" data-scroll="readiness-file">Import Microsoft readiness</button>
               <button class="btn" data-scroll="assessment-file">Import Microsoft assessment</button>
               <button class="btn" id="cancel-workflow" hidden>Cancel active scan</button>
@@ -1360,13 +1361,14 @@
             </div>
             <div class="service-panel" id="service-panel" role="status" aria-live="polite" aria-atomic="true">
               <div class="service-status"><span class="service-dot" aria-hidden="true"></span><span id="service-status">Checking the local scanner...</span></div>
-              <p class="subtitle" id="service-help">The first run installs the Microsoft Graph authentication connector for the current Windows user if it is missing. The tool opens Microsoft's device sign-in page and displays the one-time code here.</p>
+              <p class="subtitle" id="service-help">Microsoft Graph uses the sign-in code below. Workload connectors can open separate Microsoft sign-in windows. Keep this app open; progress and collection errors appear here. Collect workload evidence updates an existing baseline without repeating the SharePoint sharing scan.</p>
               <div class="guide-callout" id="auth-instructions" style="margin-top:12px" hidden>
                 <strong>Microsoft sign-in code</strong>
                 <span id="auth-code"></span>
                 <button class="btn" id="copy-auth-code" type="button">Copy code</button>
               </div>
               <pre class="service-log" id="service-log" hidden></pre>
+              <ul class="guide-checklist" id="workload-progress" aria-label="Automatic workload collection progress" aria-live="polite" hidden></ul>
               <div class="console-controls" id="capability-panel" aria-label="Collector connection requirements" hidden></div>
             </div>
           </article>
@@ -1456,11 +1458,14 @@
           </div>
           <ul class="completion-blockers" id="completion-blockers" role="list" aria-live="polite"></ul>
         </article>
+        <details class="card" id="advanced-evidence-imports" style="margin-top:16px">
+          <summary>Advanced: import an existing evidence package (optional)</summary>
+          <p class="subtitle">Automatic collection does not use these upload controls. They are retained for existing offline workflows.</p>
         <div class="evidence-source-grid" style="margin-top:16px">
           <article class="card">
-            <p class="eyebrow">Manual step required · Workload administrators</p>
+            <p class="eyebrow">Optional offline compatibility</p>
             <h3>Import administrator evidence</h3>
-            <p class="subtitle">The main tenant scan does not run this collector for you. A workload administrator must download and run the read-only PowerShell collector for Exchange Online, SharePoint Online, or Purview, then import its output here. Create a collection challenge after your baseline scan and import within its 30-minute window. Importing a package does not automatically pass its controls.</p>
+            <p class="subtitle">Use only if you already maintain an offline collection workflow. Create a collection challenge after your baseline scan and import its output within 30 minutes. The normal scan handles collection and ingestion without this step.</p>
             <label class="field" style="margin-top:12px">Administrator evidence package
               <input type="file" id="admin-evidence-file" accept=".json,application/json">
             </label>
@@ -1472,21 +1477,13 @@
             <pre class="service-log" id="admin-evidence-challenge" hidden></pre>
             <div class="source-status" id="admin-evidence-status" role="status" aria-live="polite">No locally sealed administrator evidence package is available.</div>
           </article>
-          <article class="card" id="power-platform-manual-evidence" tabindex="-1" aria-label="Manual Power Platform evidence instructions">
-            <p class="eyebrow">Manual step required · Power Platform administrator</p>
+          <article class="card" id="power-platform-manual-evidence" tabindex="-1" aria-label="Optional Power Platform evidence import">
+            <p class="eyebrow">Optional offline compatibility</p>
             <h3>Import Power Platform evidence</h3>
-            <p class="subtitle" id="power-platform-manual-boundary"><strong>Not collected automatically.</strong> Connecting your tenant does not collect this Power Platform evidence. An administrator must gather exports, fill in a JSON template, and upload the completed file here. The download is a blank data template, not a collector.</p>
-            <ol class="manual-evidence-steps" id="power-platform-manual-steps">
-              <li><strong>Run a baseline scan first.</strong> Use the tenant you intend to assess. A baseline is required before you can create the import code.</li>
-              <li><strong>Download and fill in the template.</strong> Use authenticated exports from the <a class="doc-link" href="https://admin.powerplatform.microsoft.com/" target="_blank" rel="noopener noreferrer">Power Platform admin center</a> and <a class="doc-link" href="https://copilotstudio.microsoft.com/" target="_blank" rel="noopener noreferrer">Copilot Studio</a>. This is not a one-click export-to-template conversion; map the information into the seven lists below.</li>
-              <li><strong>Replace the sample values.</strong> Set <code>tenantId</code> to your baseline tenant ID, <code>actorId</code> to the collecting administrator, and <code>producedAt</code> to the actual evidence collection time in UTC. Keep the schema and producer version fields unchanged. Do not put passwords or tokens in the file.</li>
-              <li><strong>Create the collection challenge when the file is ready.</strong> Copy the one-time code into <code>collectionChallenge</code>. You have 30 minutes to import; if it expires, create a new challenge.</li>
-              <li><strong>Select the completed JSON file below, then click Import Power Platform evidence.</strong> Read the import result, then run another tenant scan to process the package.</li>
-            </ol>
-            <p class="subtitle">Fill these seven lists under <code>evidence</code>: <code>environments</code>, <code>dlpPolicies</code>, <code>connectors</code>, <code>agents</code>, <code>agentOwners</code>, <code>agentSharing</code>, and <code>agentLifecycle</code>. Record collection failures in <code>errors</code>; do not leave a list empty merely because you could not collect it. An empty list is not proof of complete coverage.</p>
+            <p class="subtitle" id="power-platform-manual-boundary">The app collects Power Platform evidence automatically. This optional importer accepts a compatible offline package with a current baseline collection challenge; it is not required to run the tool.</p>
             <p class="source-status"><strong>After import:</strong> The app checks the package and protects it against alteration. It does not independently verify the exports or automatically mark controls as Pass. Power Platform controls without a supported observation-validation path remain Unknown. The owner statement for AFD-PPA-005 uses the separate attestation form below.</p>
             <label class="field" style="margin-top:12px">Power Platform evidence package
-              <input type="file" id="power-platform-evidence-file" accept=".json,application/json" aria-describedby="power-platform-manual-boundary power-platform-manual-steps">
+              <input type="file" id="power-platform-evidence-file" accept=".json,application/json" aria-describedby="power-platform-manual-boundary">
             </label>
             <div class="actions" style="margin-top:12px">
               <button class="btn" id="prepare-power-platform-evidence" type="button">Create collection challenge</button>
@@ -1497,8 +1494,9 @@
             <div class="source-status" id="power-platform-evidence-status" role="status" aria-live="polite">No locally sealed Power Platform evidence package is available.</div>
           </article>
         </div>
+        </details>
         <article class="card" style="margin-top:16px">
-          <p class="eyebrow">Manual step required · Accountable owner</p>
+          <p class="eyebrow">Accountable human decision</p>
           <h3>Create a locally sealed attestation</h3>
           <p class="subtitle">Use only for controls explicitly classified as Attested. The accountable owner supplies the statement and supporting JSON; AI Flight Deck binds it to the tenant, approved cohort, control, signer, and control-specific expiry window.</p>
           <div class="field-grid">
@@ -1891,6 +1889,7 @@
     let verificationOutcome = null;
     let currentJourneyPhase = 2;
     let localServiceAvailable = false;
+    let automaticCollectionAvailable = false;
     let activeWorkflowId = null;
     let readinessCatalog = null;
     let tenantEnablementPlan = null;
@@ -2839,7 +2838,7 @@
         : typeof value === "string"
           ? value
           : JSON.stringify(value);
-      if (/^[=+\-@]/.test(text)) text = `'${text}`;
+      if (/^[\s\u0000-\u001f]*[=+\-@]/.test(text)) text = `'${text}`;
       return `"${text.replace(/"/g, '""')}"`;
     }
 
@@ -2921,25 +2920,33 @@
       showToast("Detailed controls CSV downloaded");
     }
 
-    function reportPayload() {
-      const selected = remediations.filter(r => applied.has(r.id));
-      const numericGain = selected.filter(r => Number.isFinite(r.gain)).reduce((sum, r) => sum + r.gain, 0);
-      return JSON.stringify({
-        schemaVersion: "1.0",
-        reportType: "ai-flight-deck-assessment",
-        product: "AI Flight Deck",
-        tenant: activeTenant.name,
-        source: activeTenant.source,
-        generatedAt: new Date().toISOString(),
-        baselineScore: activeTenant.baselineScore,
-        forecastScore: activeTenant.source === "synthetic" ? Math.min(100, activeTenant.baselineScore + numericGain) : null,
-        verification: verificationOutcome,
-        findings,
-        selectedRemediations: selected,
-        limitation: verificationReport
-          ? "This report references an authoritative comparison report."
-          : "No comparison report has been imported. Forecast selections are not proof of remediation."
-      }, null, 2);
+    function sharingReviewCsv() {
+      const columns = [
+        "Tenant", "Data Source", "Exported At", "Scan Observed At", "Severity",
+        "Finding", "Rule", "Resource", "Finding Details", "Access Review Reason",
+        "Impact", "Recommended Action", "Evidence References", "Selected Corrections",
+        "Verification State", "Limitations"
+      ];
+      const exportedAt = new Date().toISOString();
+      const selected = remediations.filter(item => applied.has(item.id)).map(item => item.title).join("; ");
+      const limitation = [
+        activeTenant.source === "synthetic" ? "Synthetic demonstration, not a tenant assessment." : "",
+        "Sharing configuration and potential access are not proof that sensitive content was accessed.",
+        verificationReport ? "Refer to the separate verification report for change outcomes." :
+          "No verification report is loaded. Selected corrections are not proof of remediation."
+      ].filter(Boolean).join(" ");
+      const rows = findings.flatMap((finding, index) => {
+        const details = finding.evidenceDetails?.length ? finding.evidenceDetails : [{}];
+        const references = baselineScan?.findings?.[index]?.evidenceIds || finding.evidenceIds || [];
+        return details.map(detail => [
+          activeTenant.name, activeTenant.source, exportedAt, baselineScan?.generatedAt || "",
+          finding.severity, finding.title, finding.ruleKey, detail.displayName || "",
+          finding.detail, detail.reason || "", finding.impact, detail.recommendedAction || "",
+          references.join("; "), selected,
+          verificationReport ? "Verification report available" : "Not verified", limitation
+        ].map(csvCell).join(","));
+      });
+      return `\uFEFF${columns.map(csvCell).join(",")}\r\n${rows.join("\r\n")}`;
     }
 
     function clearancePayload() {
@@ -4541,7 +4548,8 @@
         authInstructions.hidden = true;
       }
       const running = state === "running";
-      document.getElementById("connect-scan").disabled = running;
+      document.getElementById("connect-scan").disabled = running || (localServiceAvailable && !automaticCollectionAvailable);
+      document.getElementById("collect-workloads").disabled = running || !baselineScan || !automaticCollectionAvailable;
       document.getElementById("verify-workflow").disabled = running || !baselineScan;
       document.getElementById("cancel-workflow").hidden = !running;
     }
@@ -4560,8 +4568,52 @@
       if (result === "baseline") {
         window.FlightDeckEvidenceAdmissibility.acceptServiceAssessment(artifact, readinessCatalog);
         applyTenantScan(artifact);
+        renderWorkloadProgress(artifact.workloadCollection?.workloads || []);
       } else {
         applyVerificationReport(artifact, { trusted: true });
+      }
+    }
+
+    function renderWorkloadProgress(workloads) {
+      const list = document.getElementById("workload-progress");
+      list.replaceChildren();
+      list.hidden = !workloads.length;
+      for (const workload of workloads) {
+        const item = document.createElement("li");
+        item.dataset.status = workload.status;
+        const content = document.createElement("span");
+        const title = document.createElement("strong");
+        title.textContent = `${workload.name}: ${workload.status.replaceAll("-", " ")}`;
+        const message = document.createElement("p");
+        message.className = "subtitle";
+        message.textContent = workload.message || "Waiting for the previous workload.";
+        content.append(title, message);
+        if (workload.resourceCounts?.length) {
+          const counts = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = "Observed rows by query (not proof of complete coverage)";
+          counts.append(summary);
+          for (const resource of workload.resourceCounts) {
+            const row = document.createElement("p");
+            row.textContent = `${resource.resource}: ${resource.rows}`;
+            counts.append(row);
+          }
+          content.append(counts);
+        }
+        if (workload.issues?.length) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.textContent = `Collection errors (${workload.issues.length} of ${workload.errors})`;
+          details.append(summary);
+          for (const issue of workload.issues) {
+            const description = document.createElement("p");
+            description.textContent = `${issue.resource}: ${issue.message} (${issue.code})`;
+            details.append(description);
+          }
+          content.append(details);
+        }
+        item.append(content);
+        list.append(item);
       }
     }
 
@@ -4609,7 +4661,9 @@
       activeWorkflowId = id;
       while (activeWorkflowId === id) {
         const job = await apiJson(`/api/jobs/${id}`);
-        const actionLabel = job.action === "baseline" ? "Scanning the tenant" : "Verifying corrections";
+        const actionLabel = job.action === "workloads" ? "Collecting workload evidence" :
+          job.action === "baseline" ? "Scanning the tenant" : "Verifying corrections";
+        renderWorkloadProgress(job.workloads || []);
         if (job.status === "running" || job.status === "cancelling") {
           renderServiceState("running", `${actionLabel}. Complete Microsoft sign-in if prompted.`, job.log, job.auth);
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -4625,9 +4679,13 @@
           throw new Error(job.error || "The tenant workflow failed.");
         }
         await loadWorkflowArtifact(job.result);
-        renderServiceState("ready", job.action === "baseline"
-          ? "Baseline complete. The Assessment page is ready."
-          : "Verification complete. The Decision page is ready.", job.log);
+        renderWorkloadProgress(job.workloads || []);
+        const gaps = (job.collectionSummary?.failed || 0) + (job.collectionSummary?.withGaps || 0);
+        renderServiceState("ready", (job.action === "verify"
+          ? "Verification complete. The Decision page is ready."
+          : job.action === "baseline" ? "Baseline complete. The Assessment page is ready." : "Assessment updated.") + (gaps ? ` ${gaps} workloads have collection gaps; review the outcomes below.` :
+            " Review the evidence and remaining validation requirements."), job.log);
+        await refreshEvidenceSourceStatus();
       }
     }
 
@@ -4635,22 +4693,29 @@
       if (!localServiceAvailable) {
         throw new Error("The integrated scanner is unavailable. Launch AI Flight Deck with its local server, not a generic static web server.");
       }
+      if (!automaticCollectionAvailable) throw new Error("Restart the local service to load automatic workload collection. Your saved baseline is retained.");
       clearError();
       const signInWindow = window.open("https://microsoft.com/devicelogin", "_blank", "noopener");
       if (!signInWindow) {
         document.getElementById("service-help").textContent = "Pop-ups are blocked. Open https://microsoft.com/devicelogin in another tab, then enter the code shown below.";
       }
-      const label = action === "baseline" ? "Preparing tenant sign-in..." : "Preparing verification sign-in...";
+      const label = action === "workloads" ? "Preparing workload collection..." :
+        action === "baseline" ? "Preparing tenant sign-in..." : "Preparing verification sign-in...";
       renderServiceState("running", label);
-      const job = await apiJson("/api/jobs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Flight-Deck": "local-ui"
-        },
-        body: JSON.stringify({ action })
-      });
-      await monitorWorkflow(job.id);
+      try {
+        const job = await apiJson("/api/jobs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Flight-Deck": "local-ui"
+          },
+          body: JSON.stringify({ action })
+        });
+        await monitorWorkflow(job.id);
+      } catch (error) {
+        renderServiceState("failed", error.message);
+        throw error;
+      }
     }
 
     async function cancelLocalWorkflow() {
@@ -4882,10 +4947,15 @@
       try {
         const status = await apiJson("/api/status");
         localServiceAvailable = status.service === "ai-flight-deck-local" && status.ready === true;
+        automaticCollectionAvailable = status.automaticWorkloadCollection === true;
         if (!localServiceAvailable) throw new Error("Unexpected local service response.");
         await loadUpstreamEvidence();
         await refreshEvidenceSourceStatus();
         renderCapabilityPlans(await apiJson("/api/capabilities?authMode=local-delegated"));
+        if (!automaticCollectionAvailable) {
+          document.getElementById("service-help").textContent =
+            "The local service is running an older version. Restart it to load automatic workload collection. Your saved baseline is retained.";
+        }
         if (status.activeJobId) {
           renderServiceState("running", "A tenant workflow is already running.");
           monitorWorkflow(status.activeJobId).catch(error => showError(error.message));
@@ -4960,6 +5030,9 @@
     document.getElementById("severity-filter").addEventListener("change", event => renderFindings(event.target.value));
     document.getElementById("connect-scan").addEventListener("click", () => {
       startLocalWorkflow("baseline").catch(error => showError(error.message));
+    });
+    document.getElementById("collect-workloads").addEventListener("click", () => {
+      startLocalWorkflow("workloads").catch(error => showError(error.message));
     });
     document.getElementById("cancel-workflow").addEventListener("click", () => {
       cancelLocalWorkflow().catch(error => showError(error.message));
@@ -5082,7 +5155,8 @@
       currentJourneyPhase = Math.max(currentJourneyPhase, 3);
       renderJourneyPhase();
     });
-    document.getElementById("export-button").addEventListener("click", () => download("ai-flight-deck-report.json", reportPayload()));
+    document.getElementById("export-button").addEventListener("click", () =>
+      downloadFile("ai-flight-deck-sharing-review.csv", sharingReviewCsv(), "text/csv;charset=utf-8"));
     document.getElementById("export-controls-csv").addEventListener("click", () => {
       try {
         exportControlsCsv();

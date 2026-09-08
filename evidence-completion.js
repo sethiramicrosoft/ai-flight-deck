@@ -43,11 +43,11 @@
     },
     AdminEvidenceRequired: {
       label: "Administrator evidence required",
-      action: "Run the administrator evidence collector, import its package, then rescan."
+      action: "In Set up, select Collect workload evidence and complete the Microsoft workload sign-in prompts. The app collects and processes the results."
     },
     PowerPlatformEvidenceRequired: {
       label: "Power Platform evidence required",
-      action: "Import the seven-resource Power Platform evidence package, then rescan."
+      action: "In Set up, select Collect workload evidence and complete Power Platform sign-in. The app collects supported resources and records any gaps."
     },
     RecollectionRequired: {
       label: "Recollect evidence",

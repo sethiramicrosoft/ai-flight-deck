@@ -57,7 +57,7 @@ function validateEvidencePackage(doc, {
   verifyDocument,
   fileName
 }) {
-  if (!doc) throw codedError("EVIDENCE_PACKAGE_MISSING", `${fileName} has not been imported.`);
+  if (!doc) throw codedError("EVIDENCE_PACKAGE_MISSING", `${fileName} is not available. Run automatic workload collection from Set up.`);
   if (doc.schema !== schema || doc.version !== "1.0.0") {
     throw codedError(
       "EVIDENCE_SCHEMA_UNSUPPORTED",
@@ -127,6 +127,11 @@ function createAdminCommandAdapter(workspace, options = {}) {
       }
     );
     const baseKey = `${request.service}:${request.command}`;
+    const workload = evidence.collectionMetadata?.workloads?.[request.service];
+    if (workload?.status === "failed") {
+      throw codedError("AUTOMATIC_COLLECTION_FAILED", workload.message ||
+        `${request.service} automatic collection failed. Retry the workload from Set up.`);
+    }
     let key = request.evidenceKey
       ? `${request.service}:${request.command}:${request.evidenceKey}`
       : baseKey;
