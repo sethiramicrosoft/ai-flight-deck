@@ -9,9 +9,66 @@ const catalog = require("./schema/readiness-catalog.v1.json");
 const { runEstateCollectors, validateCoverage } = require("./collector-orchestrator");
 const {
   buildEstateCollectors,
+  collectEstate,
   loadConfiguredCohort,
   resolveConfiguredCohort
 } = require("./estate-collector-suite");
+
+test("tenant-bound directory configuration cannot be loaded in another tenant or without context", () => {
+  const workspace = fs.mkdtempSync(path.join(__dirname, ".directory-cohort-test-"));
+  try {
+    const cohort = {
+      id: "directory-pilot", source: "MicrosoftGraphDirectory", tenantId: "tenant-a",
+      principalIds: ["00000000-0000-0000-0000-000000000001"],
+      userPrincipalNames: ["pilot@example.test"], owner: "Owner", approved: true
+    };
+    fs.writeFileSync(path.join(workspace, "cohort-config.json"), JSON.stringify(cohort));
+    assert.deepEqual(loadConfiguredCohort(workspace, "tenant-a"), cohort);
+    assert.throws(() => loadConfiguredCohort(workspace, "tenant-b"), /another tenant/);
+    assert.throws(() => loadConfiguredCohort(workspace), /verified tenant binding/);
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test("directory cohort enrichment uses targeted identity lookup and retains missing-evidence controls", async () => {
+  const workspace = fs.mkdtempSync(path.join(__dirname, ".directory-enrichment-test-"));
+  try {
+    const id = "00000000-0000-0000-0000-000000000001";
+    const configuredCohort = { id: "directory-pilot", source: "MicrosoftGraphDirectory",
+      tenantId: "tenant-a", approved: true, owner: "Owner",
+      principalIds: [id], userPrincipalNames: ["pilot@example.test"] };
+    const requests = [];
+    const result = await collectEstate({
+      rawToken: "synthetic", workspace, configuredCohort, signal: new AbortController().signal,
+      scan: { tenant: { tenantId: "tenant-a" }, auth: { actor: { id: "actor-a" } },
+        generatedAt: new Date().toISOString(), scope: { grantedScopes: [] },
+        estateAssessment: { cohorts: [], domains: catalog.domains.map(d => ({ id: d.id })) } },
+      adapters: {
+        graphRequest: async ({ url }) => {
+          requests.push(url);
+          if (new URL(url).pathname === `/v1.0/users/${id}`) {
+            return { id, userPrincipalName: "pilot@example.test", accountEnabled: true };
+          }
+          return { value: [] };
+        },
+        adminCommand: async () => { throw new Error("Synthetic workload unavailable"); },
+        networkProbe: { probe: async () => ({ unavailable: true, reason: "Synthetic probe unavailable" }) },
+        powerPlatformClient: { query: async () => ({ value: [] }) },
+        graphReportsClient: { query: async () => ({ value: [] }) },
+        attestationStore: { list: async () => [], verify: async () => false }
+      }
+    });
+    assert.equal(result.estateAssessment.cohorts[0].approved, true);
+    assert.deepEqual(result.estateAssessment.cohorts[0].principalIds, [id]);
+    assert.equal(new URL(requests[0]).pathname, `/v1.0/users/${id}`);
+    assert.equal(requests.some(url => url.includes("$select=id,userPrincipalName,assignedLicenses")), false);
+    assert.equal(result.estateAssessment.controlResults.length, 77);
+    assert.ok(result.estateAssessment.controlResults.some(control => control.status === "Unknown"));
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
 
 test("registers executable collectors for all thirteen domains and seventy-seven controls", () => {
   const collectors = buildEstateCollectors({

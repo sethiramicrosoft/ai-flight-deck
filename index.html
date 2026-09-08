@@ -70,6 +70,7 @@
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     html { min-height: 100%; }
     body {
       margin: 0;
@@ -250,6 +251,23 @@
     .completion-blocker small { display: block; color: var(--cp-text-soft); margin-top: 4px; }
     .completion-blocker-meta { font-weight: 700; }
     .completion-state { color: var(--cp-accent); font-size: 12px; font-weight: 700; }
+    .completion-lane { margin-top: 20px; }
+    .completion-lane > p { color: var(--cp-text-muted); }
+    .setup-form { border-top: 1px solid var(--cp-border); padding-top: 16px; margin-top: 16px; }
+    .setup-form summary { cursor: pointer; font-weight: 650; }
+    .setup-form form { display: grid; gap: 12px; margin-top: 12px; }
+    .sharing-search { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    .sharing-search .field { flex: 1; min-width: min(220px, 100%); }
+    .sharing-review-card { display: grid; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+    .sharing-review-card p { margin: 0; }
+    .sharing-review-card button { justify-self: start; }
+    .sharing-detail-dialog {
+      width: min(900px, calc(100vw - 24px)); max-height: 85vh; overflow: auto;
+      border: 1px solid var(--cp-border); border-radius: 16px; padding: 20px;
+      background: var(--cp-surface); color: var(--cp-text);
+    }
+    .sharing-detail-dialog::backdrop { background: var(--cp-overlay); }
+    .sharing-pagination { flex-wrap: wrap; }
     .manual-evidence-steps { padding-left: 24px; color: var(--cp-text-muted); }
     .manual-evidence-steps li { margin: 12px 0; line-height: 1.5; }
     #power-platform-manual-evidence { min-width: 0; overflow-wrap: anywhere; }
@@ -1104,7 +1122,8 @@
         <div class="actions">
           <button class="btn" id="import-button">Import existing scan</button>
           <input type="file" id="scan-file" accept=".json,application/json" hidden>
-          <button class="btn" id="export-button">Export report (CSV)</button>
+          <button class="btn" id="export-button">Export review summary (CSV)</button>
+          <button class="btn" id="export-sharing-evidence" disabled>Export collected evidence (CSV)</button>
           <button class="btn icon-btn" id="theme-button" aria-label="Toggle color theme">◐</button>
         </div>
       </header>
@@ -1216,8 +1235,8 @@
       <section class="page" id="findings">
         <div class="toolbar">
           <div>
-            <h2 style="margin-bottom:4px">Evidence-backed findings</h2>
-            <p class="subtitle">Every finding maps technical evidence to an AI exposure outcome.</p>
+            <h2 style="margin-bottom:4px">Grouped SharePoint access evidence</h2>
+            <p class="subtitle">Review grouped access patterns. Ordinary permissions remain inventory; sampled evidence is not a complete tenant assessment.</p>
           </div>
           <select id="severity-filter" aria-label="Filter findings by severity">
             <option value="all">All severities</option>
@@ -1225,6 +1244,10 @@
             <option value="high">High only</option>
             <option value="medium">Medium only</option>
           </select>
+        </div>
+        <div class="actions">
+          <button class="btn" id="export-grouped-summary">Export review summary (CSV)</button>
+          <button class="btn" id="export-grouped-evidence" disabled>Export collected evidence (CSV)</button>
         </div>
         <div class="finding-list" id="finding-list"></div>
       </section>
@@ -1446,7 +1469,7 @@
         <div class="section-head">
           <div>
             <h2>Evidence completion center</h2>
-            <p>See the next mission, resolve the five highest-priority evidence gaps, and supply the workload or accountable evidence the live Graph scan cannot produce.</p>
+            <p>Separate your decisions, confirmed administrator actions, and limitations in the app. An unverified check does not mean your tenant is misconfigured.</p>
           </div>
         </div>
         <article class="card">
@@ -1458,6 +1481,7 @@
           </div>
           <ul class="completion-blockers" id="completion-blockers" role="list" aria-live="polite"></ul>
         </article>
+        <article class="card" id="setup-decision-forms" style="margin-top:16px"></article>
         <details class="card" id="advanced-evidence-imports" style="margin-top:16px">
           <summary>Advanced: import an existing evidence package (optional)</summary>
           <p class="subtitle">Automatic collection does not use these upload controls. They are retained for existing offline workflows.</p>
@@ -1706,6 +1730,10 @@
   <script src="evidence-admissibility.js"></script>
   <script src="enablement-playbook.js"></script>
   <script src="evidence-completion.js"></script>
+  <script src="completion-center-ui.js"></script>
+  <script src="sharing-review.js"></script>
+  <script src="sharing-review-ui.js"></script>
+  <script src="setup-workflows.js"></script>
   <script src="mission-engine.js"></script>
   <script src="evidence-graph.js"></script>
   <script>
@@ -1884,6 +1912,9 @@
     let selectedScenario = scenarios[0];
     const applied = new Set();
     let baselineScan = null;
+    let sharingReviewModel = null;
+    let setupDecisionUI = null;
+    let setupDecisionWorkflowsAvailable = false;
     let attestationDataExamples = {};
     let verificationReport = null;
     let verificationOutcome = null;
@@ -1941,16 +1972,17 @@
         : "SharePoint access and sharing evidence";
       document.getElementById("scenario-section-copy").textContent = readinessMode
         ? "Trace how the strongest failed, warning, and unknown controls affect mission progression."
-        : "Review public SharePoint sites, Anyone links, organization-wide links, guest-account context, and collection boundaries. Each item explains what was observed, why it matters, what remains unproven, and the required administrator action.";
-      document.getElementById("open-simulator").textContent = readinessMode
+        : "Preview up to 25 sampled access-review scenarios. Browse the grouped evidence on Assessment for the full collected review and ordinary permission inventory; neither view proves complete tenant coverage.";
+      document.getElementById("open-simulator").textContent = sharingReviewModel ? "Review grouped access" : readinessMode
         ? "Trace blocker impact"
         : "Review SharePoint evidence";
+      document.getElementById("open-simulator").dataset.go = sharingReviewModel ? "findings" : "simulator";
       document.getElementById("simulator-heading").textContent = readinessMode
         ? "Choose a readiness blocker"
         : "Choose an access or sharing finding";
       document.getElementById("simulator-copy").textContent = readinessMode
         ? "This deterministic trace uses collected control evidence. It does not pretend that an effective-access graph exists."
-        : "The review uses sealed sharing metadata. It distinguishes confirmed sharing configuration, potential audience, collection limitations, and unproven sensitive-content exposure.";
+        : "This bounded preview uses sealed sharing metadata, not proof of sensitive-content exposure. The grouped Assessment view retains the collected review and ordinary permission inventory.";
       document.getElementById("simulation-prompt-label").textContent = readinessMode
         ? "Decision question"
         : "Review question";
@@ -2039,12 +2071,18 @@
       const graphPayload = scan.evidenceGraphEnvelope.payload || {};
       const graphNodes = new Map((graphPayload.nodes || []).map(node => [node.id, node]));
       const displayName = id => graphNodes.get(id)?.attributes?.displayName || id;
-      const accessScenarios = simulation.sensitiveMatches.map((match, index) => {
+      const reviewMatches = simulation.sensitiveMatches.filter(match => {
+        const attributes = graphNodes.get(match.resourceId)?.attributes || {};
+        if (["user-direct-grant", "group-direct-grant"].includes(attributes.scenarioType)) return false;
+        const expiry = Date.parse(attributes.expirationDateTime);
+        return !Number.isFinite(expiry) || expiry > Date.parse(scan.generatedAt);
+      });
+      const accessScenarios = reviewMatches.slice(0, 25).map((match, index) => {
         const reachability = simulation.reachableResources.find(item => item.resourceId === match.resourceId);
         const resourceNode = graphNodes.get(match.resourceId);
         const attributes = resourceNode?.attributes || {};
         const resourceName = displayName(match.resourceId);
-        const scenarioType = attributes.scenarioType ||
+        const scenarioType = attributes.inherited === true ? "inherited-permission" : attributes.scenarioType ||
           (String(attributes.evidenceId || "").startsWith("site-via-public-group:")
             ? "public-site"
             : "sharing-path");
@@ -2255,6 +2293,11 @@
     }
 
     function renderFindings(filter = "all") {
+      if (baselineScan && sharingReviewModel) {
+        window.FlightDeckSharingReviewUI.render(document.getElementById("finding-list"),
+          sharingReviewModel, { severity: filter, onError: showError });
+        return;
+      }
       const visible = findings.filter(f => filter === "all" || f.severity === filter);
       const list = document.getElementById("finding-list");
       list.replaceChildren();
@@ -2921,6 +2964,11 @@
     }
 
     function sharingReviewCsv() {
+      if (typeof sharingReviewModel !== "undefined" && sharingReviewModel) {
+        return window.FlightDeckSharingReviewUI.summaryCsv(sharingReviewModel, {
+          tenant: activeTenant.name, observedAt: baselineScan?.generatedAt || "", csvCell
+        });
+      }
       const columns = [
         "Tenant", "Data Source", "Exported At", "Scan Observed At", "Severity",
         "Finding", "Rule", "Resource", "Finding Details", "Access Review Reason",
@@ -3445,6 +3493,7 @@
         grantedPermissions,
         availableLicenses: null,
         cohort: activeCohort(),
+        decisions: setupDecisionUI?.getDecisions() || null,
         now: new Date()
       });
       const attester = baselineScan?.auth?.actor?.id ||
@@ -3453,9 +3502,9 @@
       summary.replaceChildren();
       [
         [plan.currentMission?.name || "All missions complete", "Current mission"],
-        [plan.summary.complete, "Complete"],
-        [plan.summary.evidenceRequired, "Evidence required"],
-        [plan.summary.actionRequired, "Configuration action"]
+        [plan.summary.complete, "Validated checks"],
+        [plan.summary.total - plan.summary.complete, "Not yet verified"],
+        [plan.summary.actionRequired, "Configuration actions"]
       ].forEach(([value, label]) => {
         const metric = document.createElement("div");
         metric.className = "assurance-metric";
@@ -3466,58 +3515,21 @@
         metric.append(caption, strong);
         summary.appendChild(metric);
       });
-      blockers.replaceChildren();
-      if (!plan.topBlockers.length) {
-        const complete = document.createElement("div");
-        complete.className = "source-status";
-        complete.textContent = "No unresolved controls remain for the approved cohort.";
-        blockers.appendChild(complete);
-        return;
-      }
-      for (const control of plan.topBlockers) {
-        const row = document.createElement("li");
-        row.className = "completion-blocker";
-        const content = document.createElement("div");
-        const title = document.createElement("strong");
-        title.textContent = `${control.controlId}: ${control.title}`;
-        const detail = document.createElement("small");
-        const missing = [
-          ...(control.state === "MissingPermission" ? control.missingPermissions : []),
-          ...(control.state === "MissingLicense" ? control.missingLicenses : []),
-          ...control.limitations.map(item => item.description)
-        ];
-        detail.textContent = control.nextAction;
-        const meta = document.createElement("small");
-        meta.className = "completion-blocker-meta";
-        meta.textContent = `Owner: ${control.owner} · Effort: ${control.effort}`;
-        content.append(title, meta, detail);
-        if (missing.length) {
-          const diagnostics = document.createElement("details");
-          const heading = document.createElement("summary");
-          heading.textContent = "Show collection details";
-          const explanation = document.createElement("small");
-          explanation.textContent = missing.join("; ");
-          diagnostics.append(heading, explanation);
-          content.appendChild(diagnostics);
+      window.FlightDeckCompletionUI.render(blockers, plan, {
+        onDecision: id => setupDecisionUI.open(id),
+        onControl: id => openControlPlaybook(id),
+        onCollect: () => {
+          document.getElementById("service-panel").scrollIntoView({ block: "start", behavior: "smooth" });
+          document.getElementById("collect-workloads").focus();
+        },
+        onAttest: id => {
+          const select = document.getElementById("attestation-control");
+          select.value = id;
+          select.dispatchEvent(new Event("change"));
+          document.getElementById("attestation-statement").scrollIntoView({ block: "center", behavior: "smooth" });
+          document.getElementById("attestation-statement").focus();
         }
-        const instructions = document.createElement("button");
-        instructions.type = "button";
-        instructions.className = "btn";
-        instructions.textContent = "View exact steps and references";
-        instructions.setAttribute("aria-label", `View steps and references for ${control.controlId}`);
-        instructions.addEventListener("click", () => openControlPlaybook(control.controlId));
-        content.appendChild(instructions);
-        const state = document.createElement("span");
-        state.className = "completion-state";
-        state.textContent = control.stateLabel;
-        row.append(content, state);
-        blockers.appendChild(row);
-      }
-      const context = document.createElement("li");
-      context.className = "source-status";
-      const unresolved = plan.summary.total - plan.summary.complete;
-      context.textContent = `Showing ${plan.topBlockers.length} of ${unresolved} unresolved controls, prioritized for ${plan.currentMission?.name || "the remaining missions"}.`;
-      blockers.appendChild(context);
+      });
     }
 
     function populateAttestationControls() {
@@ -4126,6 +4138,9 @@
         blastRadiusUsers: summary.blastRadiusUsers == null ? null : Number(summary.blastRadiusUsers)
       };
       baselineScan = scan;
+      sharingReviewModel = window.FlightDeckSharingReview.buildSharingReview(scan);
+      document.getElementById("export-sharing-evidence").disabled = false;
+      document.getElementById("export-grouped-evidence").disabled = false;
       verificationReport = null;
       verificationOutcome = null;
       currentJourneyPhase = 2;
@@ -4153,17 +4168,19 @@
           detail: normalizeText(item.detail, "No detail supplied."),
           source: normalizeText(item.source, "Tenant scan"),
           impact: normalizeText(item.impact, "Review required"),
-          evidenceDetails: detailSource.map(detail => ({
+          evidenceDetails: detailSource.slice(0, 50).map(detail => ({
             displayName: normalizeText(
               [detail.siteDisplayName, detail.driveDisplayName, detail.displayName]
                 .filter(Boolean)
                 .join(" / "),
               "Unnamed SharePoint resource"
             ),
-            reason: normalizeText(detail.reason, "Broad SharePoint access was detected."),
+            reason: normalizeText(detail.reason, detail.inherited
+              ? "Inherited access observation; review the grouped permission origin."
+              : "Collected access observation; effective audience and business context require review."),
             recommendedAction: normalizeText(
               detail.recommendedAction,
-              "Confirm whether this sharing path is required, restrict it when unnecessary, and rescan."
+              "Review the grouped evidence before deciding whether an access change is necessary."
             )
           }))
         };
@@ -4548,6 +4565,7 @@
         authInstructions.hidden = true;
       }
       const running = state === "running";
+      setupDecisionUI?.setWorkflowRunning(running);
       document.getElementById("connect-scan").disabled = running || (localServiceAvailable && !automaticCollectionAvailable);
       document.getElementById("collect-workloads").disabled = running || !baselineScan || !automaticCollectionAvailable;
       document.getElementById("verify-workflow").disabled = running || !baselineScan;
@@ -4563,8 +4581,9 @@
       return body;
     }
 
-    async function loadWorkflowArtifact(result) {
+    async function loadWorkflowArtifact(result, { preserveNavigation = false } = {}) {
       const artifact = await apiJson(`/api/artifacts/${result}`);
+      const previousPage = preserveNavigation ? document.querySelector(".page.active")?.id : null;
       if (result === "baseline") {
         window.FlightDeckEvidenceAdmissibility.acceptServiceAssessment(artifact, readinessCatalog);
         applyTenantScan(artifact);
@@ -4572,6 +4591,7 @@
       } else {
         applyVerificationReport(artifact, { trusted: true });
       }
+      if (previousPage) navigate(previousPage);
     }
 
     function renderWorkloadProgress(workloads) {
@@ -4599,7 +4619,10 @@
               collected: "read succeeded", partial: "partial read", failed: "read failed",
               unavailable: "not available", "not-recorded": "read outcome not recorded"
             }[resource.acquisitionStatus] || "read outcome not recorded";
-            row.textContent = `${resource.resource}: ${resource.rows} rows; ${status}`;
+            row.textContent = `${resource.resource}: ${resource.rows} rows; ${status}` +
+              (Number.isInteger(resource.acceptedRows) && Number.isInteger(resource.observationRows)
+                ? `. ${resource.acceptedRows} accepted source rows; ${resource.observationRows} retained observations. Neither count validates a readiness control.`
+                : "");
             counts.append(row);
           }
           content.append(counts);
@@ -4677,10 +4700,12 @@
       activeWorkflowId = id;
       while (activeWorkflowId === id) {
         const job = await apiJson(`/api/jobs/${id}`);
-        const actionLabel = job.action === "workloads" ? "Collecting workload evidence" :
+        const actionLabel = ["directorySearch", "directory-search"].includes(job.action) ? "Searching the directory" :
+          ["directoryCohort", "directory-cohort"].includes(job.action) ? "Saving the approved pilot" :
+          job.action === "workloads" ? "Collecting workload evidence" :
           job.action === "baseline" ? "Scanning the tenant" : "Verifying corrections";
         renderWorkloadProgress(job.workloads || []);
-        if (job.status === "running" || job.status === "cancelling") {
+        if (job.status === "queued" || job.status === "running" || job.status === "cancelling") {
           renderServiceState("running", `${actionLabel}. Complete Microsoft sign-in if prompted.`, job.log, job.auth);
           await new Promise(resolve => setTimeout(resolve, 1000));
           continue;
@@ -4688,13 +4713,19 @@
         activeWorkflowId = null;
         if (job.status === "cancelled") {
           renderServiceState("ready", "The tenant workflow was cancelled.", job.log);
-          return;
+          return job;
         }
         if (job.status === "failed") {
           renderServiceState("failed", "The tenant workflow needs attention.", job.log);
           throw new Error(job.error || "The tenant workflow failed.");
         }
-        await loadWorkflowArtifact(job.result);
+        if (job.status !== "completed") throw new Error("The local service returned an unknown workflow state.");
+        if (job.directoryResult) {
+          setupDecisionUI.acceptDirectoryResult(job.directoryResult, job.id);
+          renderServiceState("ready", "Directory search complete. Select the intended pilot users or groups.", job.log);
+          return job;
+        }
+        await loadWorkflowArtifact(job.result, { preserveNavigation: job.action === "directoryCohort" });
         renderWorkloadProgress(job.workloads || []);
         const collectionSummary = job.collectionSummary;
         const collectionMessage = collectionSummary
@@ -4704,6 +4735,11 @@
           ? "Verification complete. The Decision page is ready."
           : job.action === "baseline" ? "Baseline complete. The Assessment page is ready." : "Assessment updated.") + collectionMessage, job.log);
         await refreshEvidenceSourceStatus();
+        if (setupDecisionUI && setupDecisionWorkflowsAvailable) {
+          await setupDecisionUI.refresh();
+          renderEvidenceCompletion();
+        }
+        return job;
       }
     }
 
@@ -4966,6 +5002,7 @@
         const status = await apiJson("/api/status");
         localServiceAvailable = status.service === "ai-flight-deck-local" && status.ready === true;
         automaticCollectionAvailable = status.automaticWorkloadCollection === true;
+        setupDecisionWorkflowsAvailable = status.setupDecisionWorkflows === true;
         if (!localServiceAvailable) throw new Error("Unexpected local service response.");
         await loadUpstreamEvidence();
         await refreshEvidenceSourceStatus();
@@ -4975,18 +5012,20 @@
             "The local service is running an older version. Restart it to load automatic workload collection. Your saved baseline is retained.";
         }
         if (status.activeJobId) {
+          if (status.artifacts.baseline) await loadWorkflowArtifact("baseline", { preserveNavigation: true });
+          await setupDecisionUI.setEnabled(setupDecisionWorkflowsAvailable);
           renderServiceState("running", "A tenant workflow is already running.");
           monitorWorkflow(status.activeJobId).catch(error => showError(error.message));
           return;
         }
         if (status.artifacts.baseline) {
           try {
-            await loadWorkflowArtifact("baseline");
+            await loadWorkflowArtifact("baseline", { preserveNavigation: true });
             if (status.artifacts.report) {
-              await loadWorkflowArtifact("report");
+              await loadWorkflowArtifact("report", { preserveNavigation: true });
             }
           } catch (error) {
-            renderServiceState("ready", "The previous artifact uses an older assessment contract. Select Connect and scan tenant to create the estate-readiness baseline.");
+            renderServiceState("failed", "The saved assessment could not be loaded. It has been preserved; review the error below.");
             document.getElementById("service-help").textContent = error.message;
             return;
           }
@@ -4996,10 +5035,15 @@
           : status.artifacts.baseline
             ? "Previous baseline loaded. Review the Assessment page or verify approved corrections."
             : "Integrated scanner ready. Select Connect and scan tenant.");
-      } catch {
-        localServiceAvailable = false;
-        renderServiceState("failed", "Integrated scanner is not connected.");
-        document.getElementById("service-help").textContent = "This page was opened from a generic web server. Launch it with the AI Flight Deck local server to enable one-click sign-in and scanning. Manual import remains available.";
+        await setupDecisionUI.setEnabled(setupDecisionWorkflowsAvailable);
+        renderEvidenceCompletion();
+      } catch (error) {
+        renderServiceState("failed", localServiceAvailable
+          ? "The local service is connected, but setup data could not be loaded."
+          : "Integrated scanner is not connected.");
+        document.getElementById("service-help").textContent = localServiceAvailable
+          ? error.message
+          : `Launch the AI Flight Deck local server to enable sign-in and scanning. ${error.message}`;
       }
     }
 
@@ -5173,8 +5217,22 @@
       currentJourneyPhase = Math.max(currentJourneyPhase, 3);
       renderJourneyPhase();
     });
-    document.getElementById("export-button").addEventListener("click", () =>
-      downloadFile("ai-flight-deck-sharing-review.csv", sharingReviewCsv(), "text/csv;charset=utf-8"));
+    document.getElementById("export-button").addEventListener("click", () => {
+      try {
+        downloadFile("ai-flight-deck-sharing-review.csv", sharingReviewCsv(), "text/csv;charset=utf-8");
+      } catch (error) { showError(error.message); }
+    });
+    document.getElementById("export-sharing-evidence").addEventListener("click", () => {
+      try {
+        if (!sharingReviewModel) throw new Error("Load a collected assessment before exporting its evidence.");
+        const csv = window.FlightDeckSharingReviewUI.fullEvidenceCsv(sharingReviewModel, {
+          tenant: activeTenant.name, observedAt: baselineScan.generatedAt, csvCell
+        });
+        downloadFile("ai-flight-deck-collected-sharing-evidence.csv", csv, "text/csv;charset=utf-8");
+      } catch (error) { showError(error.message); }
+    });
+    document.getElementById("export-grouped-summary").addEventListener("click", () => document.getElementById("export-button").click());
+    document.getElementById("export-grouped-evidence").addEventListener("click", () => document.getElementById("export-sharing-evidence").click());
     document.getElementById("export-controls-csv").addEventListener("click", () => {
       try {
         exportControlsCsv();
@@ -5219,6 +5277,13 @@
       showToast(`${next[0].toUpperCase() + next.slice(1)} theme enabled`);
     });
 
+    setupDecisionUI = window.FlightDeckSetupUI.mount({
+      container: document.getElementById("setup-decision-forms"),
+      api: apiJson, monitorJob: monitorWorkflow,
+      context: () => baselineScan ? { tenantId: scanTenantId(baselineScan), cohortId: activeCohort()?.id } : null,
+      onSaved: () => renderEvidenceCompletion(),
+      onError: showError
+    });
     renderScenarios();
     renderFindings();
     renderRemediations();

@@ -135,6 +135,33 @@ test("a failed workload cannot substitute stale evidence and does not block othe
   });
 });
 
+test("administrator observations are retained separately and cross-service observation keys are rejected", async () => {
+  for (const crossService of [false, true]) await inWorkspace(async workspace => {
+    const job = {};
+    const key = `${crossService ? "exchangeOnline" : "sharePointOnline"}:Get-Synthetic`;
+    const documents = await collectWorkloadEvidence({
+      workspace, tenantId, actorId, job, graphRequest: graph, workloads: ["sharePointOnline"],
+      execute: async args => {
+        const document = documentFor(args);
+        document.evidence = {};
+        document.observations = { [key]: [{ id: "observed-site" }] };
+        document.errors = { "sharePointOnline:Get-Synthetic": { code: "COMMAND_WARNING", message: "Incomplete source rows." } };
+        writeOutput(args, document);
+      }
+    });
+    if (crossService) {
+      assert.equal(job.workloads[0].status, "failed");
+      assert.match(job.workloads[0].message, /outside its requested service/);
+      assert.deepEqual(documents.admin.observations, {});
+    } else {
+      assert.deepEqual(documents.admin.observations[key], [{ id: "observed-site" }]);
+      assert.equal(job.workloads[0].resourceCounts[0].rows, 1);
+      assert.equal(job.workloads[0].resourceCounts[0].acceptedRows, 0);
+    }
+    assert.deepEqual(documents.admin.evidence, {});
+  });
+});
+
 test("all-command failure details reach the workload panel and persist without admitting evidence", async () => {
   const issue = { resource: "sharePointOnline:Get-SPOSite:restrictedContent",
     code: "COMMAND_ACCESS_DENIED", message: "The service denied this read." };

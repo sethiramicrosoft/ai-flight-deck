@@ -32,6 +32,8 @@ const { validateEvidencePackage, graphRequest } = require("./collector-adapters"
 const { selectedWorkloads, collectWorkloadEvidence, PRODUCER_VERSIONS, collectorErrorFromOutput } = require("./workload-collection");
 const { buildEvidenceCompletionPlan } = require("./evidence-completion");
 const { validateAssessmentAuthority } = require("./evidence-authority");
+const { sameTenant, safeDirectoryError, validateDirectorySearch, directorySearch, validateDirectorySelection,
+  resolveDirectoryCohort, decisionsForContext, recordDecision } = require("./setup-decisions");
 
 const DEFAULT_PORT = 8080;
 const MAX_LOG_LENGTH = 50000;
@@ -278,7 +280,9 @@ function createWorkflowRunner({
   executePowerShell = runPowerShell,
   acquireToken = acquireGraphToken,
   collectWorkloads = collectWorkloadEvidence,
-  collectEstateEvidence = collectEstate
+  collectEstateEvidence = collectEstate,
+  graphQuery = graphRequest,
+  readDirectorySelection
 } = {}) {
   const workflowScript = path.join(__dirname, "scanner", "test-live-tenant.ps1");
   let cachedToken = null;
@@ -318,11 +322,16 @@ function createWorkflowRunner({
   }
 
   async function withGraph(job, signal, operation, expectedTenant) {
+    signal?.throwIfAborted();
     if (!cachedToken || cachedToken.expiresAt - Date.now() < 5 * 60 * 1000) {
       appendLog(job, "Requesting Microsoft sign-in...\n");
-      cachedToken = await acquireToken(job, signal);
+      const acquired = await acquireToken(job, signal);
+      signal?.throwIfAborted();
+      cachedToken = acquired;
     }
-    if (expectedTenant && cachedToken.tenantId.toLowerCase() !== expectedTenant.toLowerCase()) {
+    signal?.throwIfAborted();
+    if (expectedTenant && !sameTenant(cachedToken.tenantId, expectedTenant)) {
+      cachedToken = null;
       throw new Error("Sign in to the tenant identified by the baseline. Workload collection was not started.");
     }
     const binding = {
@@ -341,6 +350,59 @@ function createWorkflowRunner({
   }
 
   return async (job, action, signal) => {
+    if (["directorySearch", "directoryCohort"].includes(action)) {
+      const baseline = readBaseline();
+      const tenantId = baseline.tenant?.tenantId || baseline.tenant?.id;
+      if (!tenantId) throw new Error("A verified baseline tenant is required.");
+      return withGraph(job, signal, async rawToken => {
+        const authenticatedRequest = graphQuery(rawToken);
+        const request = async input => {
+          try {
+            return await authenticatedRequest(input);
+          } catch (error) {
+            signal.throwIfAborted();
+            const safe = safeDirectoryError(error);
+            if (safe.httpStatus === 401) cachedToken = null;
+            throw safe;
+          }
+        };
+        if (action === "directorySearch") {
+          const result = await directorySearch(request, job.directoryRequest, tenantId, signal);
+          const current = readBaseline();
+          if (!sameTenant(current.tenant?.tenantId || current.tenant?.id, tenantId)) {
+            throw new Error("The baseline tenant changed during directory search.");
+          }
+          job.directoryResult = result;
+          appendLog(job, "Bounded read-only directory search completed (maximum 50 results).\n");
+          return "directory";
+        }
+        const selection = readDirectorySelection(job.directorySelectionRequest);
+        if (!sameTenant(selection.tenantId, tenantId)) throw new Error("The selected directory tenant changed.");
+        const actorId = readJwtClaim(rawToken, "oid");
+        if (!actorId || !sameTenant(actorId, baseline.auth?.actor?.id)) {
+          throw new Error("Pilot re-evaluation requires the account that created the baseline. Sign in with that account so evidence is not attributed to a different collector.");
+        }
+        const cohort = await resolveDirectoryCohort(request, selection, signal);
+        delete baseline.integrity;
+        delete baseline.evidenceGraphEnvelope;
+        const enriched = await collectEstateEvidence({
+          rawToken, workspace, scan: baseline, signal, verifyAttestation, verifyEvidencePackage,
+          attestationIntegrity, configuredCohort: cohort, adapters: { graphRequest: request }
+        });
+        signal.throwIfAborted();
+        const currentSelection = readDirectorySelection(job.directorySelectionRequest);
+        if (!sameTenant(currentSelection.tenantId, tenantId)) throw new Error("The directory tenant changed.");
+        const applied = enriched.estateAssessment?.cohorts?.find(item => item.id === cohort.id);
+        if (!applied || applied.approved !== true || applied.resolutionComplete !== true ||
+            !sameTenant(applied.tenantId, tenantId)) {
+          throw new Error("The cohort could not be fully evaluated; the previous cohort and baseline were retained.");
+        }
+        writeJsonAtomic(path.join(workspace, "cohort-config.json"), cohort);
+        writeJsonAtomic(path.join(workspace, "baseline-scan.json"), enriched);
+        appendLog(job, "Approved directory cohort applied to the read-only assessment. No workload sign-ins or sharing scan were repeated.\n");
+        return "baseline";
+      }, tenantId);
+    }
     const baseline = action === "workloads" ? readBaseline() : null;
     const expectedTenant = baseline?.tenant?.tenantId || baseline?.tenant?.id;
     appendLog(job, "Preparing the Microsoft Graph connector...\n");
@@ -475,7 +537,11 @@ function createApp({
     verifyEvidencePackage,
     attestationIntegrity: { key: integrityKey, keyId: integrityKeyId },
     storeAutomaticEvidence,
-    readBaseline: () => readVerifiedArtifact("baseline")
+    readBaseline: () => readVerifiedArtifact("baseline"),
+    readDirectorySelection: input => {
+      const { tenantId } = verifiedBaselineContext();
+      return validateDirectorySelection(input, jobs.get(input.directoryJobId), tenantId);
+    }
   });
   let activeJobId = null;
   const artifactPaths = {
@@ -583,8 +649,34 @@ function createApp({
     return { baseline, tenantId };
   }
 
-  async function startJob(action, workloads) {
-    if (!ALLOWED_ACTIONS.has(action)) {
+  function requireIdle() {
+    const active = jobs.get(activeJobId);
+    if (active && ["running", "cancelling"].includes(active.status)) {
+      throw new Error("Another tenant workflow is already running.");
+    }
+  }
+
+  const decisionsPath = path.join(workspace, "setup-decisions.json");
+  function readSetupDecisions() {
+    const { baseline, tenantId } = verifiedBaselineContext();
+    const cohortId = baseline.estateAssessment?.cohorts?.[0]?.id || null;
+    let document = null;
+    if (fs.existsSync(decisionsPath)) {
+      const stored = JSON.parse(fs.readFileSync(decisionsPath, "utf8"));
+      verifyEvidenceEnvelope(stored.envelope, integrityKey);
+      if (sha256Digest(stored.document) !== stored.envelope.payloadDigest) {
+        throw new Error("The local setup decisions failed integrity verification.");
+      }
+      document = stored.document;
+      if (!sameTenant(document.tenantId, tenantId) || !sameTenant(stored.envelope.tenant, tenantId)) {
+        throw new Error("The saved setup decisions belong to another tenant. They cannot be applied to this baseline.");
+      }
+    }
+    return decisionsForContext(document, tenantId, cohortId);
+  }
+
+  async function startJob(action, workloads, metadata = {}) {
+    if (!ALLOWED_ACTIONS.has(action) && !["directorySearch", "directoryCohort"].includes(action)) {
       throw new Error("Unsupported workflow action.");
     }
     if (activeJobId) {
@@ -597,7 +689,7 @@ function createApp({
     const job = {
       id,
       action,
-      selectedWorkloads: selectedWorkloads(workloads),
+      selectedWorkloads: action.startsWith("directory") ? [] : selectedWorkloads(workloads),
       status: "running",
       result: null,
       error: null,
@@ -606,6 +698,12 @@ function createApp({
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+    if (action === "directorySearch") job.directoryRequest = metadata.directoryRequest;
+    if (action === "directoryCohort") job.directorySelectionRequest = metadata.directorySelectionRequest;
+    // Restore the complete previously sealed state if evaluation, cancellation or sealing fails.
+    const backup = action === "directoryCohort" ? new Map([
+      artifactPaths.cohort, artifactPaths.baseline, envelopePaths.baseline, artifactPaths.history
+    ].map(file => [file, fs.existsSync(file) ? fs.readFileSync(file) : null])) : null;
     jobs.set(id, job);
     const controller = new AbortController();
     jobControllers.set(id, controller);
@@ -613,14 +711,38 @@ function createApp({
     Promise.resolve()
       .then(() => runWorkflow(job, action, controller.signal))
       .then(result => {
-        sealArtifact(result);
+        controller.signal.throwIfAborted();
+        if (result === "directory" && action === "directorySearch") {
+          if (!job.directoryResult) throw new Error("Directory search did not return a result.");
+        } else {
+          sealArtifact(result);
+        }
         job.status = "completed";
         job.result = result;
-        job.updatedAt = new Date().toISOString();
+        job.completedAt = job.updatedAt = new Date().toISOString();
+        job.auth = null;
       })
       .catch(error => {
+        if (backup) {
+          try {
+            for (const [file, content] of backup) {
+              if (content === null) fs.rmSync(file, { force: true });
+              else {
+                const staging = `${file}.${crypto.randomUUID()}.tmp`;
+                fs.writeFileSync(staging, content, { mode: 0o600 });
+                fs.renameSync(staging, file);
+              }
+            }
+          } catch {
+            error = new Error("Cohort application failed and local rollback could not complete. Do not use this baseline; restore the workspace backup or run a new baseline.");
+          }
+        }
         job.status = controller.signal.aborted ? "cancelled" : "failed";
         job.error = error.message || "The tenant workflow failed.";
+        if (error.directoryRequestError === true) {
+          job.errorCode = error.code;
+          if (error.httpStatus) job.httpStatus = error.httpStatus;
+        }
         job.auth = null;
         job.updatedAt = new Date().toISOString();
       })
@@ -646,6 +768,7 @@ function createApp({
             service: "ai-flight-deck-local",
             ready: true,
             automaticWorkloadCollection: true,
+            setupDecisionWorkflows: true,
             activeJobId,
             artifacts: {
               baseline: fs.existsSync(artifactPaths.baseline),
@@ -655,6 +778,47 @@ function createApp({
               attestations: fs.existsSync(attestationsPath)
             }
           });
+          return;
+        }
+        if (req.method === "GET" && pathname === "/api/setup-decisions") {
+          json(res, 200, readSetupDecisions());
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/setup-decisions") {
+          if (!requireTrustedUiMutation(req, res)) return;
+          const input = await readJsonBody(req, 8192);
+          requireIdle();
+          const current = readSetupDecisions();
+          const document = recordDecision(current, input, current.tenantId, current.cohortId);
+          const envelope = createEvidenceEnvelope({
+            tenant: current.tenantId, producer: "ai-flight-deck/local-setup-decisions",
+            generatedAt: new Date().toISOString(), payload: document,
+            keyId: integrityKeyId, key: integrityKey
+          });
+          writeJsonAtomic(decisionsPath, { document, envelope });
+          json(res, 200, document);
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/directory-search") {
+          if (!requireTrustedUiMutation(req, res)) return;
+          const input = await readJsonBody(req, 4096);
+          verifiedBaselineContext();
+          const directoryRequest = validateDirectorySearch(input);
+          const job = await startJob("directorySearch", [], { directoryRequest });
+          json(res, 202, { id: job.id, status: job.status });
+          return;
+        }
+        if (req.method === "POST" && pathname === "/api/directory-cohort") {
+          if (!requireTrustedUiMutation(req, res)) return;
+          const input = await readJsonBody(req, 16384);
+          const { tenantId } = verifiedBaselineContext();
+          validateDirectorySelection(input, jobs.get(input.directoryJobId), tenantId);
+          const directorySelectionRequest = {
+            directoryJobId: input.directoryJobId, selectedIds: input.selectedIds,
+            name: input.name, owner: input.owner, approved: input.approved
+          };
+          const job = await startJob("directoryCohort", [], { directorySelectionRequest });
+          json(res, 202, { id: job.id, status: job.status });
           return;
         }
         if (req.method === "GET" && pathname === "/api/evidence-sources") {
@@ -852,6 +1016,7 @@ function createApp({
         if (req.method === "POST" && pathname === "/api/upstream-evidence") {
           if (!requireTrustedUiMutation(req, res)) return;
           const input = await readJsonBody(req, 12 * 1024 * 1024);
+          requireIdle();
           if (!["m365-copilot-readiness", "microsoft-automated-readiness-assessment"]
             .includes(input.sourceType)) {
             throw new Error("Unsupported upstream evidence source.");
@@ -911,6 +1076,7 @@ function createApp({
             throw new Error("Import the Microsoft Copilot Readiness CSV before creating a pilot cohort.");
           }
           const input = await readJsonBody(req, 1024 * 1024);
+          requireIdle();
           const readiness = JSON.parse(fs.readFileSync(artifactPaths.readinessImport, "utf8"));
           const cohort = createPilotCohort(readiness, {
             id: input.id,
@@ -919,6 +1085,7 @@ function createApp({
             approved: input.approved === true,
             userNames: input.userNames
           });
+          if (fs.existsSync(envelopePaths.baseline)) cohort.tenantId = verifiedBaselineContext().tenantId;
           writeJsonAtomic(artifactPaths.cohort, cohort);
           json(res, 200, cohort);
           return;
@@ -940,6 +1107,7 @@ function createApp({
         if (req.method === "POST" && pathname === "/api/jobs") {
           if (!requireTrustedUiMutation(req, res)) return;
           const input = await readJsonBody(req, 4096);
+          if (!ALLOWED_ACTIONS.has(input.action)) throw new Error("Unsupported workflow action.");
           if (input.action === "workloads") verifiedBaselineContext();
           const job = await startJob(input.action, input.workloads);
           json(res, 202, { id: job.id, status: job.status });
@@ -997,6 +1165,7 @@ function createApp({
 
       const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
       const publicFiles = new Set(["index.html", "enablement-playbook.js", "evidence-completion.js",
+        "sharing-review.js", "sharing-review-ui.js", "setup-workflows.js", "completion-center-ui.js",
         "mission-engine.js", "evidence-admissibility.js", "evidence-graph.js",
         "schema/readiness-catalog.v1.json", "schema/control-result.schema.v1.json",
         "schema/evidence-authority.schema.v2.json", "schema/attestation-data-examples.v1.json",

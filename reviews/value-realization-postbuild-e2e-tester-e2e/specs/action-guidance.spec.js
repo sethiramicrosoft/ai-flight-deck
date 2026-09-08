@@ -18,7 +18,7 @@ test("control guidance navigation, policy boundaries and exports work on desktop
       renderTenantEnablementPlan("complete");
       navigate("guide");
     });
-    const button = page.locator("#completion-blockers button").first();
+    const button = page.locator('#completion-blockers [data-lane="appLimitations"] button[data-control-id]').first();
     await expect(button).toBeVisible();
     const id = (await button.getAttribute("aria-label")).match(/AFD-[A-Z]+-\d+/)[0];
     await button.focus();
@@ -38,7 +38,7 @@ test("control guidance navigation, policy boundaries and exports work on desktop
   }
 
   await page.evaluate(() => openControlPlaybook("AFD-TEAMS-001"));
-  await expect(page.locator("#enablement-AFD-TEAMS-001 .control-badge")).toHaveText("Evidence integration required");
+  await expect(page.locator("#enablement-AFD-TEAMS-001 .control-badge")).toHaveText("App capability missing");
   await expect(page.locator("#enablement-AFD-TEAMS-001")).toContainText("permissions or a rescan alone");
   await page.evaluate(() => openControlPlaybook("AFD-PPA-001"));
   await expect(page.locator("#enablement-AFD-PPA-001")).toContainText("Collect workload evidence");

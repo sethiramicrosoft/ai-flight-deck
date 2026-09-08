@@ -18,6 +18,7 @@ function graphRequest(rawToken) {
       headers: {
         Accept: "application/json",
         "Accept-Language": "en-US",
+        ...(request.consistencyLevel === "eventual" ? { ConsistencyLevel: "eventual" } : {}),
         Authorization: `Bearer ${rawToken}`
       },
       signal: request.signal
@@ -78,6 +79,10 @@ function validateEvidencePackage(doc, {
       "EVIDENCE_SHAPE_INVALID",
       `${fileName} must contain object-shaped evidence and errors maps.`
     );
+  }
+  if (doc.observations !== undefined && (!isPlainObject(doc.observations) ||
+      Object.values(doc.observations).some(rows => !Array.isArray(rows)))) {
+    throw codedError("EVIDENCE_SHAPE_INVALID", `${fileName} observations must be an object of row arrays.`);
   }
   const producedAt = Date.parse(doc.producedAt);
   if (!Number.isFinite(producedAt)) {
@@ -146,6 +151,11 @@ function createAdminCommandAdapter(workspace, options = {}) {
         evidence.errors[key].code || "COMMAND_FAILED",
         evidence.errors[key].message || `${request.command} failed during administrator collection.`
       );
+    }
+    const acquisitionStatus = evidence.commandResults?.[key]?.acquisitionStatus;
+    if (acquisitionStatus !== undefined && acquisitionStatus !== "collected") {
+      throw codedError("OBSERVATION_NOT_VALIDATED",
+        `${request.command} returned limited or unavailable observations, not validated configuration evidence.`);
     }
     if (!Object.prototype.hasOwnProperty.call(evidence.evidence || {}, key)) {
       throw codedError(

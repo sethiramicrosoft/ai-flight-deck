@@ -8,7 +8,8 @@ param(
     [string]$AdminUrl = "https://synthetic-admin.sharepoint.com",
     [string]$ExpectedTenant = "11111111-1111-4111-8111-111111111111",
     [string]$CollectionChallenge = "synthetic_challenge_0123456789_abcdefghijklmnop",
-    [string]$OutputPath
+    [string]$OutputPath,
+    [int]$MaxSiteDetails = 200
 )
 $ErrorActionPreference = "Stop"
 class AdminSyntheticHttpException : System.Exception {
@@ -21,6 +22,8 @@ $global:adminTestCalls = [System.Collections.Generic.List[object]]::new()
 $global:adminTestScenario = $Scenario
 $global:adminTestConnected = $null
 $global:adminTestInstalled = $false
+$global:adminTestClockAdvanced = $false
+$global:adminTestPurviewDisconnected = $false
 $global:adminTestWorkload = $Workload
 $global:adminTestTenant = "11111111-1111-4111-8111-111111111111"
 $originalSecurityProtocol = [Net.ServicePointManager]::SecurityProtocol
@@ -35,6 +38,12 @@ $global:adminTestCommandNames = @(
     "Get-ComplianceTag", "Get-ComplianceCase", "Get-CaseHoldPolicy", "Get-InsiderRiskPolicy",
     "Get-SupervisoryReviewPolicyV2"
 )
+
+function global:Get-Date {
+    [CmdletBinding()]param()
+    if ($global:adminTestClockAdvanced) { return [datetime]::Now.AddMinutes(15) }
+    [datetime]::Now
+}
 
 function global:Get-Module {
     [CmdletBinding()]param([string]$Name, [switch]$ListAvailable)
@@ -87,6 +96,8 @@ function global:Install-Module {
 function global:Get-Command {
     [CmdletBinding()]param([string]$Name, [string[]]$CommandType)
     if ($global:adminTestScenario -eq "missingCommand" -and $Name -eq "Get-HybridConfiguration") { return }
+    if ($Name -eq "Search-UnifiedAuditLog" -and
+        ($global:adminTestConnected -ne "exchangeOnline" -or $global:adminTestScenario -eq "auditCommandMissing")) { return }
     if ($global:adminTestScenario -eq "oldSpoApi" -and $Name -eq "Connect-SPOService") {
         return [pscustomobject]@{ Parameters = @{} }
     }
@@ -95,13 +106,19 @@ function global:Get-Command {
 function global:Get-ConnectionInformation {
     [CmdletBinding()]param()
     if (-not $global:adminTestConnected -and $global:adminTestScenario -ne "existingConnection") { return }
+    $auditSession = $global:adminTestPurviewDisconnected -and $global:adminTestConnected -eq "exchangeOnline"
     $connection = [pscustomobject]@{
         State = if ($global:adminTestScenario -eq "inactive") { "Disconnected" } else { "Connected" }
         TokenStatus = "Active"
-        IsEopSession = if ($global:adminTestScenario -eq "wrongSession") { $true } else { $global:adminTestConnected -eq "purview" }
-        UserPrincipalName = if ($global:adminTestScenario -eq "missingActor") { $null } else { "synthetic-admin@example.invalid" }
-        ConnectionId = "22222222-2222-4222-8222-222222222222"
-        TenantID = if ($global:adminTestScenario -eq "tenantMismatch") {
+        IsEopSession = if ($global:adminTestScenario -eq "wrongSession" -or
+            ($auditSession -and $global:adminTestScenario -eq "auditWrongSession")) { $true }
+            else { $global:adminTestConnected -eq "purview" }
+        UserPrincipalName = if ($global:adminTestScenario -eq "missingActor") { $null }
+            elseif ($auditSession -and $global:adminTestScenario -eq "auditActorMismatch") { "other-admin@example.invalid" }
+            else { "synthetic-admin@example.invalid" }
+        ConnectionId = if ($auditSession) { "44444444-4444-4444-8444-444444444444" } else { "22222222-2222-4222-8222-222222222222" }
+        TenantID = if ($global:adminTestScenario -eq "tenantMismatch" -or
+            ($auditSession -and $global:adminTestScenario -eq "auditTenantMismatch")) {
             "33333333-3333-4333-8333-333333333333"
         } elseif ($global:adminTestScenario -eq "missingTenant") { $null } else { $global:adminTestTenant }
     }
@@ -112,6 +129,10 @@ function global:Connect-ExchangeOnline {
     [CmdletBinding()]param([switch]$ShowBanner, [switch]$DisableWAM)
     $global:adminTestCalls.Add(@{ command = "Connect-ExchangeOnline"; disableWAM = [bool]$DisableWAM })
     if ($global:adminTestScenario -in @("signInFailure", "signInAndDisconnectFailure")) { throw "SENSITIVE_TEST_VALUE" }
+    if ($global:adminTestPurviewDisconnected -and $global:adminTestScenario -in @("auditSignInFailure", "auditFailureWithPolicyWarning")) { throw "SENSITIVE_TEST_VALUE" }
+    if ($global:adminTestPurviewDisconnected -and $global:adminTestScenario -eq "auditConditionalAccess") {
+        throw "SENSITIVE_TEST_VALUE AADSTS53003: SENSITIVE_TEST_VALUE"
+    }
     $global:adminTestConnected = "exchangeOnline"
 }
 function global:Connect-IPPSSession {
@@ -134,6 +155,7 @@ function global:Connect-SPOService {
 function global:Disconnect-ExchangeOnline {
     [CmdletBinding(SupportsShouldProcess)]param()
     $global:adminTestCalls.Add(@{ command = "Disconnect-ExchangeOnline" })
+    if ($global:adminTestConnected -eq "purview") { $global:adminTestPurviewDisconnected = $true }
     $global:adminTestConnected = $null
     if ($global:adminTestScenario -in @("disconnectFailure", "signInAndDisconnectFailure")) { throw "SENSITIVE_TEST_VALUE" }
 }
@@ -157,15 +179,25 @@ foreach ($commandName in $global:adminTestCommandNames) {
             [object]$ResultSize, [string[]]$Properties,
             [datetime]$StartDate = [datetime]::MinValue, [datetime]$EndDate = [datetime]::MinValue,
             [string]$RecordType, [string]$ReportType, [string]$ReportEntity, [string]$Workload,
-            [string]$Limit, [switch]$Detailed, [bool]$IncludePersonalSite, [string]$SyntheticCommandName
+            [string]$Limit, [string]$Identity, [bool]$IncludePersonalSite, [string]$SyntheticCommandName
         )
         $command = if ($SyntheticCommandName) { $SyntheticCommandName } else { $MyInvocation.MyCommand.Name }
         $global:adminTestCalls.Add(@{
-            command = $command; resultSize = $ResultSize; limit = $Limit; detailed = [bool]$Detailed
+            command = $command; resultSize = $ResultSize; limit = $Limit; identity = $Identity
             reportType = $ReportType; reportEntity = $ReportEntity; workload = $Workload
             includePersonalSite = $IncludePersonalSite; recordType = $RecordType
             startDate = $StartDate.ToString("o"); endDate = $EndDate.ToString("o")
+            connectionService = $global:adminTestConnected
         })
+        if ($command -eq "Search-UnifiedAuditLog") {
+            if ($global:adminTestConnected -ne "exchangeOnline") {
+                throw [System.InvalidOperationException]::new("Synthetic audit calls require an Exchange Online session.")
+            }
+            if ($global:adminTestScenario -eq "auditReadFailure") {
+                throw [System.UnauthorizedAccessException]::new("SENSITIVE_TEST_VALUE")
+            }
+            if ($global:adminTestScenario -eq "auditWarning") { Write-Warning "SENSITIVE_TEST_VALUE" }
+        }
         if ($global:adminTestScenario -eq "allFailure") { throw "SENSITIVE_TEST_VALUE" }
         if ($global:adminTestScenario -eq "allDenied") {
             throw [System.UnauthorizedAccessException]::new("SENSITIVE_TEST_VALUE response/header/token")
@@ -191,6 +223,17 @@ foreach ($commandName in $global:adminTestCommandNames) {
         if ($global:adminTestScenario -eq "unsupported") { throw [System.NotSupportedException]::new("SENSITIVE_TEST_VALUE") }
         if ($global:adminTestScenario -eq "throttled") { throw [AdminSyntheticHttpException]::new(429) }
         if ($global:adminTestScenario -eq "http403") { throw [AdminSyntheticHttpException]::new(403) }
+        if ($global:adminTestScenario -in @("allWarnings", "allWarningsEmpty")) {
+            Write-Warning "SENSITIVE_TEST_VALUE token/private-url"
+            if ($global:adminTestScenario -eq "allWarningsEmpty") { return }
+        }
+        if ($global:adminTestScenario -eq "reportWarningEmpty" -and $command -eq "Get-SPODataAccessGovernanceInsight") {
+            Write-Warning "SENSITIVE_TEST_VALUE"
+            return
+        }
+        if ($global:adminTestScenario -in @("labelPolicyWarning", "auditFailureWithPolicyWarning") -and $command -eq "Get-LabelPolicy") {
+            Write-Warning "SENSITIVE_TEST_VALUE"
+        }
         if ($global:adminTestScenario -eq "information") {
             Write-Host "SENSITIVE_TEST_VALUE"
             Write-Information "SENSITIVE_TEST_VALUE" -InformationAction Continue
@@ -209,8 +252,65 @@ foreach ($commandName in $global:adminTestCommandNames) {
             return
         }
         if ($global:adminTestScenario -eq "empty") { return }
+        if ($command -eq "Get-SPOSite") {
+            $detailFields = @(
+                "AllowDownloadingNonWebViewableFiles", "AllowEditing", "AllowSelfServiceUpgrade",
+                "AnonymousLinkExpirationInDays", "ConditionalAccessPolicy", "DefaultLinkPermission",
+                "DefaultLinkToExistingAccess", "DefaultSharingLinkType", "DenyAddAndCustomizePages",
+                "DisableCompanyWideSharingLinks", "ExternalUserExpirationInDays", "InformationSegment",
+                "LimitedAccessFileType", "OverrideTenantAnonymousLinkExpirationPolicy",
+                "OverrideTenantExternalUserExpirationPolicy", "PWAEnabled", "SandboxedCodeActivationCapability",
+                "SensitivityLabel", "SharingAllowedDomainList", "SharingBlockedDomainList",
+                "SharingCapability", "SharingDomainRestrictionMode"
+            )
+            if ($Identity) {
+                if ($global:adminTestScenario -eq "siteDetailFailure" -and $Identity.EndsWith("/s2")) {
+                    throw [System.UnauthorizedAccessException]::new("SENSITIVE_TEST_VALUE")
+                }
+                if ($global:adminTestScenario -eq "siteDetailWarning" -and $Identity.EndsWith("/s2")) {
+                    Write-Warning "SENSITIVE_TEST_VALUE"
+                }
+                $row = [ordered]@{ Url = $Identity; Title = "Synthetic"; Template = "STS#3" }
+                if ($global:adminTestScenario -eq "siteDetailMismatch") { $row.Url = "https://other.sharepoint.com/sites/wrong" }
+                foreach ($field in $detailFields) { $row[$field] = "HYDRATED_VALUE" }
+                if ($global:adminTestScenario -eq "siteMissingField") { $row.Remove("ConditionalAccessPolicy") }
+                [pscustomobject]$row
+                return
+            }
+            if ($global:adminTestScenario -in @("siteInventoryWarning", "siteObserved32")) {
+                Write-Warning "SENSITIVE_TEST_VALUE"
+            }
+            if ($global:adminTestScenario -eq "siteDeadline") { $global:adminTestClockAdvanced = $true }
+            $normalCount = if ($global:adminTestScenario -eq "siteObserved32") { 32 } else { 2 }
+            $personalCount = if ($global:adminTestScenario -eq "siteObserved32") { 20 } else { 1 }
+            if ($global:adminTestScenario -eq "siteInventoryCap") { $normalCount = 1000; $personalCount = 0 }
+            for ($i = 1; $i -le $normalCount; $i++) {
+                $row = [ordered]@{ Url = "https://synthetic.sharepoint.com/sites/s$i"; Title = "Synthetic"; Template = "STS#3" }
+                foreach ($field in $detailFields) { $row[$field] = "LIST_DEFAULT_MUST_NOT_BE_ACCEPTED" }
+                if ($global:adminTestScenario -eq "siteForeignInventory") { $row.Url = "https://other.sharepoint.com/sites/s$i" }
+                [pscustomobject]$row
+            }
+            if ($IncludePersonalSite) {
+                for ($i = 1; $i -le $personalCount; $i++) {
+                    [pscustomobject]@{ Url = "https://synthetic-my.sharepoint.com/personal/p$i"; Title = "Synthetic personal"; Template = "SPSPERS#10" }
+                }
+            }
+            return
+        }
         [pscustomobject]@{ id = "synthetic-$command"; displayName = "Test Unicode $([char]0x2713)" }
     }
+}
+
+$global:adminTestSiteOperation = (Microsoft.PowerShell.Core\Get-Command Get-SPOSite -CommandType Function).ScriptBlock
+function global:Get-SPOSite {
+    [CmdletBinding(DefaultParameterSetName = "Inventory")]
+    param(
+        [Parameter(ParameterSetName = "Inventory")][string]$Limit,
+        [Parameter(ParameterSetName = "Inventory")][bool]$IncludePersonalSite,
+        [Parameter(Mandatory = $true, ParameterSetName = "Identity")][string]$Identity
+    )
+    & $global:adminTestSiteOperation -SyntheticCommandName "Get-SPOSite" -Limit $Limit `
+        -IncludePersonalSite $IncludePersonalSite -Identity $Identity -ErrorAction Stop
 }
 
 $global:adminTestDagOperation = (Microsoft.PowerShell.Core\Get-Command Get-SPODataAccessGovernanceInsight -CommandType Function).ScriptBlock
@@ -263,6 +363,7 @@ $parameters = @{
     TenantId = $ExpectedTenant; WorkspacePath = $WorkspacePath
     CollectionChallenge = $CollectionChallenge
     SharePointAdminUrl = $AdminUrl
+    MaxSiteDetails = $MaxSiteDetails
     Workloads = if ($Workload -eq "all") { @("exchangeOnline", "sharePointOnline", "purview") } else { @($Workload) }
 }
 if ($Scenario -ne "manual") { $parameters.OutputPath = $output }

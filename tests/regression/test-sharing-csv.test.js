@@ -67,3 +67,37 @@ test("export retains full source references beyond the UI display limit", () => 
   });
   assert.equal(parse(csv)[0]["Evidence References"].split("; ").length, 105);
 });
+
+test("grouped summary and opt-in full evidence CSV avoid quadratic reference repetition", () => {
+  const root = path.resolve(__dirname, "..", "..");
+  const api = require(path.join(root, "sharing-review"));
+  const model = api.buildSharingReview({
+    tenant: { tenantId: "synthetic" }, generatedAt: "2026-09-09T00:00:00Z",
+    summary: { sitesScanned: 1, sampledItems: 8 },
+    evidenceDetails: { permissionPaths: Array.from({ length: 64 }, (_, index) => ({
+      evidenceId: `permission-${index}`, itemEvidenceId: `item-${index % 8}`,
+      itemId: `item-${index % 8}`, siteId: "site-1", driveId: "drive-1",
+      itemType: "File", displayName: index === 0 ? "=1+1" : index === 1 ? "x".repeat(900) : `File ${index % 8}`,
+      siteDisplayName: "Synthetic site", driveDisplayName: "Documents",
+      accessType: "user-direct-grant", principalRefs: ["user:synthetic"], roles: ["read"],
+      inherited: true, inheritedFrom: { driveId: "drive-1", id: "parent-folder" }
+    })) }
+  });
+  const context = { FlightDeckSharingReview: api, model };
+  vm.createContext(context);
+  vm.runInContext(`${section("csvCell", "controlsCsv")}\n${fs.readFileSync(path.join(root, "sharing-review-ui.js"), "utf8")}`, context);
+  const summary = vm.runInContext(`FlightDeckSharingReviewUI.summaryCsv(model, {
+    tenant: "Synthetic", observedAt: "2026-09-09T00:00:00Z", csvCell })`, context);
+  const full = vm.runInContext(`FlightDeckSharingReviewUI.fullEvidenceCsv(model, {
+    tenant: "Synthetic", observedAt: "2026-09-09T00:00:00Z", csvCell })`, context);
+  const summaries = parse(summary);
+  const rows = parse(full);
+  assert.ok(summaries.length > 0 && summaries.length < 10);
+  assert.equal(rows.length, 64);
+  assert.equal(new Set(rows.map(row => row["Evidence reference"])).size, 64);
+  assert.equal(rows.find(row => row["Evidence reference"] === "permission-0").Resource, "'=1+1");
+  assert.equal(rows.find(row => row["Evidence reference"] === "permission-1").Resource.length, 900);
+  assert.ok(rows.every(row => row.Roles === "read"));
+  assert.ok(rows.every(row => /inherit/i.test(row["Permission origin"])));
+  assert.ok(full.length < 100000, "Each permission must not repeat the entire finding's evidence ID list.");
+});

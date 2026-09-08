@@ -101,6 +101,55 @@ test("Power Platform adapter reads all resources from a versioned package", asyn
   });
 });
 
+test("administrator observations never replace accepted evidence or override acquisition failure", async () => {
+  await withWorkspace(async workspace => {
+    const key = "sharePointOnline:Get-SPOSite:restrictedContent";
+    const request = { tenantId: "tenant-1", service: "sharePointOnline",
+      command: "Get-SPOSite", evidenceKey: "restrictedContent" };
+    const write = data => fs.writeFileSync(path.join(workspace, "admin-evidence.json"), JSON.stringify({
+      schema: "ai-flight-deck/admin-evidence", version: "1.0.0", tenantId: "tenant-1",
+      producedAt: new Date().toISOString(), evidence: {}, errors: {},
+      observations: { [key]: [{ id: "observed-site", RestrictedContentDiscovery: false }] }, ...data
+    }));
+    const read = () => createAdminCommandAdapter(workspace, { verifyDocument: () => true })(request);
+    write({});
+    await assert.rejects(read, error => error.code === "COMMAND_UNAVAILABLE");
+    for (const status of ["partial", "failed", "unavailable", "unexpected", null]) {
+      write({ evidence: { [key]: [{ id: "not-admissible" }] },
+        commandResults: { [key]: { acquisitionStatus: status } } });
+      await assert.rejects(read, error => error.code === "OBSERVATION_NOT_VALIDATED");
+    }
+    write({ evidence: { [key]: [] }, commandResults: { [key]: { acquisitionStatus: "collected" } } });
+    assert.deepEqual(await read(), []);
+    write({ errors: { [key]: { code: "COMMAND_WARNING", message: "Incomplete observations." } },
+      commandResults: { [key]: { acquisitionStatus: "partial" } } });
+    await assert.rejects(read, error => error.code === "COMMAND_WARNING");
+    for (const observations of [[], null, { [key]: {} }]) {
+      write({ observations });
+      await assert.rejects(read, error => error.code === "EVIDENCE_SHAPE_INVALID");
+    }
+  });
+});
+
+test("Graph directory advanced queries forward only the explicit eventual-consistency option", async () => {
+  const originalFetch = global.fetch;
+  const headers = [];
+  global.fetch = async (_url, options) => {
+    headers.push(options.headers);
+    return { ok: true, json: async () => ({ value: [] }) };
+  };
+  try {
+    const request = graphRequest("synthetic-test-token");
+    await request({ url: "https://graph.microsoft.com/v1.0/groups", consistencyLevel: "eventual",
+      headers: { Authorization: "must-not-replace-service-binding", Extra: "must-not-forward" } });
+    await request({ url: "https://graph.microsoft.com/v1.0/users" });
+    assert.equal(headers[0].ConsistencyLevel, "eventual");
+    assert.equal(headers[0].Authorization, "Bearer synthetic-test-token");
+    assert.equal(headers[0].Extra, undefined);
+    assert.equal(headers[1].ConsistencyLevel, undefined);
+  } finally { global.fetch = originalFetch; }
+});
+
 test("Graph requests pin a supported locale for locale-sensitive beta endpoints", async () => {
   const originalFetch = global.fetch;
   let observed;

@@ -12,6 +12,9 @@ param(
 
     [switch]$InstallMissingModules,
 
+    [ValidateRange(0, 1000)]
+    [int]$MaxSiteDetails = 200,
+
     [ValidateSet("exchangeOnline", "sharePointOnline", "purview")]
     [string[]]$Workloads = @("exchangeOnline", "sharePointOnline", "purview")
 )
@@ -21,6 +24,7 @@ $ProgressPreference = "SilentlyContinue"
 $VerbosePreference = "SilentlyContinue"
 $DebugPreference = "SilentlyContinue"
 $evidence = [ordered]@{}
+$observations = [ordered]@{}
 $errors = [ordered]@{}
 $commandResults = [ordered]@{}
 $connections = [ordered]@{}
@@ -28,6 +32,22 @@ $workloadResults = [ordered]@{}
 $moduleVersions = [ordered]@{}
 $cleanupErrors = [System.Collections.Generic.List[object]]::new()
 $now = (Get-Date).ToUniversalTime()
+$siteInventoryLimit = 1000
+$siteInventoryCache = @{}
+$siteDetailCache = @{}
+$siteDetailReads = 0
+$siteDetailDeadline = $now.AddMinutes(14)
+# Microsoft documents these fields as unpopulated/default-valued with Get-SPOSite -Limit or -Filter.
+$siteDetailFields = @(
+    "AllowDownloadingNonWebViewableFiles", "AllowEditing", "AllowSelfServiceUpgrade",
+    "AnonymousLinkExpirationInDays", "ConditionalAccessPolicy", "DefaultLinkPermission",
+    "DefaultLinkToExistingAccess", "DefaultSharingLinkType", "DenyAddAndCustomizePages",
+    "DisableCompanyWideSharingLinks", "ExternalUserExpirationInDays", "InformationSegment",
+    "LimitedAccessFileType", "OverrideTenantAnonymousLinkExpirationPolicy",
+    "OverrideTenantExternalUserExpirationPolicy", "PWAEnabled", "SandboxedCodeActivationCapability",
+    "SensitivityLabel", "SharingAllowedDomainList", "SharingBlockedDomainList", "SharingCapability",
+    "SharingDomainRestrictionMode"
+)
 $failureCode = "INPUT_INVALID"
 $failureMessage = "Provide TenantId, WorkspacePath, and CollectionChallenge."
 $appMode = -not [string]::IsNullOrWhiteSpace($OutputPath)
@@ -174,8 +194,12 @@ function Get-CommandBoundary {
             $boundary.note = "ResultSize Unlimited requested; module-managed paging within the connected account's visible scope."
         }
         "Get-SPOSite" {
-            $boundary.pagination = "module-managed"
-            $boundary.note = "Limit All requested for the connected admin endpoint only; other geographies and deleted sites are not enumerated."
+            $boundary.pagination = "bounded-inventory-with-cached-identity-details"
+            $boundary.inventoryLimit = $siteInventoryLimit
+            $boundary.maxSiteDetails = $MaxSiteDetails
+            $boundary.detailSelection = "First distinct approved site URLs in service-returned inventory order; the budget is shared across all three query keys."
+            $boundary.detailDeadlineAt = $siteDetailDeadline.ToString("o")
+            $boundary.note = "At most 1000 inventory rows per scope; at most MaxSiteDetails distinct identity reads across this process. List defaults are not configuration evidence. Other geographies and deleted sites are excluded."
         }
         "Get-MessageTraceV2" {
             $boundary.pagination = "single-query-no-continuation"
@@ -210,6 +234,186 @@ function Get-CommandBoundary {
     return $boundary
 }
 
+function Get-SafeWarningSummary {
+    param([string]$Command, [int]$Count, [string]$Source = "command")
+    if ($Count -eq 0) { return }
+    $code = switch ($Command) {
+        "Get-SPOSite" { "SPO_SITE_QUERY_WARNING" }
+        "Get-SPODataAccessGovernanceInsight" { "SPO_REPORT_QUERY_WARNING" }
+        "Get-LabelPolicy" { "PURVIEW_LABEL_POLICY_WARNING" }
+        default { "COMMAND_WARNING" }
+    }
+    # No warning text is forwarded. No informational signature has yet been verified safe to promote.
+    [ordered]@{
+        code = $code
+        message = "The source emitted an unclassified warning. Returned rows are observations only; they do not establish configuration or complete coverage."
+        count = $Count
+        sourceCount = 1
+        source = $Source
+        disposition = "observations-only"
+    }
+}
+
+function Get-BoundSiteUrl {
+    param([object]$Value, [bool]$IncludePersonalSite)
+    $text = [string]$Value
+    $uri = $null
+    if ($text.Length -gt 2048 -or $text.Contains('\') -or
+        -not [uri]::TryCreate($text, [UriKind]::Absolute, [ref]$uri)) { return $null }
+    $tenantHost = ([uri]$SharePointAdminUrl).Host -replace '-admin\.sharepoint\.com$', ''
+    $allowedHosts = @("$tenantHost.sharepoint.com")
+    if ($IncludePersonalSite) { $allowedHosts += "$tenantHost-my.sharepoint.com" }
+    if ($uri.Scheme -ne "https" -or $uri.Port -ne 443 -or $uri.UserInfo -or $uri.Query -or
+        $uri.Fragment -or $uri.Host -notin $allowedHosts) { return $null }
+    return $uri.AbsoluteUri.TrimEnd('/')
+}
+
+function ConvertTo-SiteInventoryObservation {
+    param([object]$Row, [string]$Url)
+    # Only identity/inventory fields survive an unhydrated or warning-bearing site read.
+    $projected = [ordered]@{ Url = $Url }
+    foreach ($name in @("Title", "Template")) {
+        if ($Row.PSObject.Properties[$name]) { $projected[$name] = $Row.$name }
+    }
+    [pscustomobject]$projected
+}
+
+function Invoke-BoundedSpoRead {
+    param([hashtable]$Parameters, [string]$Source)
+    try {
+        $returned = @(Get-SPOSite @Parameters -ErrorAction Stop 3>&1 4>$null 5>$null 6>$null)
+        $warningRecords = @($returned | Where-Object { $_ -is [System.Management.Automation.WarningRecord] })
+        [pscustomobject]@{
+            rows = @($returned | Where-Object { $_ -isnot [System.Management.Automation.WarningRecord] })
+            warnings = @(Get-SafeWarningSummary -Command "Get-SPOSite" -Count $warningRecords.Count -Source $Source)
+            error = $null
+        }
+    } catch {
+        [pscustomobject]@{
+            rows = @()
+            warnings = @()
+            error = Get-SafeCollectorDiagnostic -Record $_ -DefaultCode "COMMAND_FAILED" `
+                -DefaultMessage "The site read failed; its underlying cause is unavailable."
+        }
+    }
+}
+
+function Get-BoundedSpoSiteEvidence {
+    param([bool]$IncludePersonalSite = $false)
+    $cacheKey = if ($IncludePersonalSite) { "including-personal" } else { "standard" }
+    $newInventoryRead = -not $siteInventoryCache.ContainsKey($cacheKey)
+    $inventoryReadCount = 0
+    if ($newInventoryRead) {
+        if ((Get-Date).ToUniversalTime() -ge $siteDetailDeadline) {
+            $siteInventoryCache[$cacheKey] = [pscustomobject]@{
+                rows = @(); warnings = @()
+                error = @{ code = "SITE_COLLECTION_DEADLINE"; message = "The site acquisition deadline was reached before this inventory scope could be read." }
+            }
+        } else {
+            $inventoryReadCount = 1
+            $siteInventoryCache[$cacheKey] = Invoke-BoundedSpoRead `
+                -Parameters @{ Limit = [string]$siteInventoryLimit; IncludePersonalSite = $IncludePersonalSite } -Source "inventory"
+        }
+    }
+    $inventory = $siteInventoryCache[$cacheKey]
+    $rows = [System.Collections.Generic.List[object]]::new()
+    $safeWarnings = [System.Collections.Generic.List[object]]::new()
+    foreach ($warning in $inventory.warnings) { $safeWarnings.Add($warning) }
+    $gaps = [System.Collections.Generic.List[object]]::new()
+    if ($inventory.error) { $gaps.Add($inventory.error) }
+    if ($inventory.rows.Count -ge $siteInventoryLimit) {
+        $gaps.Add(@{ code = "SITE_INVENTORY_LIMIT"; message = "The bounded site inventory reached its row limit; tenant-wide coverage has not been established." })
+    }
+    $hydrated = 0
+    $unhydrated = 0
+    $invalidIdentities = 0
+    $detailReadsBefore = $script:siteDetailReads
+    $cacheHits = 0
+    $budgetSkipped = 0
+    $deadlineSkipped = 0
+    $seen = @{}
+    foreach ($site in @($inventory.rows | Select-Object -First $siteInventoryLimit)) {
+        $url = Get-BoundSiteUrl -Value $site.Url -IncludePersonalSite $IncludePersonalSite
+        if (-not $url) {
+            $invalidIdentities++
+            continue
+        }
+        if ($seen.ContainsKey($url)) { continue }
+        $seen[$url] = $true
+        if ($siteDetailCache.ContainsKey($url)) {
+            $cacheHits++
+        } elseif ($script:siteDetailReads -lt $MaxSiteDetails -and
+            (Get-Date).ToUniversalTime() -lt $siteDetailDeadline) {
+            $script:siteDetailReads++
+            # Identity reads must never include Limit, Filter, or the deprecated Detailed switch.
+            $siteDetailCache[$url] = Invoke-BoundedSpoRead -Parameters @{ Identity = $url } -Source "identity"
+        } else {
+            if ($script:siteDetailReads -ge $MaxSiteDetails) { $budgetSkipped++ }
+            else { $deadlineSkipped++ }
+        }
+        $detail = if ($siteDetailCache.ContainsKey($url)) { $siteDetailCache[$url] } else { $null }
+        $validDetail = $false
+        if ($null -ne $detail) {
+            foreach ($warning in $detail.warnings) { $safeWarnings.Add($warning) }
+            if ($detail.error) {
+                $gaps.Add($detail.error)
+            } elseif ($detail.rows.Count -ne 1 -or
+                (Get-BoundSiteUrl -Value $detail.rows[0].Url -IncludePersonalSite $IncludePersonalSite) -ne $url) {
+                $gaps.Add(@{ code = "SITE_IDENTITY_MISMATCH"; message = "A detail result did not match the requested site identity within the approved SharePoint target. That detail result was rejected." })
+            } elseif ($detail.warnings.Count -eq 0) {
+                $missing = @($siteDetailFields | Where-Object { -not $detail.rows[0].PSObject.Properties[$_] })
+                if ($missing.Count -eq 0) { $validDetail = $true }
+                else { $gaps.Add(@{ code = "SITE_DETAIL_FIELDS_UNAVAILABLE"; message = "The identity read did not expose all required site configuration fields. Missing fields are not interpreted as default settings." }) }
+            }
+        }
+        if ($validDetail) {
+            $hydrated++
+            $rows.Add($detail.rows[0])
+        } else {
+            $unhydrated++
+            $rows.Add((ConvertTo-SiteInventoryObservation -Row $site -Url $url))
+        }
+    }
+    if ($invalidIdentities -gt 0) {
+        $gaps.Add(@{ code = "SITE_IDENTITY_UNBOUND"; message = "Inventory included site identities outside the approved SharePoint target or with an invalid URL. No detail reads were issued for those identities." })
+    }
+    if ($budgetSkipped -gt 0 -or $deadlineSkipped -gt 0) {
+        $gaps.Add(@{ code = "SITE_DETAIL_LIMIT"; message = "The process-wide site detail budget or deadline was reached. Remaining inventory rows are observations, not site configuration evidence." })
+    }
+    $uniqueGaps = [ordered]@{}
+    foreach ($gap in $gaps) {
+        if (-not $uniqueGaps.Contains($gap.code)) { $uniqueGaps[$gap.code] = $gap }
+    }
+    $warningCount = 0
+    foreach ($warning in $safeWarnings) { $warningCount += $warning.count }
+    $completeWithinQuery = $gaps.Count -eq 0 -and $warningCount -eq 0 -and $unhydrated -eq 0
+    [pscustomobject]@{
+        rows = @($rows.ToArray())
+        warnings = @($safeWarnings.ToArray())
+        gaps = @($uniqueGaps.Values)
+        accepted = $completeWithinQuery
+        metadata = [ordered]@{
+            inventoryRowCount = [Math]::Min($inventory.rows.Count, $siteInventoryLimit)
+            inventoryReadCount = $inventoryReadCount
+            detailReadCount = $script:siteDetailReads - $detailReadsBefore
+            detailCacheHitCount = $cacheHits
+            detailBudgetSkippedCount = $budgetSkipped
+            detailDeadlineSkippedCount = $deadlineSkipped
+            hydratedRowCount = $hydrated
+            unhydratedRowCount = $unhydrated
+            rejectedIdentityCount = $invalidIdentities
+            includePersonalSite = $IncludePersonalSite
+            fieldAvailability = [ordered]@{
+                mode = if ($completeWithinQuery) { "identity-details" } else { "observations-only" }
+                inventoryFields = @("Url", "Title", "Template")
+                identityDetailRequiredFields = $siteDetailFields
+                notCollected = @(if ($unhydrated -gt 0 -or $invalidIdentities -gt 0) { $siteDetailFields })
+                note = "Listed configuration fields require identity reads. Inventory defaults are removed; observations must not be used as configuration evidence even if some identity reads succeeded."
+            }
+        }
+    }
+}
+
 function Add-Evidence {
     param(
         [Parameter(Mandatory = $true)][string]$Service,
@@ -230,14 +434,48 @@ function Add-Evidence {
         command = $Command
         service = $Service
         status = "failed"
+        acquisitionStatus = "failed"
         code = $null
         rowCount = 0
+        acceptedRowCount = 0
+        observationRowCount = 0
         warningCount = 0
+        warningSourceCount = 0
+        warnings = @()
+        gaps = @()
         startedAt = $started.ToString("o")
         completedAt = $null
         boundary = $boundary
     }
+    $commandFailureCode = "COMMAND_FAILED"
+    $commandFailureMessage = "The command failed; the underlying cause is unavailable. No result was accepted."
+    $closeAuditConnection = $false
     try {
+        if ($Service -eq "purview" -and $Command -eq "Search-UnifiedAuditLog") {
+            $result.connectionService = "exchangeOnline"
+            Write-Host "Purview audit data uses Exchange Online authentication"
+            $commandFailureCode = "AUDIT_SESSION_NOT_ISOLATED"
+            $commandFailureMessage = "The supplemental audit session could not be isolated from an existing workload connection. Audit evidence was not read."
+            if (@(Get-ConnectionInformation -ErrorAction Stop).Count -ne 0) { throw "AUDIT_SESSION_NOT_ISOLATED" }
+            $commandFailureCode = "SIGN_IN_FAILED"
+            $commandFailureMessage = "The supplemental Exchange Online connection for Purview audit data could not be established; the underlying cause is unavailable."
+            $closeAuditConnection = $true
+            Connect-ExchangeOnline -ShowBanner:$false -DisableWAM -ErrorAction Stop *> $null
+            try {
+                $auditConnection = Assert-Connection -Service "exchangeOnline" -PassThru
+            } catch {
+                $commandFailureCode = $script:failureCode
+                $commandFailureMessage = $script:failureMessage
+                throw
+            }
+            $commandFailureCode = "ACTOR_MISMATCH"
+            $commandFailureMessage = "The supplemental audit connection uses a different account from the verified Purview connection. Audit evidence was not read."
+            if ($auditConnection.actorId -ne $connections["purview"].actorId) { throw "ACTOR_MISMATCH" }
+            $auditConnection.connectionService = "exchangeOnline"
+            $connections["purview"].auditConnection = $auditConnection
+            $commandFailureCode = "COMMAND_FAILED"
+            $commandFailureMessage = "The audit command failed in the verified Exchange Online session; the underlying cause is unavailable. No result was accepted."
+        }
         if (-not (Get-Command -Name $Command -CommandType Cmdlet,Function -ErrorAction SilentlyContinue)) {
             if ($Service -eq "exchangeOnline" -and $Command -eq "Get-HybridConfiguration") {
                 $errors[$key] = @{
@@ -249,32 +487,71 @@ function Add-Evidence {
             }
             return
         }
-        # Capture warnings without logging potentially sensitive service text. Any warning is conservative failure.
+        # Unknown warnings are preserved as safe classifications, never silently promoted to accepted evidence.
         $returned = @(& $Operation 3>&1 4>$null 5>$null 6>$null)
         $warnings = @($returned | Where-Object { $_ -is [System.Management.Automation.WarningRecord] })
         $value = @($returned | Where-Object { $_ -isnot [System.Management.Automation.WarningRecord] })
+        $siteResult = $null
+        if ($Command -eq "Get-SPOSite") {
+            $siteResult = $value[0]
+            $value = @($siteResult.rows)
+            $result.warnings = @($siteResult.warnings)
+            $result.gaps = @($siteResult.gaps)
+            $result.siteDetails = $siteResult.metadata
+        } else {
+            $result.warnings = @(Get-SafeWarningSummary -Command $Command -Count $warnings.Count)
+        }
         $result.rowCount = $value.Count
-        $result.warningCount = $warnings.Count
-        if ($warnings.Count -gt 0) {
-            $errors[$key] = @{ code = "COMMAND_WARNING"; message = "The service returned warnings; these results are withheld because completeness is uncertain." }
+        foreach ($warning in $result.warnings) {
+            $result.warningCount += $warning.count
+            $result.warningSourceCount += $warning.sourceCount
+        }
+        if ($result.warningCount -gt 0 -or ($null -ne $siteResult -and -not $siteResult.accepted)) {
+            if ($result.warningCount -gt 0) { $result.acquisitionStatus = "partial" }
+            if ($value.Count -gt 0) { $observations[$key] = $value }
+            $errors[$key] = if ($result.gaps.Count -gt 0) { $result.gaps[0] } else {
+                @{ code = "COMMAND_WARNING"; message = "The source returned warnings. Available rows are retained as observations only; configuration and complete coverage remain unresolved." }
+            }
             return
         }
         if ($null -ne $boundary.resultLimit -and $value.Count -ge $boundary.resultLimit) {
+            $observations[$key] = $value
             $errors[$key] = @{ code = "RESULT_LIMIT_REACHED"; message = "The bounded query reached its result limit. Truncated results are not accepted as complete evidence." }
             return
         }
         $evidence[$key] = $value
         $result.status = "succeeded"
+        $result.acceptedRowCount = $value.Count
+        $result.acquisitionStatus = "collected"
     }
     catch {
-        $errors[$key] = Get-SafeCollectorDiagnostic -Record $_ -DefaultCode "COMMAND_FAILED" `
-            -DefaultMessage "The command failed; the underlying cause is unavailable. No result was accepted."
+        $errors[$key] = Get-SafeCollectorDiagnostic -Record $_ -DefaultCode $commandFailureCode `
+            -DefaultMessage $commandFailureMessage
     }
     finally {
-        if ($errors.Contains($key)) { $result.code = $errors[$key].code }
+        if ($closeAuditConnection) { Close-CollectorConnection -Service "purview" }
+        if ($errors.Contains($key)) {
+            $result.code = $errors[$key].code
+            if ($observations.Contains($key)) {
+                $result.observationRowCount = @($observations[$key]).Count
+                $result.acquisitionStatus = "partial"
+            } elseif ($result.code -in @("COMMAND_UNAVAILABLE", "ON_PREMISES_SOURCE_UNAVAILABLE", "FEATURE_UNSUPPORTED", "FEATURE_NOT_LICENSED")) {
+                $result.acquisitionStatus = "unavailable"
+            }
+        }
         $result.completedAt = (Get-Date).ToUniversalTime().ToString("o")
         $commandResults[$key] = $result
     }
+}
+
+function Get-AcquisitionRowCounts {
+    $accepted = 0
+    $observed = 0
+    foreach ($entry in $commandResults.Values) {
+        $accepted += $entry.acceptedRowCount
+        $observed += $entry.observationRowCount
+    }
+    return @{ accepted = $accepted; observed = $observed }
 }
 
 function Import-CollectorModule {
@@ -350,7 +627,7 @@ function Import-CollectorModule {
 }
 
 function Assert-Connection {
-    param([string]$Service)
+    param([string]$Service, [switch]$PassThru)
     $script:failureCode = "CONNECTION_IDENTITY_UNVERIFIED"
     $script:failureMessage = "The connected workload tenant and actor could not be verified."
     $active = @(Get-ConnectionInformation -ErrorAction Stop)
@@ -373,7 +650,7 @@ function Assert-Connection {
         throw "TENANT_MISMATCH"
     }
     # Only selected supported connection properties are persisted, never tokens or the entire connection object.
-    $connections[$Service] = [ordered]@{
+    $verifiedConnection = [ordered]@{
         basis = "Get-ConnectionInformation"
         expectedTenantId = $TenantId
         observedTenantId = $observedTenant.ToString()
@@ -382,6 +659,8 @@ function Assert-Connection {
         connectionId = [string]$connection.ConnectionId
         tenantVerified = $true
     }
+    if ($PassThru) { return $verifiedConnection }
+    $connections[$Service] = $verifiedConnection
 }
 
 function Close-CollectorConnection {
@@ -506,13 +785,13 @@ if ($Workloads -contains "sharePointOnline") {
         Get-SPOTenantRestrictedSearchAllowedList -ErrorAction Stop
     }
     Add-Evidence sharePointOnline Get-SPOSite {
-        Get-SPOSite -Limit All -Detailed -ErrorAction Stop
+        Get-BoundedSpoSiteEvidence
     } restrictedContent
     Add-Evidence sharePointOnline Get-SPOSite {
-        Get-SPOSite -Limit All -Detailed -ErrorAction Stop
+        Get-BoundedSpoSiteEvidence
     } siteLifecycle
     Add-Evidence sharePointOnline Get-SPOSite {
-        Get-SPOSite -IncludePersonalSite $true -Limit All -Detailed -ErrorAction Stop
+        Get-BoundedSpoSiteEvidence -IncludePersonalSite $true
     } oneDriveOverrides
     }
     finally {
@@ -537,10 +816,6 @@ if ($Workloads -contains "purview") {
         Add-Evidence purview Get-DlpCompliancePolicy { Get-DlpCompliancePolicy -ErrorAction Stop }
         Add-Evidence purview Get-DlpComplianceRule { Get-DlpComplianceRule -ErrorAction Stop }
         Add-Evidence purview Get-AdminAuditLogConfig { Get-AdminAuditLogConfig -ErrorAction Stop }
-        Add-Evidence purview Search-UnifiedAuditLog {
-            Search-UnifiedAuditLog -StartDate $now.AddDays(-1) -EndDate $now `
-                -RecordType CopilotInteraction -ResultSize 5000 -ErrorAction Stop
-        }
         Add-Evidence purview Get-RetentionCompliancePolicy {
             Get-RetentionCompliancePolicy -ErrorAction Stop
         }
@@ -555,29 +830,44 @@ if ($Workloads -contains "purview") {
     finally {
         Close-CollectorConnection "purview"
     }
+    Add-Evidence purview Search-UnifiedAuditLog {
+        Search-UnifiedAuditLog -StartDate $now.AddDays(-1) -EndDate $now `
+            -RecordType CopilotInteraction -ResultSize 5000 -ErrorAction Stop
+    }
 }
 
 $failedWorkloads = @()
 foreach ($workload in $Workloads) {
     $results = @($commandResults.Values | Where-Object { $_.service -eq $workload })
     $succeeded = @($results | Where-Object { $_.status -eq "succeeded" }).Count
+    $partial = @($results | Where-Object { $_.acquisitionStatus -eq "partial" }).Count
+    $acceptedRows = 0
+    $observedRows = 0
+    foreach ($result in $results) {
+        $acceptedRows += $result.acceptedRowCount
+        $observedRows += $result.observationRowCount
+    }
     $workloadResults[$workload] = [ordered]@{
-        status = if ($succeeded -eq $results.Count) { "succeeded" } elseif ($succeeded -gt 0) { "partial" } else { "failed" }
+        status = if ($succeeded -eq $results.Count) { "succeeded" } elseif ($succeeded -gt 0 -or $observedRows -gt 0) { "partial" } else { "failed" }
         attemptedCommandCount = $results.Count
         succeededCommandCount = $succeeded
         failedCommandCount = $results.Count - $succeeded
+        partialCommandCount = $partial
+        acceptedRowCount = $acceptedRows
+        observationRowCount = $observedRows
         coverageComplete = $false
     }
-    if ($succeeded -eq 0) {
+    if ($succeeded -eq 0 -and $observedRows -eq 0) {
         $failedWorkloads += $workload
     }
 }
 if ($failedWorkloads.Count -gt 0) {
     $failureCode = "WORKLOAD_COLLECTION_FAILED"
-    $failureMessage = "One or more workloads returned no successful evidence commands. No package was written."
+    $failureMessage = "One or more workloads returned neither accepted evidence nor observational rows. No package was written."
     throw "WORKLOAD_COLLECTION_FAILED"
 }
 $actors = @($connections.Values | ForEach-Object { $_.actorId } | Where-Object { $_ } | Select-Object -Unique)
+$rowCounts = Get-AcquisitionRowCounts
 $document = [ordered]@{
     schema = "ai-flight-deck/admin-evidence"
     version = "1.0.0"
@@ -589,6 +879,7 @@ $document = [ordered]@{
     producedAt = (Get-Date).ToUniversalTime().ToString("o")
     workloads = @($Workloads)
     evidence = $evidence
+    observations = $observations
     errors = $errors
     connections = $connections
     commandResults = $commandResults
@@ -598,6 +889,9 @@ $document = [ordered]@{
         attemptedCommandCount = $commandResults.Count
         succeededCommandCount = $evidence.Count
         failedCommandCount = $errors.Count
+        partialCommandCount = @($commandResults.Values | Where-Object { $_.acquisitionStatus -eq "partial" }).Count
+        acceptedRowCount = $rowCounts.accepted
+        observationRowCount = $rowCounts.observed
         coverageComplete = $false
         excludedWorkloads = @(@("exchangeOnline", "sharePointOnline", "purview") | Where-Object { $_ -notin $Workloads })
         modules = $moduleVersions
@@ -627,6 +921,7 @@ try {
 Write-Host "Administrator evidence collection finished."
 if (-not $appMode) { Write-Host "Administrator evidence package created: $OutputPath" }
 } catch {
+    $rowCounts = Get-AcquisitionRowCounts
     $diagnostic = Get-SafeCollectorDiagnostic -Record $_ -DefaultCode $failureCode -DefaultMessage $failureMessage
     $issues = @($errors.Keys | Select-Object -First 31 | ForEach-Object {
         [ordered]@{ resource = $_; code = $errors[$_].code; message = $errors[$_].message }
@@ -636,10 +931,15 @@ if (-not $appMode) { Write-Host "Administrator evidence package created: $Output
         $outcome = $commandResults[$key]
         $outcomes[$key] = [ordered]@{
             status = $outcome.status
+            acquisitionStatus = $outcome.acquisitionStatus
             code = $outcome.code
             rowCount = $outcome.rowCount
+            acceptedRowCount = $outcome.acceptedRowCount
+            observationRowCount = $outcome.observationRowCount
             warningCount = $outcome.warningCount
+            warnings = $outcome.warnings
         }
+        if ($outcome.Contains("connectionService")) { $outcomes[$key].connectionService = $outcome.connectionService }
     }
     # Fatal diagnostics contain fixed explanations and command outcomes, never evidence rows or identity/token data.
     $diagnostic.stageCode = $failureCode
@@ -650,6 +950,7 @@ if (-not $appMode) { Write-Host "Administrator evidence package created: $Output
         attemptedCommandCount = $commandResults.Count
         succeededCommandCount = $evidence.Count
         failedCommandCount = $errors.Count
+        observationRowCount = $rowCounts.observed
         coverageComplete = $false
     }
     [Console]::Error.WriteLine("AFD_COLLECTOR_ERROR:" + ($diagnostic | ConvertTo-Json -Depth 8 -Compress))

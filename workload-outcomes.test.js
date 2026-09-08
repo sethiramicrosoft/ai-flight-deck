@@ -97,10 +97,46 @@ test("legacy packages retain issues without claiming a recorded acquisition outc
     evidence: { environments: [] }, errors: { environments: { code: "OLD_GAP", message: "Old output." } },
     collection: { resources: { environments: { complete: false, issues: [] } } }
   });
+
   assert.equal(outcome.errors, 1);
   assert.equal(outcome.issues[0].code, "OLD_GAP");
   assert.equal(outcome.resourceCounts[0].acquisitionStatus, "not-recorded");
   assert.match(outcome.message, /not recorded/);
+});
+
+test("administrator warning observations retain row counts without becoming accepted source rows", () => {
+  const key = "sharePointOnline:Get-SPOSite:restrictedContent";
+  const warning = { code: "COMMAND_WARNING", message: "Observed rows have unresolved field availability." };
+  const outcome = summarizeWorkloadEvidence({
+    evidence: {}, observations: { [key]: Array.from({ length: 32 }, (_, index) => ({ id: `site-${index}` })) },
+    errors: { [key]: warning }, commandResults: { [key]: resource("partial", [warning]) }
+  });
+  assert.equal(outcome.status, "collected-with-gaps");
+  assert.equal(outcome.errors, 0);
+  assert.equal(outcome.evidenceGapCount, 1);
+  assert.equal(outcome.acquisitionSummary.partial, 1);
+  assert.deepEqual(outcome.resourceCounts[0], {
+    resource: key, rows: 32, acceptedRows: 0, observationRows: 32, acquisitionStatus: "partial"
+  });
+});
+
+test("administrator producer warning and gap metadata separates query errors from source limits", () => {
+  const warning = { code: "COMMAND_WARNING", message: "Warning-only response." };
+  const denial = { code: "COMMAND_ACCESS_DENIED", message: "Read denied." };
+  const outcome = summarizeWorkloadEvidence({
+    evidence: {}, observations: { site: [{ id: "observed" }] }, errors: { site: warning, failed: denial },
+    commandResults: {
+      site: { acquisitionStatus: "partial", warnings: [{ code: "SPO_SITE_QUERY_WARNING", message: "Site warning." }],
+        gaps: [], boundary: { coverageComplete: false, note: "Bounded sample." } },
+      failed: { acquisitionStatus: "failed", warnings: [], gaps: [denial] },
+      emptyWarning: { acquisitionStatus: "partial", warnings: [warning], gaps: [] }
+    }
+  });
+  assert.deepEqual(outcome.acquisitionSummary, { collected: 0, partial: 2, failed: 1, unavailable: 0 });
+  assert.equal(outcome.errors, 1);
+  assert.deepEqual(outcome.issues, [{ resource: "failed", ...denial }]);
+  assert.equal(outcome.resourceCounts.find(item => item.resource === "site").observationRows, 1);
+  assert.ok(outcome.evidenceGaps.some(item => item.code === "SOURCE_SCOPE_LIMITED"));
 });
 
 test("actual synthetic PowerShell output retains new datasets through Node admission and summarization",

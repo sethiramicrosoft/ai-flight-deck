@@ -137,16 +137,29 @@ function isoTime(value) {
 }
 
 function errorCode(error) {
-  const code = String(error?.code || error?.statusCode || error?.status || "").toUpperCase();
+  const suppliedCode = String(error?.code || "");
+  const code = suppliedCode.toUpperCase();
+  const status = String(error?.statusCode || error?.status || "");
   const message = String(error?.message || error || "").toLowerCase();
-  if (code === "401" || code === "403" || /permission|forbidden|unauthori|role/.test(message)) {
-    return "MISSING_PERMISSION_OR_ROLE";
+  if (code === "COMMAND_NOT_FOUND") return "COMMAND_UNAVAILABLE";
+  if (["COMMAND_ACCESS_DENIED", "PERMISSION_DENIED", "ACCESS_DENIED", "ERRORACCESSDENIED",
+    "AUTHORIZATION_REQUESTDENIED", "FORBIDDEN", "CONSENT_REQUIRED", "ADMIN_CONSENT_REQUIRED",
+    "403", "HTTP_403"].includes(code)) {
+    return suppliedCode;
   }
-  if (code === "402" || /licen[cs]e|subscription|entitle/.test(message)) return "LICENSE_REQUIRED";
-  if (code === "404" || /not found|unsupported api|not available/.test(message)) return "API_UNAVAILABLE";
-  if (/command.*not.*(found|recogn)/.test(message) || code === "COMMAND_NOT_FOUND") {
+  // Preserve structured command failures before HTTP or message fallbacks.
+  if (/^(COMMAND_|ON_PREMISES_)/.test(code) &&
+      /^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(suppliedCode)) return suppliedCode;
+  if (status === "403") {
+    return "HTTP_403";
+  }
+  if (code === "401" || status === "401") return "AUTHENTICATION_REQUIRED";
+  if (code === "402" || status === "402") return "LICENSE_REQUIRED";
+  if (/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(suppliedCode)) return suppliedCode;
+  if (/command.*not.*(found|recogn)/.test(message)) {
     return "COMMAND_UNAVAILABLE";
   }
+  if (code === "404" || status === "404") return "API_UNAVAILABLE";
   return "SOURCE_QUERY_FAILED";
 }
 
@@ -157,7 +170,7 @@ function failure(error, source) {
     source,
     error: {
       code: errorCode(error),
-      message: String(error?.message || error || "The evidence source was unavailable.")
+      message: String(error?.description || error?.message || error || "The evidence source was unavailable.")
     }
   };
 }
@@ -972,13 +985,13 @@ function sharePointPlan() {
     command("dataAccessGovernance", "sharePointOnline", "Get-SPODataAccessGovernanceInsight",
       { ReportEntity: "EveryoneExceptExternalUsersForItems", ReportType: "RecentActivity", Workload: "SharePoint" }),
     command("restrictedContent", "sharePointOnline", "Get-SPOSite",
-      { Limit: "All", Detailed: true }),
+      { Limit: "All" }),
     command("restrictedSearchMode", "sharePointOnline", "Get-SPOTenantRestrictedSearchMode"),
     command("restrictedSearchAllowedList", "sharePointOnline", "Get-SPOTenantRestrictedSearchAllowedList"),
     command("siteLifecycle", "sharePointOnline", "Get-SPOSite",
-      { Limit: "All", Detailed: true }),
+      { Limit: "All" }),
     command("oneDriveOverrides", "sharePointOnline", "Get-SPOSite",
-      { IncludePersonalSite: true, Limit: "All", Detailed: true })
+      { IncludePersonalSite: true, Limit: "All" })
   ];
 }
 

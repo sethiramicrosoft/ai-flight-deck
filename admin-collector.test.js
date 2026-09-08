@@ -31,7 +31,7 @@ function runScenario(scenario, workload = "exchangeOnline", extra = []) {
     assert.ok(diagnosticMarkers.length <= 1, "A failed producer emits one structured diagnostic.");
     const diagnostic = diagnosticMarkers.length ? JSON.parse(diagnosticMarkers[0][1]) : null;
     const bytes = result.files.length === 1 ? fs.readFileSync(path.join(workspace, result.files[0])) : null;
-    if (bytes) assert.doesNotMatch(bytes.toString("utf8"), /SENSITIVE_TEST_VALUE|partial-must-not-survive/);
+    if (bytes) assert.doesNotMatch(bytes.toString("utf8"), /SENSITIVE_TEST_VALUE|partial-must-not-survive|LIST_DEFAULT_MUST_NOT_BE_ACCEPTED/);
     return {
       ...result, stdout: processResult.stdout.slice(0, marker.index),
       diagnostic,
@@ -82,7 +82,7 @@ for (const [workload, count, connect, disconnect] of [
     assert.equal(doc.collection.excludedWorkloads.length, 2);
     assert.ok(Object.values(doc.commandResults).every(result => result.boundary.coverageComplete === false));
     assert.equal(result.calls.filter(call => call.command === connect).length, 1);
-    assert.equal(result.calls.filter(call => call.command === disconnect).length, 1);
+    assert.equal(result.calls.filter(call => call.command === disconnect).length, workload === "purview" ? 2 : 1);
     assert.equal(result.calls.filter(call => call.command === "Install-Module").length, 0);
     assert.doesNotMatch(result.stdout, /Import this package|result\.json/);
     if (workload === "sharePointOnline") {
@@ -92,8 +92,11 @@ for (const [workload, count, connect, disconnect] of [
       assert.equal(doc.connections[workload].adminUrl, "https://synthetic-admin.sharepoint.com");
       assert.equal(result.calls.find(call => call.command === connect).useSystemBrowser, true);
       assert.equal(result.calls.find(call => call.command === "Import-Module").compatibility, result.psEdition === "Core");
-      assert.equal(result.calls.filter(call => call.command === "Get-SPOSite").length, 3);
-      assert.equal(result.calls.find(call => call.command === "Get-SPOSite" && call.includePersonalSite).limit, "All");
+      const siteCalls = result.calls.filter(call => call.command === "Get-SPOSite");
+      assert.equal(siteCalls.filter(call => !call.identity).length, 2);
+      assert.equal(siteCalls.filter(call => call.identity).length, 3);
+      assert.equal(siteCalls.find(call => call.includePersonalSite).limit, "1000");
+      assert.ok(siteCalls.filter(call => call.identity).every(call => !call.limit));
     } else {
       assert.equal(doc.actorId, "synthetic-admin@example.invalid");
       assert.equal(doc.connections[workload].observedTenantId, doc.tenantId);
@@ -117,7 +120,7 @@ test("admin collector combined CLI preserves all keys and actual identities", { 
   assert.equal(Object.keys(result.document.evidence).length, 31);
   assert.equal(result.document.collection.attemptedCommandCount, 31);
   assert.deepEqual(result.document.collection.excludedWorkloads, []);
-  assert.equal(result.calls.filter(call => call.command === "Disconnect-ExchangeOnline").length, 2);
+  assert.equal(result.calls.filter(call => call.command === "Disconnect-ExchangeOnline").length, 3);
 });
 
 for (const scenario of ["tenantMismatch", "missingTenant", "missingActor", "wrongSession", "inactive", "ambiguous", "existingConnection"]) {
@@ -219,7 +222,7 @@ test("all denied SPO reads remain fatal but preserve all seven exact diagnostic 
     assert.equal(diagnostic.commandResults[issue.resource].code, issue.code);
   }
   assert.deepEqual(diagnostic.collection, {
-    attemptedCommandCount: 7, succeededCommandCount: 0, failedCommandCount: 7, coverageComplete: false
+    attemptedCommandCount: 7, succeededCommandCount: 0, failedCommandCount: 7, observationRowCount: 0, coverageComplete: false
   });
   assert.equal(diagnostic.workloadResults.sharePointOnline.status, "failed");
   assert.equal(diagnostic.evidence, undefined);
@@ -251,7 +254,7 @@ test("real synthetic parameter-binding exceptions identify a collector contract 
     assert.equal(result.document.commandResults[resource].code, "COMMAND_PARAMETER_BINDING");
     assert.equal(result.document.evidence[resource], undefined);
   }
-  assert.equal(result.document.evidence["sharePointOnline:Get-SPOSite:siteLifecycle"].length, 1);
+  assert.equal(result.document.evidence["sharePointOnline:Get-SPOSite:siteLifecycle"].length, 2);
   const unsafe = runScenario("unsafeParameterName", "sharePointOnline");
   assert.equal(unsafe.failure, null);
   assert.doesNotMatch(JSON.stringify(unsafe.document), /SENSITIVE_TEST_VALUE/);
@@ -420,4 +423,297 @@ test("admin collector protects existing destinations and retains optional CLI ou
   const invalid = runScenario("success", "exchangeOnline", ["-ExpectedTenant", "------------------------------------"]);
   assert.match(invalid.failure, /^INPUT_INVALID:/);
   assert.equal(invalid.calls.length, 0);
+});
+
+const siteKeys = ["restrictedContent", "siteLifecycle", "oneDriveOverrides"]
+  .map(key => `sharePointOnline:Get-SPOSite:${key}`);
+
+test("bounded site hydration caches inventory and identities without deprecated or default-bearing detail parameters", { skip }, () => {
+  const result = runScenario("success", "sharePointOnline");
+  assert.equal(result.failure, null);
+  const calls = result.calls.filter(call => call.command === "Get-SPOSite");
+  const inventory = calls.filter(call => !call.identity);
+  const details = calls.filter(call => call.identity);
+  assert.equal(inventory.length, 2);
+  assert.ok(inventory.every(call => call.limit === "1000"));
+  assert.equal(details.length, 3);
+  assert.equal(new Set(details.map(call => call.identity)).size, 3);
+  assert.ok(details.every(call => !call.limit && !call.includePersonalSite));
+  assert.doesNotMatch(fs.readFileSync(script, "utf8"), /-Detailed\b/);
+  for (const key of siteKeys) {
+    const outcome = result.document.commandResults[key];
+    assert.equal(outcome.acquisitionStatus, "collected");
+    assert.equal(outcome.observationRowCount, 0);
+    assert.equal(outcome.acceptedRowCount, result.document.evidence[key].length);
+    assert.equal(outcome.boundary.maxSiteDetails, 200);
+    assert.equal(outcome.boundary.inventoryLimit, 1000);
+    assert.equal(outcome.boundary.coverageComplete, false);
+    assert.deepEqual(outcome.siteDetails.fieldAvailability.notCollected, []);
+    assert.ok(result.document.evidence[key].every(row => row.SharingCapability === "HYDRATED_VALUE"));
+  }
+  assert.equal(result.document.commandResults[siteKeys[1]].siteDetails.inventoryReadCount, 0);
+  assert.equal(result.document.commandResults[siteKeys[1]].siteDetails.detailReadCount, 0);
+  assert.equal(result.document.commandResults[siteKeys[2]].siteDetails.detailReadCount, 1);
+});
+
+test("32/32/52 warning-bearing site rows survive only as observations, with 52 unique detail reads", { skip }, () => {
+  const result = runScenario("siteObserved32", "sharePointOnline");
+  assert.equal(result.failure, null);
+  for (const [index, key] of siteKeys.entries()) {
+    const expected = index === 2 ? 52 : 32;
+    assert.equal(result.document.evidence[key], undefined);
+    assert.equal(result.document.observations[key].length, expected);
+    const outcome = result.document.commandResults[key];
+    assert.equal(outcome.acquisitionStatus, "partial");
+    assert.equal(outcome.acceptedRowCount, 0);
+    assert.equal(outcome.observationRowCount, expected);
+    assert.equal(outcome.warningCount, 1);
+    assert.equal(outcome.warningSourceCount, 1);
+    assert.equal(outcome.warnings[0].code, "SPO_SITE_QUERY_WARNING");
+    assert.equal(outcome.warnings[0].disposition, "observations-only");
+    assert.equal(outcome.warnings[0].source, "inventory");
+  }
+  assert.equal(result.calls.filter(call => call.command === "Get-SPOSite" && call.identity).length, 52);
+  assert.equal(result.document.collection.observationRowCount, 116);
+  const outcome = require("./workload-collection").summarizeWorkloadEvidence(result.document);
+  assert.equal(outcome.status, "collected-with-gaps");
+  assert.equal(outcome.errors, 0);
+  assert.equal(outcome.acquisitionSummary.partial, 3);
+  for (const key of siteKeys) {
+    const count = outcome.resourceCounts.find(item => item.resource === key);
+    assert.equal(count.acceptedRows, 0);
+    assert.equal(count.observationRows, result.document.observations[key].length);
+  }
+  assert.equal(result.document.workloadResults.sharePointOnline.status, "partial");
+});
+
+test("all-warning acquisitions create an observations-only partial package, but zero-row warnings remain fatal", { skip }, () => {
+  const result = runScenario("allWarnings", "sharePointOnline");
+  assert.equal(result.failure, null);
+  assert.equal(result.diagnostic, null);
+  assert.deepEqual(result.document.evidence, {});
+  assert.equal(Object.keys(result.document.observations).length, 7);
+  assert.equal(Object.keys(result.document.errors).length, 7);
+  assert.equal(result.document.collection.acceptedRowCount, 0);
+  assert.ok(result.document.collection.observationRowCount > 0);
+  assert.equal(result.document.collection.partialCommandCount, 7);
+  assert.equal(result.document.workloadResults.sharePointOnline.status, "partial");
+  assert.ok(Object.values(result.document.commandResults).every(outcome => outcome.acquisitionStatus === "partial"));
+  assert.equal(result.document.connections.sharePointOnline.targetConnected, true);
+  assert.equal(result.document.connections.sharePointOnline.observedTenantId, null);
+  assert.ok(result.document.observations[siteKeys[0]].every(row => row.SharingCapability === undefined));
+  const empty = runScenario("allWarningsEmpty", "sharePointOnline");
+  assert.match(empty.failure, /^WORKLOAD_COLLECTION_FAILED:/);
+  assert.equal(empty.outputExists, false);
+  assert.equal(empty.diagnostic.collection.observationRowCount, 0);
+  assert.equal(empty.diagnostic.issues.length, 7);
+});
+
+test("site detail caps preserve inventory observations without accepting default-valued fields", { skip }, () => {
+  const result = runScenario("success", "sharePointOnline", ["-MaxSiteDetails", "1"]);
+  assert.equal(result.failure, null);
+  assert.equal(result.calls.filter(call => call.command === "Get-SPOSite" && call.identity).length, 1);
+  for (const key of siteKeys) {
+    const outcome = result.document.commandResults[key];
+    assert.equal(result.document.evidence[key], undefined);
+    assert.equal(outcome.acquisitionStatus, "partial");
+    assert.equal(outcome.code, "SITE_DETAIL_LIMIT");
+    assert.ok(outcome.siteDetails.detailBudgetSkippedCount > 0);
+    assert.ok(outcome.siteDetails.fieldAvailability.notCollected.includes("SharingCapability"));
+    assert.ok(outcome.siteDetails.fieldAvailability.notCollected.includes("ConditionalAccessPolicy"));
+    assert.equal(result.document.observations[key][1].SharingCapability, undefined);
+  }
+  const inventoryOnly = runScenario("success", "sharePointOnline", ["-MaxSiteDetails", "0"]);
+  assert.equal(inventoryOnly.failure, null);
+  assert.equal(inventoryOnly.calls.filter(call => call.command === "Get-SPOSite" && call.identity).length, 0);
+  assert.ok(inventoryOnly.document.observations[siteKeys[0]].every(row => row.SharingCapability === undefined));
+});
+
+test("site deadline preserves acquired inventory but does not start late details or a new inventory scope", { skip }, () => {
+  const result = runScenario("siteDeadline", "sharePointOnline");
+  assert.equal(result.failure, null);
+  const calls = result.calls.filter(call => call.command === "Get-SPOSite");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].identity, "");
+  assert.equal(result.document.observations[siteKeys[0]].length, 2);
+  assert.equal(result.document.commandResults[siteKeys[0]].siteDetails.detailDeadlineSkippedCount, 2);
+  assert.equal(result.document.errors[siteKeys[2]].code, "SITE_COLLECTION_DEADLINE");
+  assert.equal(result.document.commandResults[siteKeys[2]].siteDetails.inventoryReadCount, 0);
+});
+
+for (const [scenario, code] of [
+  ["siteDetailFailure", "COMMAND_ACCESS_DENIED"],
+  ["siteDetailWarning", "COMMAND_WARNING"],
+  ["siteMissingField", "SITE_DETAIL_FIELDS_UNAVAILABLE"],
+  ["siteDetailMismatch", "SITE_IDENTITY_MISMATCH"]
+]) {
+  test(`${scenario} is a configuration evidence gap, with safe observations and no repeated detail reads`, { skip }, () => {
+    const result = runScenario(scenario, "sharePointOnline");
+    assert.equal(result.failure, null);
+    const reads = result.calls.filter(call => call.command === "Get-SPOSite" && call.identity);
+    assert.equal(reads.length, 3);
+    assert.equal(new Set(reads.map(call => call.identity)).size, 3);
+    for (const key of siteKeys) {
+      assert.equal(result.document.evidence[key], undefined);
+      assert.equal(result.document.errors[key].code, code);
+      assert.equal(result.document.commandResults[key].acquisitionStatus, "partial");
+      assert.ok(result.document.observations[key].length > 0);
+    }
+    assert.doesNotMatch(JSON.stringify(result.document), /other\.sharepoint\.com/);
+  });
+}
+
+test("foreign inventory identities are never followed or accepted", { skip }, () => {
+  const result = runScenario("siteForeignInventory", "sharePointOnline");
+  assert.equal(result.failure, null);
+  const details = result.calls.filter(call => call.command === "Get-SPOSite" && call.identity);
+  assert.equal(details.length, 1);
+  assert.ok(details.every(call => call.identity.startsWith("https://synthetic-my.sharepoint.com/")));
+  assert.equal(result.document.errors[siteKeys[0]].code, "SITE_IDENTITY_UNBOUND");
+  assert.equal(result.document.evidence[siteKeys[0]], undefined);
+  assert.doesNotMatch(JSON.stringify(result.document), /other\.sharepoint\.com/);
+});
+
+test("inventory at the 1000-row cap cannot become accepted configuration evidence", { skip }, () => {
+  const result = runScenario("siteInventoryCap", "sharePointOnline", ["-MaxSiteDetails", "1"]);
+  assert.equal(result.failure, null);
+  assert.equal(result.calls.filter(call => call.command === "Get-SPOSite" && call.identity).length, 1);
+  for (const key of siteKeys) {
+    assert.equal(result.document.errors[key].code, "SITE_INVENTORY_LIMIT");
+    assert.equal(result.document.evidence[key], undefined);
+    assert.equal(result.document.observations[key].length, 1000);
+    assert.equal(result.document.commandResults[key].acceptedRowCount, 0);
+  }
+});
+
+test("source-specific report and label warnings do not imply missing roles or successful empty configuration", { skip }, () => {
+  const report = runScenario("reportWarningEmpty", "sharePointOnline");
+  assert.equal(report.failure, null);
+  for (const key of ["siteAccessReport", "dataAccessGovernance"]) {
+    const resource = `sharePointOnline:Get-SPODataAccessGovernanceInsight:${key}`;
+    assert.equal(report.document.evidence[resource], undefined);
+    assert.equal(report.document.commandResults[resource].observationRowCount, 0);
+    assert.equal(report.document.commandResults[resource].warnings[0].code, "SPO_REPORT_QUERY_WARNING");
+  }
+  const label = runScenario("labelPolicyWarning", "purview");
+  assert.equal(label.failure, null);
+  const key = "purview:Get-LabelPolicy";
+  assert.equal(label.document.evidence[key], undefined);
+  assert.equal(label.document.observations[key].length, 1);
+  assert.equal(label.document.commandResults[key].warnings[0].code, "PURVIEW_LABEL_POLICY_WARNING");
+  assert.equal(label.document.commandResults[key].acquisitionStatus, "partial");
+});
+
+test("SPO inventory and identity parameter sets match installed SDK metadata without tenant invocation", {
+  skip: process.platform !== "win32", timeout: 60000
+}, t => {
+  const windowsPowerShell = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const verification = `
+    $ErrorActionPreference = 'Stop'
+    if (-not (Get-Module -ListAvailable Microsoft.Online.SharePoint.PowerShell)) {
+      Write-Output 'SPO_METADATA_ABSENT'; exit 0
+    }
+    Import-Module Microsoft.Online.SharePoint.PowerShell -WarningAction SilentlyContinue
+    $command = Get-Command Get-SPOSite
+    foreach ($arguments in @(
+      @{Limit='1000'; IncludePersonalSite=$false},
+      @{Limit='1000'; IncludePersonalSite=$true},
+      @{Identity='https://synthetic.sharepoint.com/sites/s1'}
+    )) {
+      foreach ($name in $arguments.Keys) {
+        if (-not $command.Parameters.ContainsKey($name)) { throw 'Unsupported site parameter.' }
+        $null = [Management.Automation.LanguagePrimitives]::ConvertTo($arguments[$name], $command.Parameters[$name].ParameterType)
+      }
+      $matching = @($command.ParameterSets | Where-Object {
+        $set=$_
+        @($arguments.Keys | Where-Object { $_ -notin $set.Parameters.Name }).Count -eq 0 -and
+          @($set.Parameters | Where-Object {$_.IsMandatory -and -not $arguments.ContainsKey($_.Name)}).Count -eq 0
+      })
+      if (-not $matching.Count) { throw 'Incompatible site parameter set.' }
+    }
+    Write-Output 'SPO_SITE_CONTRACT_VERIFIED:3'
+  `;
+  const result = spawnSync(windowsPowerShell, ["-NoProfile", "-NonInteractive", "-Command", verification], {
+    env: require("./server").powerShellEnvironment(windowsPowerShell),
+    encoding: "utf8", timeout: 45000
+  });
+  assert.equal(result.status, 0, result.error?.message || result.stdout + result.stderr);
+  if (result.stdout.includes("SPO_METADATA_ABSENT")) { t.skip("Installed SPO module unavailable."); return; }
+  assert.match(result.stdout, /SPO_SITE_CONTRACT_VERIFIED:3/);
+});
+
+test("Purview audit data is acquired only after IPPS disconnect in a tenant- and actor-verified supplemental EXO session", { skip }, () => {
+  const result = runScenario("success", "purview");
+  assert.equal(result.failure, null);
+  assert.match(result.stdout, /Purview audit data uses Exchange Online authentication/);
+  const calls = result.calls;
+  const ippsDisconnect = calls.findIndex(call => call.command === "Disconnect-ExchangeOnline");
+  const supplementalConnect = calls.findIndex(call => call.command === "Connect-ExchangeOnline");
+  const auditRead = calls.findIndex(call => call.command === "Search-UnifiedAuditLog");
+  assert.ok(ippsDisconnect >= 0 && supplementalConnect > ippsDisconnect && auditRead > supplementalConnect);
+  assert.equal(calls[auditRead].connectionService, "exchangeOnline");
+  assert.equal(calls.find(call => call.command === "Get-LabelPolicy").connectionService, "purview");
+  assert.equal(calls.filter(call => call.command === "Disconnect-ExchangeOnline").length, 2);
+  assert.equal(calls.at(-1).command, "Disconnect-ExchangeOnline");
+  const primary = result.document.connections.purview;
+  const supplemental = primary.auditConnection;
+  assert.deepEqual(Object.keys(result.document.connections), ["purview"]);
+  assert.equal(primary.connectionId, "22222222-2222-4222-8222-222222222222");
+  assert.equal(supplemental.connectionId, "44444444-4444-4444-8444-444444444444");
+  assert.equal(supplemental.actorId, primary.actorId);
+  assert.equal(supplemental.observedTenantId, primary.observedTenantId);
+  assert.equal(supplemental.tenantVerified, true);
+  assert.equal(supplemental.connectionService, "exchangeOnline");
+  const auditKey = "purview:Search-UnifiedAuditLog";
+  assert.equal(result.document.commandResults[auditKey].connectionService, "exchangeOnline");
+  assert.equal(result.document.commandResults[auditKey].acquisitionStatus, "collected");
+  assert.equal(result.document.evidence[auditKey].length, 1);
+  const combined = runScenario("success", "all");
+  assert.equal(combined.failure, null);
+  assert.equal(combined.document.connections.exchangeOnline.connectionId, primary.connectionId);
+  assert.equal(combined.document.connections.purview.auditConnection.connectionId, supplemental.connectionId);
+});
+
+for (const [scenario, code, readExpected, verifiedConnectionExpected] of [
+  ["auditSignInFailure", "SIGN_IN_FAILED", false, false],
+  ["auditConditionalAccess", "AUTH_CONDITIONAL_ACCESS", false, false],
+  ["auditTenantMismatch", "TENANT_MISMATCH", false, false],
+  ["auditActorMismatch", "ACTOR_MISMATCH", false, false],
+  ["auditWrongSession", "CONNECTION_IDENTITY_UNVERIFIED", false, false],
+  ["auditCommandMissing", "COMMAND_UNAVAILABLE", false, true],
+  ["auditReadFailure", "COMMAND_ACCESS_DENIED", true, true]
+]) {
+  test(`${scenario} affects only the logical Purview audit key and retains policy evidence`, { skip }, () => {
+    const result = runScenario(scenario, "purview");
+    assert.equal(result.failure, null);
+    assert.equal(result.diagnostic, null);
+    const key = "purview:Search-UnifiedAuditLog";
+    assert.equal(result.document.evidence[key], undefined);
+    assert.deepEqual(Object.keys(result.document.errors), [key]);
+    assert.equal(result.document.errors[key].code, code);
+    assert.equal(Object.keys(result.document.evidence).length, 12);
+    assert.equal(result.document.workloadResults.purview.status, "partial");
+    assert.equal(result.document.commandResults[key].connectionService, "exchangeOnline");
+    assert.equal(result.calls.some(call => call.command === "Search-UnifiedAuditLog"), readExpected);
+    assert.equal(result.calls.filter(call => call.command === "Disconnect-ExchangeOnline").length, 2);
+    assert.equal(!!result.document.connections.purview.auditConnection, verifiedConnectionExpected);
+    assert.equal(result.document.connections.exchangeOnline, undefined);
+    assert.equal(result.document.actorId, "synthetic-admin@example.invalid");
+    assert.doesNotMatch(JSON.stringify(result.document), /other-admin@example\.invalid/);
+  });
+}
+
+test("supplemental audit failure preserves policy observations; audit warnings cannot become accepted evidence", { skip }, () => {
+  const policyWarning = runScenario("auditFailureWithPolicyWarning", "purview");
+  assert.equal(policyWarning.failure, null);
+  assert.equal(policyWarning.document.observations["purview:Get-LabelPolicy"].length, 1);
+  assert.equal(policyWarning.document.evidence["purview:Get-LabelPolicy"], undefined);
+  assert.equal(Object.keys(policyWarning.document.evidence).length, 11);
+  assert.equal(policyWarning.document.errors["purview:Search-UnifiedAuditLog"].code, "SIGN_IN_FAILED");
+  const auditWarning = runScenario("auditWarning", "purview");
+  assert.equal(auditWarning.failure, null);
+  assert.equal(auditWarning.document.observations["purview:Search-UnifiedAuditLog"].length, 1);
+  assert.equal(auditWarning.document.evidence["purview:Search-UnifiedAuditLog"], undefined);
+  assert.equal(auditWarning.document.commandResults["purview:Search-UnifiedAuditLog"].acquisitionStatus, "partial");
+  assert.equal(Object.keys(auditWarning.document.evidence).length, 12);
 });

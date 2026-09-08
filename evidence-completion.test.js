@@ -25,8 +25,12 @@ test("evidence completion plan classifies every catalog control and prioritizes 
   assert.equal(plan.topBlockers.length, 5);
   assert.ok(plan.topBlockers.every(control => control.currentMission));
   assert.ok(plan.controls.some(control => control.state === "SignedAttestationRequired"));
-  assert.ok(plan.controls.some(control => control.state === "AdminEvidenceRequired"));
-  assert.ok(plan.controls.some(control => control.state === "PowerPlatformEvidenceRequired"));
+  assert.ok(plan.controls.some(control => control.state === "ObservationValidationRequired"));
+  assert.ok(plan.controls.some(control => control.state === "IntegrationRequired"));
+  assert.equal(plan.controls.length, Object.values(plan.lanes).flat().filter(item => item.controlId).length);
+  assert.deepEqual(plan.lanes.userDecisions.filter(item => item.id).map(item => item.id),
+    ["pilotCohort", "hybridExchange", "webGrounding"]);
+  for (const [lane, entries] of Object.entries(plan.lanes)) assert.equal(plan.laneCounts[lane], entries.length);
 });
 
 test("evidence completion plan uses specific missing permissions before generic adapter states", () => {
@@ -35,7 +39,7 @@ test("evidence completion plan uses specific missing permissions before generic 
   const plan = buildEvidenceCompletionPlan({ catalog, now });
   const planned = plan.controls.find(item => item.controlId === control.id);
   assert.equal(planned.state, "MissingPermission");
-  assert.deepEqual(planned.missingPermissions, control.requiredPermissions);
+  assert.deepEqual(planned.missingPermissions, ["Directory.Read.All", "Organization.Read.All"]);
 });
 
 test("only source-admitted pass or signed bounded applicability evidence is complete", async () => {
@@ -73,7 +77,7 @@ test("only source-admitted pass or signed bounded applicability evidence is comp
 
 test("absent licence inventory is unknown, not evidence of a missing entitlement", () => {
   const control = catalog.domains[0].controls[0];
-  const input = { catalog, now, grantedPermissions: control.requiredPermissions };
+  const input = { catalog, now, grantedPermissions: ["Directory.Read.All", "Organization.Read.All"] };
   const unknown = buildEvidenceCompletionPlan(input).controls.find(item => item.controlId === control.id);
   assert.equal(unknown.state, "LiveCollectionRequired");
   assert.equal(unknown.licenseInventoryStatus, "NotAssessed");
@@ -110,8 +114,151 @@ test("observed errors are not mistaken for entitlement gaps merely because they 
     ]
   });
   const state = id => plan.controls.find(item => item.controlId === id).state;
-  assert.equal(state("AFD-EXO-001"), "AdminEvidenceRequired");
+  assert.equal(state("AFD-EXO-001"), "IntegrationRequired");
   assert.equal(state("AFD-LIC-001"), "MissingLicense");
-  assert.equal(state("AFD-TEAMS-001"), "MissingPermission");
+  assert.equal(state("AFD-TEAMS-001"), "IntegrationRequired");
   assert.equal(state("AFD-COPILOT-003"), "IntegrationRequired");
+});
+
+test("legacy generic permission codes with unavailable command descriptions remain app gaps", () => {
+  const cases = [
+    ["AFD-PURV-004", "Get-AdminAuditLogConfig: COMMAND_UNAVAILABLE; sign in with the correct role."],
+    ["AFD-EXO-002", "Get-HybridConfiguration: ON_PREMISES_SOURCE_UNAVAILABLE; permission required."]
+  ];
+  const plan = buildEvidenceCompletionPlan({
+    catalog, now,
+    controlResults: cases.map(([controlId, description]) => ({
+      controlId, status: "Unknown",
+      limitations: [{ code: "MISSING_PERMISSION_OR_ROLE", description }],
+      authority: { whatWouldChangeDecision: ["PERMISSION_DENIED", description] }
+    }))
+  });
+  for (const [id] of cases) {
+    const item = plan.controls.find(control => control.controlId === id);
+    assert.equal(item.actionLane, "appLimitations");
+    assert.equal(item.stateLabel, "App capability missing");
+    assert.deepEqual(item.missingPermissions, []);
+    assert.match(item.warning, /unclassified/);
+    assert.doesNotMatch(item.nextAction, /grant|rescan|import/i);
+    assert.notEqual(item.effort, "<15 minutes");
+  }
+  assert.ok(plan.lanes.userDecisions.some(item => item.id === "hybridExchange"));
+});
+
+test("structured source codes alone determine denial and capability categories", () => {
+  const makePlan = code => buildEvidenceCompletionPlan({
+    catalog, now,
+    controlResults: [{
+      controlId: "AFD-EXO-001", status: "Unknown",
+      limitations: [{ code, description: "COMMAND_UNAVAILABLE PERMISSION_DENIED LICENSE_REQUIRED" }],
+      authority: { whatWouldChangeDecision: ["CONSENT_REQUIRED"] }
+    }]
+  }).controls.find(item => item.controlId === "AFD-EXO-001");
+  for (const code of ["COMMAND_UNAVAILABLE", "ON_PREMISES_SOURCE_UNAVAILABLE",
+    "COMMAND_WARNING", "COMMAND_FAILED", "COMMAND_PARAMETER_BINDING"]) {
+    assert.equal(makePlan(code).actionLane, "appLimitations");
+  }
+  for (const code of ["HTTP_403", "403", "COMMAND_ACCESS_DENIED", "CONSENT_REQUIRED", "AUTH_CONSENT_REQUIRED",
+    "AUTHORIZATION_REQUESTDENIED"]) {
+    const item = makePlan(code);
+    assert.equal(item.actionLane, "administratorActions");
+    assert.equal(item.state, "MissingPermission");
+    assert.equal(item.status, "Unknown");
+    assert.match(item.appBlockedReason, /No source-observation validation contract/);
+    assert.match(item.nextAction, /Access recovery alone cannot complete/);
+    assert.deepEqual(item.missingPermissions, []);
+  }
+});
+
+test("missing validators and Copilot source paths are app work even with approved local decisions", () => {
+  const ids = ["AFD-EXO-001", "AFD-EXO-002", "AFD-COPILOT-001", "AFD-COPILOT-002"];
+  const controlResults = ids.map(controlId => ({ controlId, cohortId: "pilot", status: "Unknown" }));
+  const cohort = { id: "pilot", approved: true };
+  const before = buildEvidenceCompletionPlan({ catalog, now, cohort, controlResults });
+  const record = value => ({ value, owner: "owner", rationale: "Reviewed scope", recordedAt: now.toISOString() });
+  const after = buildEvidenceCompletionPlan({
+    catalog, now, cohort, controlResults,
+    decisions: { hybridExchange: record("no"), webGrounding: record("restrict") }
+  });
+  assert.deepEqual(after.controls, before.controls);
+  assert.equal(after.lanes.userDecisions.some(item => item.id), false);
+  for (const id of ids) {
+    const item = after.controls.find(control => control.controlId === id);
+    assert.equal(item.status, "Unknown");
+    assert.equal(item.actionLane, "appLimitations");
+    assert.match(item.appBlockedReason, /No source-observation validation contract/);
+  }
+  assert.equal(after.summary.complete, 0);
+  assert.match(after.summary.explanation, /not a confirmed tenant misconfiguration/);
+});
+
+test("only explicit approved cohort and decisive choices remove independent decision tasks", () => {
+  for (const cohort of [null, { id: "pilot" }, { id: "pilot", approved: "true" }]) {
+    const plan = buildEvidenceCompletionPlan({
+      catalog, now, cohort,
+      decisions: { hybridExchange: { value: "unknown" }, webGrounding: { value: "undecided" } }
+    });
+    assert.deepEqual(plan.lanes.userDecisions.filter(item => item.id).map(item => item.id),
+      ["pilotCohort", "hybridExchange", "webGrounding"]);
+    assert.ok(plan.lanes.userDecisions.filter(item => item.id).every(item =>
+      item.title && item.description && item.nextAction && !item.controlId && !item.status));
+  }
+});
+
+test("expired supported source requires recollection without pretending proof remains current", async () => {
+  const f = require("./authority-test-fixtures");
+  const [derived] = await f.licensing();
+  const plan = buildEvidenceCompletionPlan({ catalog, now: new Date("2027-01-01"), controlResults: [derived] });
+  const item = plan.controls.find(control => control.controlId === derived.controlId);
+  assert.equal(item.state, "RecollectionRequired");
+  assert.equal(item.actionLane, "administratorActions");
+  assert.equal(item.status, "Unknown");
+  assert.equal(plan.summary.complete, 0);
+});
+
+test("catalogue permission hints never prescribe app-only or unrelated Graph privileges", () => {
+  const altered = structuredClone(catalog);
+  for (const domain of altered.domains) for (const control of domain.controls) {
+    control.requiredPermissions = ["Invalid.Permission", "Exchange.ManageAsApp", "AuditLog.Read.All"];
+  }
+  const plan = buildEvidenceCompletionPlan({ catalog: altered, now });
+  assert.ok(plan.controls.every(item => !item.missingPermissions.some(permission =>
+    ["Invalid.Permission", "Exchange.ManageAsApp", "AuditLog.Read.All"].includes(permission))));
+  for (const id of ["AFD-PURV-004", "AFD-EXO-002"]) {
+    assert.equal(plan.controls.find(item => item.controlId === id).actionLane, "appLimitations");
+  }
+});
+
+test("unclassified causes warn rather than infer a role from prose", () => {
+  const plan = buildEvidenceCompletionPlan({
+    catalog, now, grantedPermissions: ["Directory.Read.All", "Organization.Read.All"],
+    controlResults: [{
+      controlId: "AFD-LIC-001", status: "Unknown",
+      limitations: [{ code: "SOURCE_QUERY_FAILED", description: "Permission or role might be missing." }]
+    }]
+  });
+  const item = plan.controls.find(control => control.controlId === "AFD-LIC-001");
+  assert.notEqual(item.state, "MissingPermission");
+  assert.match(item.warning, /have not been established/);
+});
+
+test("only admitted outcomes enter Complete and confirmed configuration lanes", async () => {
+  const f = require("./authority-test-fixtures");
+  const current = buildEvidenceCompletionPlan({
+    catalog, now: f.now, controlResults: await f.licensing(), cohort: f.context.cohort
+  });
+  assert.ok(current.lanes.complete.length > 0);
+  assert.equal(current.lanes.configurationActions.length, 0);
+  const source = structuredClone(f.observations);
+  source.skus[0].prepaidUnits.enabled = 1;
+  const failed = buildEvidenceCompletionPlan({
+    catalog, now: f.now, controlResults: await f.licensing({ source }), cohort: f.context.cohort
+  });
+  const action = failed.lanes.configurationActions.find(item => item.controlId === "AFD-LIC-001");
+  assert.equal(action.status, "Fail");
+  assert.equal(action.appBlockedReason, null);
+  const unverified = buildEvidenceCompletionPlan({
+    catalog, now: f.now, controlResults: [{ ...f.base("AFD-EXO-001"), status: "Fail" }]
+  });
+  assert.equal(unverified.lanes.configurationActions.length, 0);
 });

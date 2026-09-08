@@ -30,20 +30,23 @@ does not enable Copilot or silently change tenant configuration.
 
 ### Prioritize incomplete evidence
 
-The Evidence completion center identifies the current rollout mission and the
-five highest-priority unresolved controls. Each blocker shows:
+The Evidence completion center separates **Your decisions**, **Administrator
+actions**, **Configuration actions**, and **App limitations**. Each category
+initially shows at most five items, with more available on demand.
 
-- the control and evidence state;
-- the accountable owner;
-- estimated effort;
-- the missing requirement; and
-- the next action.
+Decisions open the appropriate setup form. Administrator actions require an
+actual collection/access requirement; unsupported commands and unknown errors
+are not automatically permission problems. Missing validation contracts are
+explicit app limitations. Repeated scans or permission grants cannot implement
+those contracts. Select **View control definition** to inspect the boundary.
 
-An unresolved result is therefore presented as a specific missing permission,
-licence, administrator package, Power Platform package, accountable
-attestation, configuration action, owner review, recollection requirement, or
-an explicit evidence-integration/observation-validation gap. Select **View exact
-steps and references** to open that control's detailed instructions.
+The setup forms search live directory users or groups and save an approved
+pilot membership snapshot without a CSV. Hybrid Exchange applicability intent
+and the web-grounding policy choice are recorded locally with an owner and
+rationale. These decisions do not change Microsoft settings, act as signed
+attestations, or clear an Unknown control.
+
+[![Record scoped pilot and policy decisions](screenshots/14-setup-decisions.png)](screenshots/14-setup-decisions.png)
 
 [![Prioritize missing evidence](screenshots/02-setup-evidence-center.png)](screenshots/02-setup-evidence-center.png)
 
@@ -73,6 +76,9 @@ it does not interpret the provisioning-state label as proof of a database.
 Failed administrator workloads also show individual command errors when the
 producer supplied them, even if every read failed and no evidence package was
 accepted. Older saved runs cannot recover diagnostics their collector discarded.
+Warning-bearing administrator rows are retained as observations, separate from
+accepted source rows. Their presence is useful for investigation, not a passed
+configuration check.
 
 The local service rejects stale, malformed, cross-tenant, replayed, or
 unsupported packages before they can affect a control result.
@@ -168,14 +174,20 @@ missing evidence to its control, mission, decision, and correction.
 
 [![Inspect the fixture's evidence-to-decision trace](screenshots/08-assessment-sharing-result.png)](screenshots/08-assessment-sharing-result.png)
 
-### Review evidence-backed findings
+### Review grouped access evidence
 
-Findings expose the concrete evidence behind sharing and access risks. Filter
-the list by severity and move a selected finding into correction planning.
+The default view shows access-pattern groups, not thousands of permission rows.
+**Needs access review** is separate from ordinary **Permission inventory**.
+Inheritance is labelled explicitly; an unknown parent remains unresolved.
+Each group shows its sampled item count, permission count, owner status, reason
+and next action.
 
-This view keeps the technical signal, affected resource or population, and
-expected Copilot exposure outcome together for security, compliance, identity,
-SharePoint, and program owners.
+Browse 25 groups per page and open a group for at most 50 records at a time.
+The primary CSV is a grouped summary; the separate collected-evidence CSV
+retains individual references without repeating the entire evidence list on
+every row. These are sampled observations, not a complete tenant inventory.
+The full bounded artifact still loads locally; UI pagination is not a
+million-file backend.
 
 [![Review evidence-backed findings](screenshots/09-assessment-findings.png)](screenshots/09-assessment-findings.png)
 

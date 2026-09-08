@@ -19,6 +19,7 @@ const { createOperationalDomainCollectors } = require("./collectors/operational-
 const { applyGenericAttestations } = require("./attestation-evidence");
 const { buildEvidenceGraph } = require("./evidence-graph-builder");
 const { captureAttestationEvidence, validateControlResultsAuthority } = require("./evidence-authority");
+const { sameTenant, resolveDirectoryUsers } = require("./setup-decisions");
 
 function buildEstateCollectors({
   rawToken,
@@ -179,17 +180,36 @@ async function listGraphCollection(request, initialUrl, signal, maxPages = 100) 
   return values;
 }
 
-function loadConfiguredCohort(workspace) {
+function loadConfiguredCohort(workspace, tenantId) {
   const filePath = path.join(workspace, "cohort-config.json");
   if (!fs.existsSync(filePath)) return null;
   const cohort = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  if (cohort.tenantId && tenantId && !sameTenant(cohort.tenantId, tenantId)) {
+    throw new Error("The saved cohort belongs to another tenant. Select a new cohort.");
+  }
+  if (cohort.source === "MicrosoftGraphDirectory" && (!cohort.tenantId || !tenantId)) {
+    throw new Error("Directory cohorts require a verified tenant binding.");
+  }
   if (!Array.isArray(cohort.userPrincipalNames) || !cohort.userPrincipalNames.length) {
     throw new Error("The saved cohort does not contain any user principal names.");
   }
   return cohort;
 }
 
-async function resolveConfiguredCohort(request, configuredCohort, signal) {
+async function resolveConfiguredCohort(request, configuredCohort, signal, tenantId) {
+  if (configuredCohort.tenantId && tenantId && !sameTenant(configuredCohort.tenantId, tenantId)) {
+    throw new Error("The configured cohort belongs to another tenant.");
+  }
+  if (configuredCohort.source === "MicrosoftGraphDirectory") {
+    if (!sameTenant(configuredCohort.tenantId, tenantId)) {
+      throw new Error("Directory cohorts require a verified tenant binding.");
+    }
+    const users = await resolveDirectoryUsers(request, configuredCohort.principalIds, signal);
+    return { ...configuredCohort, principalIds: users.map(user => user.id),
+      userPrincipalNames: users.map(user => user.userPrincipalName),
+      population: users.length, resolutionComplete: true,
+      requestedApproved: configuredCohort.approved === true };
+  }
   const directoryUsers = await listGraphCollection(
     request,
     "https://graph.microsoft.com/v1.0/users?$select=id,userPrincipalName,assignedLicenses&$top=999",
@@ -222,7 +242,8 @@ async function collectEstate({
   verifyAttestation,
   verifyEvidencePackage,
   attestationIntegrity,
-  adapters
+  adapters,
+  configuredCohort
 }) {
   const collectorAdapters = adapters || {};
   const request = collectorAdapters.graphRequest || graphRequest(rawToken);
@@ -233,18 +254,19 @@ async function collectEstate({
     verifyEvidencePackage,
     adapters: { ...collectorAdapters, graphRequest: request }
   });
-  const savedCohort = loadConfiguredCohort(workspace);
+  const tenantId = scan.tenant?.tenantId || scan.tenant?.id;
+  const savedCohort = configuredCohort || loadConfiguredCohort(workspace, tenantId);
   const defaultCohort = scan.estateAssessment?.cohorts?.[0] || {
     id: "tenant-wide",
     approved: false,
     principalIds: []
   };
   const cohort = savedCohort
-    ? await resolveConfiguredCohort(request, savedCohort, signal)
+    ? await resolveConfiguredCohort(request, savedCohort, signal, tenantId)
     : await inferLicensedCohort(request, defaultCohort, signal);
   scan.estateAssessment.cohorts = [cohort];
   const context = {
-    tenantId: scan.tenant.tenantId,
+    tenantId,
     actorId: scan.auth.actor.id,
     observedAt: scan.generatedAt,
     cohort,

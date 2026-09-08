@@ -65,6 +65,12 @@ test("all query plans are read-only and run through injected adapters", async ()
   assert.equal(graphCalls.every(call => call.method === "GET"), true);
   assert.equal(commandCalls.every(call => !/set-|new-|remove-|add-|enable-|disable-/i.test(call.command)), true);
   assert.equal(commandCalls.every(call => call.signal), true);
+  assert.equal(commandCalls.length, 31);
+  const spoSites = commandCalls.filter(call => call.command === "Get-SPOSite");
+  assert.equal(spoSites.length, 3);
+  assert.deepEqual(spoSites.map(call => call.parameters), [
+    { Limit: "All" }, { Limit: "All" }, { IncludePersonalSite: true, Limit: "All" }
+  ]);
   const reports = commandCalls.filter(call => call.command === "Get-SPODataAccessGovernanceInsight");
   assert.deepEqual(reports.map(call => ({ key: call.evidenceKey, parameters: call.parameters })), [
     { key: "siteAccessReport",
@@ -349,6 +355,68 @@ test("missing APIs and licences return Unknown with exact limitation codes", asy
   const codes = new Set(run.controlResults.flatMap(item => item.limitations.map(limit => limit.code)));
   assert.equal(codes.has("LICENSE_REQUIRED"), true);
   assert.equal(codes.has("COMMAND_UNAVAILABLE"), true);
+});
+
+test("structured command errors preserve their exact cause without inferring permissions from prose", async () => {
+  const codes = [
+    "ON_PREMISES_SOURCE_UNAVAILABLE", "COMMAND_UNAVAILABLE", "COMMAND_WARNING",
+    "COMMAND_FAILED", "COMMAND_PARAMETER_BINDING", "COMMAND_ACCESS_DENIED",
+    "CONSENT_REQUIRED", "UNCLASSIFIED_SOURCE_ERROR"
+  ];
+  for (const code of codes) {
+    const description = `${code}: Permission or role advice is not proof of an access denial.`;
+    const collector = createExchangeOnlineCollector({
+      adminCommand: async () => { throw Object.assign(new Error(description), { code }); }
+    });
+    const registry = new CollectorRegistry();
+    registry.register(collector);
+    const [run] = await registry.run({ context });
+    const mailbox = run.controlResults.find(item => item.controlId === "AFD-EXO-001");
+    assert.equal(mailbox.status, "Unknown", code);
+    assert.equal(mailbox.limitations[0].code, code);
+    assert.ok(mailbox.limitations[0].description.endsWith(description));
+    assert.equal(mailbox.coverage.complete, false);
+  }
+});
+
+test("actual HTTP denial stays distinct from authentication and unclassified failures", async () => {
+  const cases = [
+    [{ statusCode: 403 }, "HTTP_403"],
+    [{ code: "403" }, "403"],
+    [{ status: 401 }, "AUTHENTICATION_REQUIRED"],
+    [{ code: "Authorization_RequestDenied" }, "Authorization_RequestDenied"],
+    [{ code: "COMMAND_UNAVAILABLE", status: 403 }, "COMMAND_UNAVAILABLE"],
+    [{}, "SOURCE_QUERY_FAILED"]
+  ];
+  for (const [details, expected] of cases) {
+    const collector = createExchangeOnlineCollector({
+      adminCommand: async () => {
+        throw Object.assign(new Error("Command unavailable; check permission, role, or subscription."), details);
+      }
+    });
+    const registry = new CollectorRegistry();
+    registry.register(collector);
+    const [run] = await registry.run({ context });
+    const item = run.controlResults.find(result => result.controlId === "AFD-EXO-001");
+    assert.equal(item.status, "Unknown");
+    assert.equal(item.limitations[0].code, expected);
+  }
+});
+
+test("structured failure descriptions are retained without becoming normalizer observations", async () => {
+  const description = "Get-HybridConfiguration requires the on-premises Exchange source.";
+  const registry = new CollectorRegistry();
+  registry.register(createExchangeOnlineCollector({
+    adminCommand: async () => {
+      throw { code: "ON_PREMISES_SOURCE_UNAVAILABLE", description };
+    }
+  }));
+  const [run] = await registry.run({ context });
+  const item = run.controlResults.find(result => result.controlId === "AFD-EXO-002");
+  assert.equal(item.status, "Unknown");
+  assert.equal(item.coverage.complete, false);
+  assert.equal(item.limitations[0].code, "ON_PREMISES_SOURCE_UNAVAILABLE");
+  assert.ok(item.limitations[0].description.endsWith(description));
 });
 
 test("approved, current applicability evidence can produce NotApplicable", () => {

@@ -84,7 +84,7 @@ async function collectWorkloadEvidence({
     schema: "ai-flight-deck/admin-evidence", version: "1.0.0",
     producerId: "ai-flight-deck/admin-evidence-collector", producerVersion: PRODUCER_VERSIONS.admin,
     collectionChallenge: challenge, tenantId, actorId: null, producedAt: startedAt,
-    workloads: selected.filter(id => id !== "powerPlatform"), evidence: {}, errors: {},
+    workloads: selected.filter(id => id !== "powerPlatform"), evidence: {}, observations: {}, errors: {},
     connections: {}, commandResults: {}, workloadResults: {},
     collectionMetadata: { mode: "app-managed", initiatedBy: actorId, workloads: {} }
   };
@@ -149,11 +149,12 @@ async function collectWorkloadEvidence({
               connection.actorId !== document.actorId) {
             throw new Error("The administration output does not contain a matching authenticated tenant and actor.");
           }
-          if (Object.keys(document.evidence).concat(Object.keys(document.errors))
+          if (Object.keys(document.evidence).concat(Object.keys(document.errors), Object.keys(document.observations || {}))
             .some(key => !key.startsWith(`${entry.id}:`))) {
             throw new Error("The workload returned evidence outside its requested service.");
           }
           Object.assign(admin.evidence, document.evidence);
+          Object.assign(admin.observations, document.observations);
           Object.assign(admin.errors, document.errors);
           Object.assign(admin.connections, document.connections);
           Object.assign(admin.commandResults, document.commandResults);
@@ -211,7 +212,23 @@ async function collectWorkloadEvidence({
 }
 
 function summarizeWorkloadEvidence(document) {
-  const metadata = document.collection?.resources;
+  const commands = document.commandResults;
+  const metadata = document.collection?.resources || (commands && Object.fromEntries(
+    Object.entries(commands).map(([key, record]) => {
+      if (!record || record.acquisitionStatus === undefined || Array.isArray(record.acquisitionErrors)) {
+        return [key, record];
+      }
+      const acquisitionErrors = [];
+      const issues = [...(Array.isArray(record.warnings) ? record.warnings : [])];
+      const isGap = code => /^(SITE_|RESULT_LIMIT_REACHED$|COMMAND_WARNING$|ON_PREMISES_SOURCE_UNAVAILABLE$|COMMAND_UNAVAILABLE$|FEATURE_UNSUPPORTED$|FEATURE_NOT_LICENSED$)/.test(code || "");
+      for (const gap of [...(Array.isArray(record.gaps) ? record.gaps : []), document.errors[key]].filter(Boolean)) {
+        (isGap(gap.code) || record.acquisitionStatus === "unavailable" ? issues : acquisitionErrors).push(gap);
+      }
+      if (record.boundary?.coverageComplete === false) issues.push({
+        code: "SOURCE_SCOPE_LIMITED", message: record.boundary.note || "The query does not establish complete workload coverage."
+      });
+      return [key, { ...record, acquisitionErrors, issues }];
+    })));
   const statuses = new Set(["collected", "partial", "failed", "unavailable"]);
   const detailed = metadata && typeof metadata === "object" && Object.values(metadata).some(record =>
     record && typeof record === "object" &&
@@ -219,9 +236,16 @@ function summarizeWorkloadEvidence(document) {
   const validRecord = record => record && statuses.has(record.acquisitionStatus) &&
     Array.isArray(record.acquisitionErrors) && Array.isArray(record.issues);
   const resourceNames = new Set([...Object.keys(document.evidence), ...Object.keys(document.errors),
+    ...Object.keys(document.observations || {}),
     ...Object.keys(metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata : {})]);
   const resourceCounts = [...resourceNames].map(resource => ({
-    resource, rows: Array.isArray(document.evidence[resource]) ? document.evidence[resource].length : 0,
+    resource, rows: Math.max(
+      Array.isArray(document.evidence[resource]) ? document.evidence[resource].length : 0,
+      Array.isArray(document.observations?.[resource]) ? document.observations[resource].length : 0),
+    ...(document.observations !== undefined ? {
+      acceptedRows: Array.isArray(document.evidence[resource]) ? document.evidence[resource].length : 0,
+      observationRows: Array.isArray(document.observations[resource]) ? document.observations[resource].length : 0
+    } : {}),
     acquisitionStatus: validRecord(metadata?.[resource])
       ? metadata[resource].acquisitionStatus : "not-recorded"
   }));
