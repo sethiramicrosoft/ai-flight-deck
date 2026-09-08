@@ -32,8 +32,133 @@ $failureCode = "INPUT_INVALID"
 $failureMessage = "Provide TenantId, WorkspacePath, and CollectionChallenge."
 $appMode = -not [string]::IsNullOrWhiteSpace($OutputPath)
 
+function Get-SafeCollectorDiagnostic {
+    param(
+        [System.Management.Automation.ErrorRecord]$Record,
+        [string]$DefaultCode,
+        [string]$DefaultMessage
+    )
+    $diagnostic = [ordered]@{ code = $DefaultCode; message = $DefaultMessage }
+    $parameterNames = @("Identity", "ResultSize", "Properties", "StartDate", "EndDate", "RecordType",
+        "ReportType", "ReportEntity", "ReportID", "Workload", "Limit", "Detailed", "IncludePersonalSite",
+        "ShowBanner", "DisableWAM", "Url", "UseSystemBrowser", "ErrorAction")
+    $errorId = ([string]$Record.FullyQualifiedErrorId -split ',', 2)[0]
+    $category = [string]$Record.CategoryInfo.Category
+    $binding = $errorId -in @("NamedParameterNotFound", "ParameterBindingException",
+        "ParameterArgumentValidationError", "ParameterArgumentTransformationError",
+        "MissingMandatoryParameter", "AmbiguousParameterSet", "PositionalParameterNotFound")
+    $unavailable = $errorId -eq "CommandNotFoundException"
+    $accessDenied = $category -in @("PermissionDenied", "SecurityError") -or
+        $errorId -in @("AccessDenied", "Unauthorized", "Forbidden", "UnauthorizedAccessException")
+    $connectionUnavailable = $category -eq "ConnectionError" -or
+        $errorId -in @("NoConnection", "NotConnected", "PSSessionStateBroken", "PSSessionNotAvailable")
+    $unsupported = $category -eq "NotImplemented"
+    $unlicensed = $errorId -in @("LicenseRequired", "FeatureNotLicensed", "SubscriptionNotLicensed")
+    $cancelled = $false
+    $parameter = $null
+    $aadsts = $null
+    $httpStatus = $null
+    $exception = $Record.Exception
+    # Inspect only bounded exception chains. Raw service text is never returned, redacted, or serialized.
+    for ($depth = 0; $null -ne $exception -and $depth -lt 8; $depth++) {
+        if ($exception -is [System.Management.Automation.ParameterBindingException]) {
+            $binding = $true
+            $parameter = @($parameterNames | Where-Object { $_ -eq $exception.ParameterName } | Select-Object -First 1)
+        }
+        if ($exception -is [System.Management.Automation.CommandNotFoundException]) { $unavailable = $true }
+        if ($exception -is [System.UnauthorizedAccessException]) { $accessDenied = $true }
+        if ($exception -is [System.Management.Automation.Remoting.PSRemotingTransportException]) { $connectionUnavailable = $true }
+        if ($exception -is [System.NotSupportedException]) { $unsupported = $true }
+        if ($exception -is [System.OperationCanceledException]) { $cancelled = $true }
+        if (-not $aadsts) {
+            $text = [string]$exception.Message
+            $match = [regex]::Match($text.Substring(0, [Math]::Min(16384, $text.Length)),
+                '(?i)(?<![a-z0-9])AADSTS(?<code>[0-9]{5,9})(?![0-9])')
+            if ($match.Success) { $aadsts = $match.Groups["code"].Value }
+        }
+        $statusValue = $null
+        if ($exception.PSObject.Properties["StatusCode"]) { $statusValue = $exception.StatusCode }
+        elseif ($exception.PSObject.Properties["Response"] -and $null -ne $exception.Response -and
+            $exception.Response.PSObject.Properties["StatusCode"]) { $statusValue = $exception.Response.StatusCode }
+        $numericStatus = 0
+        if ($statusValue -is [System.Net.HttpStatusCode]) { $numericStatus = [int]$statusValue }
+        elseif ($null -ne $statusValue) { [int]::TryParse([string]$statusValue, [ref]$numericStatus) | Out-Null }
+        if ($numericStatus -in @(400, 401, 403, 404, 408, 409, 429, 500, 502, 503, 504)) { $httpStatus = $numericStatus }
+        $exception = $exception.InnerException
+    }
+
+    if ($binding) {
+        $diagnostic.code = "COMMAND_PARAMETER_BINDING"
+        $diagnostic.message = "The collector invocation does not match the installed command's parameter contract; this is not evidence of a tenant configuration problem."
+        if ($null -ne $parameter -and @($parameter).Count -eq 1 -and $parameter[0]) {
+            $diagnostic.parameter = $parameter[0]
+            $diagnostic.message += " Parameter: $($parameter[0])."
+        }
+    } elseif ($unavailable) {
+        $diagnostic.code = "COMMAND_UNAVAILABLE"
+        $diagnostic.message = "The installed module or assigned role does not expose this command."
+    } elseif ($aadsts) {
+        switch ($aadsts) {
+            { $_ -in @("53000", "53001", "53002", "53003") } {
+                $diagnostic.code = "AUTH_CONDITIONAL_ACCESS"
+                $diagnostic.message = "Microsoft Entra blocked authentication under a device or Conditional Access requirement."
+            }
+            { $_ -in @("65001", "65004") } {
+                $diagnostic.code = "AUTH_CONSENT_REQUIRED"
+                $diagnostic.message = "Microsoft Entra reported missing or declined application consent; the required consent must be reviewed by an authorized administrator."
+            }
+            { $_ -in @("50076", "50079", "50158", "50058") } {
+                $diagnostic.code = "AUTH_INTERACTION_REQUIRED"
+                $diagnostic.message = "Microsoft Entra requires an additional authentication interaction or challenge that this connection did not complete."
+            }
+            { $_ -in @("70043", "700082", "700084") } {
+                $diagnostic.code = "AUTHENTICATION_REQUIRED"
+                $diagnostic.message = "Microsoft Entra reported an expired authentication session; a new workload connection is required."
+            }
+            "50105" {
+                $diagnostic.code = "COMMAND_ACCESS_DENIED"
+                $diagnostic.message = "Microsoft Entra denied access because the required application assignment is missing."
+            }
+            default {
+                $diagnostic.message = "Microsoft Entra returned an authentication error; its specific cause is not classified."
+            }
+        }
+        $diagnostic.aadstsCode = $aadsts
+        $diagnostic.message += " AADSTS$aadsts."
+    } elseif ($httpStatus -eq 429 -or $category -eq "LimitsExceeded") {
+        $diagnostic.code = "COMMAND_THROTTLED"
+        $diagnostic.message = "The service rejected the request because of throttling or a request limit; retry after the service permits it."
+    } elseif ($httpStatus -eq 401 -or $category -eq "AuthenticationError") {
+        $diagnostic.code = "AUTHENTICATION_REQUIRED"
+        $diagnostic.message = "The service did not accept the workload authentication; a valid workload connection is required."
+    } elseif ($unlicensed) {
+        $diagnostic.code = "FEATURE_NOT_LICENSED"
+        $diagnostic.message = "The service explicitly reported a missing license for this feature."
+    } elseif ($httpStatus -eq 403 -or $accessDenied) {
+        $diagnostic.code = "COMMAND_ACCESS_DENIED"
+        $diagnostic.message = "Access to the requested operation was denied. The available error does not identify which permission or policy caused the denial."
+    } elseif ($connectionUnavailable) {
+        $diagnostic.code = "CONNECTION_UNAVAILABLE"
+        $diagnostic.message = "The workload connection or session transport is unavailable; this command did not return usable evidence."
+    } elseif ($unsupported) {
+        $diagnostic.code = "FEATURE_UNSUPPORTED"
+        $diagnostic.message = "The requested operation is not supported by the current service or module."
+    } elseif ($httpStatus -in @(408, 500, 502, 503, 504)) {
+        $diagnostic.code = "SERVICE_REQUEST_FAILED"
+        $diagnostic.message = "The service returned a timeout or server-side request failure; no result was accepted."
+    } elseif ($cancelled) {
+        $diagnostic.code = "OPERATION_CANCELLED"
+        $diagnostic.message = "The workload operation reported cancellation; the initiating cause is not known."
+    }
+    if ($null -ne $httpStatus) {
+        $diagnostic.httpStatus = $httpStatus
+        $diagnostic.message += " HTTP $httpStatus."
+    }
+    return $diagnostic
+}
+
 function Get-CommandBoundary {
-    param([string]$Command)
+    param([string]$Command, [string]$EvidenceKey)
     $boundary = [ordered]@{
         coverageComplete = $false
         pagination = "cmdlet-default"
@@ -67,7 +192,19 @@ function Get-CommandBoundary {
             $boundary.note = "One-day CopilotInteraction sample, at most 5000 rows; no session paging. Audit ingestion delay and record-type filtering exclude other activity."
         }
         "Get-SPODataAccessGovernanceInsight" {
-            $boundary.note = "Reads an existing service-generated insight; does not create or refresh a report. Report age, licensing, and report scope can limit results."
+            $boundary.workload = "SharePoint"
+            $boundary.pagination = "existing-report-metadata-only"
+            if ($EvidenceKey -eq "siteAccessReport") {
+                $boundary.reportEntity = "PermissionsReport"
+                $boundary.reportType = "Snapshot"
+                $boundary.note = "Reads existing SharePoint PermissionsReport snapshot metadata, not detailed site permissions. Does not create, refresh, or export reports; report age, licensing, and report availability limit results."
+                $boundary.exclusions += @("Detailed site/item permission rows and report contents are not retrieved.", "Other report entities and workloads are not queried.")
+            } else {
+                $boundary.reportEntity = "EveryoneExceptExternalUsersForItems"
+                $boundary.reportType = "RecentActivity"
+                $boundary.note = "Reads existing SharePoint recent-activity report metadata for the EveryoneExceptExternalUsersForItems entity only. This is not complete oversharing coverage; no report is created, refreshed, or exported."
+                $boundary.exclusions += @("Other sharing audiences, report entities, workloads, and historical activity are not queried.", "Detailed report contents are not retrieved.")
+            }
         }
     }
     return $boundary
@@ -88,11 +225,12 @@ function Add-Evidence {
         "${Service}:${Command}"
     }
     $started = (Get-Date).ToUniversalTime()
-    $boundary = Get-CommandBoundary $Command
+    $boundary = Get-CommandBoundary -Command $Command -EvidenceKey $EvidenceKey
     $result = [ordered]@{
         command = $Command
         service = $Service
         status = "failed"
+        code = $null
         rowCount = 0
         warningCount = 0
         startedAt = $started.ToString("o")
@@ -101,7 +239,14 @@ function Add-Evidence {
     }
     try {
         if (-not (Get-Command -Name $Command -CommandType Cmdlet,Function -ErrorAction SilentlyContinue)) {
-            $errors[$key] = @{ code = "COMMAND_UNAVAILABLE"; message = "The installed module or assigned role does not expose this command." }
+            if ($Service -eq "exchangeOnline" -and $Command -eq "Get-HybridConfiguration") {
+                $errors[$key] = @{
+                    code = "ON_PREMISES_SOURCE_UNAVAILABLE"
+                    message = "Get-HybridConfiguration is an on-premises Exchange command, not available from this Exchange Online connection. Hybrid configuration remains unresolved; changing cloud roles does not supply this source."
+                }
+            } else {
+                $errors[$key] = @{ code = "COMMAND_UNAVAILABLE"; message = "The installed module or assigned role does not expose this command." }
+            }
             return
         }
         # Capture warnings without logging potentially sensitive service text. Any warning is conservative failure.
@@ -122,19 +267,11 @@ function Add-Evidence {
         $result.status = "succeeded"
     }
     catch {
-        # Never persist raw service exceptions: authentication errors can contain tokens and request data.
-        $code = if ($_.Exception -is [System.Management.Automation.CommandNotFoundException]) {
-            "COMMAND_UNAVAILABLE"
-        } elseif ($_.Exception -is [System.UnauthorizedAccessException] -or
-            $_.FullyQualifiedErrorId -match "AccessDenied|Unauthorized|Forbidden") {
-            "COMMAND_ACCESS_DENIED"
-        } else { "COMMAND_FAILED" }
-        $errors[$key] = [ordered]@{
-            code = $code
-            message = "The command failed; no result was accepted. Check service availability, assigned roles, licensing, and module support."
-        }
+        $errors[$key] = Get-SafeCollectorDiagnostic -Record $_ -DefaultCode "COMMAND_FAILED" `
+            -DefaultMessage "The command failed; the underlying cause is unavailable. No result was accepted."
     }
     finally {
+        if ($errors.Contains($key)) { $result.code = $errors[$key].code }
         $result.completedAt = (Get-Date).ToUniversalTime().ToString("o")
         $commandResults[$key] = $result
     }
@@ -304,7 +441,7 @@ if ($Workloads -contains "exchangeOnline" -or $Workloads -contains "purview") {
 if ($Workloads -contains "exchangeOnline") {
     try {
         $failureCode = "SIGN_IN_FAILED"
-        $failureMessage = "Exchange Online browser sign-in failed or was cancelled."
+        $failureMessage = "The Exchange Online connection could not be established; the underlying cause is unavailable."
         Write-Host "Signing in to Exchange Online..."
         Connect-ExchangeOnline -ShowBanner:$false -DisableWAM -ErrorAction Stop *> $null
         Assert-Connection "exchangeOnline"
@@ -343,7 +480,7 @@ if ($Workloads -contains "sharePointOnline") {
     }
     try {
     $failureCode = "SIGN_IN_FAILED"
-    $failureMessage = "SharePoint Online browser sign-in failed or was cancelled."
+    $failureMessage = "The SharePoint Online connection could not be established; the underlying cause is unavailable."
     Write-Host "Signing in to SharePoint Online..."
     Connect-SPOService -Url $SharePointAdminUrl -UseSystemBrowser $true -ErrorAction Stop *> $null
     $connections["sharePointOnline"] = [ordered]@{
@@ -357,10 +494,10 @@ if ($Workloads -contains "sharePointOnline") {
         targetConnected = $true
     }
     Add-Evidence sharePointOnline Get-SPODataAccessGovernanceInsight {
-        Get-SPODataAccessGovernanceInsight -ReportType SitePermissions -ErrorAction Stop
+        Get-SPODataAccessGovernanceInsight -ReportEntity PermissionsReport -ReportType Snapshot -Workload SharePoint -ErrorAction Stop
     } siteAccessReport
     Add-Evidence sharePointOnline Get-SPODataAccessGovernanceInsight {
-        Get-SPODataAccessGovernanceInsight -ReportType OversharingBaseline -ErrorAction Stop
+        Get-SPODataAccessGovernanceInsight -ReportEntity EveryoneExceptExternalUsersForItems -ReportType RecentActivity -Workload SharePoint -ErrorAction Stop
     } dataAccessGovernance
     Add-Evidence sharePointOnline Get-SPOTenantRestrictedSearchMode {
         Get-SPOTenantRestrictedSearchMode -ErrorAction Stop
@@ -386,7 +523,7 @@ if ($Workloads -contains "sharePointOnline") {
 if ($Workloads -contains "purview") {
     try {
         $failureCode = "SIGN_IN_FAILED"
-        $failureMessage = "Purview browser sign-in failed or was cancelled."
+        $failureMessage = "The Purview connection could not be established; the underlying cause is unavailable."
         Write-Host "Signing in to Purview..."
         Connect-IPPSSession -ShowBanner:$false -DisableWAM -ErrorAction Stop *> $null
         Assert-Connection "purview"
@@ -420,6 +557,7 @@ if ($Workloads -contains "purview") {
     }
 }
 
+$failedWorkloads = @()
 foreach ($workload in $Workloads) {
     $results = @($commandResults.Values | Where-Object { $_.service -eq $workload })
     $succeeded = @($results | Where-Object { $_.status -eq "succeeded" }).Count
@@ -431,10 +569,13 @@ foreach ($workload in $Workloads) {
         coverageComplete = $false
     }
     if ($succeeded -eq 0) {
-        $failureCode = "WORKLOAD_COLLECTION_FAILED"
-        $failureMessage = "No evidence commands succeeded for $workload. No package was written."
-        throw "WORKLOAD_COLLECTION_FAILED"
+        $failedWorkloads += $workload
     }
+}
+if ($failedWorkloads.Count -gt 0) {
+    $failureCode = "WORKLOAD_COLLECTION_FAILED"
+    $failureMessage = "One or more workloads returned no successful evidence commands. No package was written."
+    throw "WORKLOAD_COLLECTION_FAILED"
 }
 $actors = @($connections.Values | ForEach-Object { $_.actorId } | Where-Object { $_ } | Select-Object -Unique)
 $document = [ordered]@{
@@ -486,9 +627,31 @@ try {
 Write-Host "Administrator evidence collection finished."
 if (-not $appMode) { Write-Host "Administrator evidence package created: $OutputPath" }
 } catch {
-    # Throw a safe stage error, not the service exception or its token-bearing details.
-    [Console]::Error.WriteLine("AFD_COLLECTOR_ERROR:" + (@{
-        code = $failureCode; message = $failureMessage
-    } | ConvertTo-Json -Compress))
-    throw "${failureCode}: ${failureMessage}"
+    $diagnostic = Get-SafeCollectorDiagnostic -Record $_ -DefaultCode $failureCode -DefaultMessage $failureMessage
+    $issues = @($errors.Keys | Select-Object -First 31 | ForEach-Object {
+        [ordered]@{ resource = $_; code = $errors[$_].code; message = $errors[$_].message }
+    })
+    $outcomes = [ordered]@{}
+    foreach ($key in @($commandResults.Keys | Select-Object -First 31)) {
+        $outcome = $commandResults[$key]
+        $outcomes[$key] = [ordered]@{
+            status = $outcome.status
+            code = $outcome.code
+            rowCount = $outcome.rowCount
+            warningCount = $outcome.warningCount
+        }
+    }
+    # Fatal diagnostics contain fixed explanations and command outcomes, never evidence rows or identity/token data.
+    $diagnostic.stageCode = $failureCode
+    $diagnostic.issues = $issues
+    $diagnostic.commandResults = $outcomes
+    $diagnostic.workloadResults = $workloadResults
+    $diagnostic.collection = [ordered]@{
+        attemptedCommandCount = $commandResults.Count
+        succeededCommandCount = $evidence.Count
+        failedCommandCount = $errors.Count
+        coverageComplete = $false
+    }
+    [Console]::Error.WriteLine("AFD_COLLECTOR_ERROR:" + ($diagnostic | ConvertTo-Json -Depth 8 -Compress))
+    throw "$($diagnostic.code): $($diagnostic.message)"
 }

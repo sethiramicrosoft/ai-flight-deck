@@ -44,7 +44,9 @@ test("existing-baseline collection needs one button, shows workload failures and
     if (job.action === "workloads") {
       job.workloads = [
         { id: "exchangeOnline", name: "Exchange Online", status: "collected", message: "Synthetic command evidence collected." },
-        { id: "sharePointOnline", name: "SharePoint Online", status: "failed", message: "Synthetic SharePoint role denied." },
+        { id: "sharePointOnline", name: "SharePoint Online", status: "failed", message: "Synthetic SharePoint role denied.",
+          errors: 1, issues: [{ resource: "sharePointOnline:Get-SPOSite:restrictedContent",
+            code: "COMMAND_ACCESS_DENIED", message: "Synthetic site read denied." }] },
         { id: "purview", name: "Microsoft Purview", status: "collected", message: "Synthetic command evidence collected." },
         { id: "powerPlatform", name: "Power Platform and Copilot Studio", status: "collected-with-gaps",
           message: "Synthetic agent sharing coverage is incomplete.", errors: 1,
@@ -72,14 +74,19 @@ test("existing-baseline collection needs one button, shows workload failures and
   await page.evaluate(() => navigate("guide"));
   await expect(page.locator("#collect-workloads")).toBeEnabled();
   await page.locator("#collect-workloads").click();
-  await expect(page.locator("#service-status")).toContainText("2 workloads have collection gaps", { timeout: 25000 });
+  await expect(page.locator("#service-status")).toContainText("2 collected; 1 collected with gaps; 1 failed", { timeout: 25000 });
   for (const viewport of [{ width: 1440, height: 1080 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
     await page.evaluate(() => navigate("guide"));
     await expect(page.locator("#workload-progress > li")).toHaveCount(4);
     await expect(page.locator("#workload-progress")).toContainText("Synthetic SharePoint role denied.");
     await expect(page.locator("#workload-progress")).toContainText("incomplete");
-    const errorDetails = page.locator("#workload-progress details").filter({ hasText: "Collection errors" });
+    const failedDetails = page.locator('#workload-progress [data-status="failed"] details');
+    await expect(failedDetails.locator("summary")).toHaveText("Collection errors (1 of 1)");
+    await failedDetails.locator("summary").click();
+    await expect(failedDetails).toContainText("sharePointOnline:Get-SPOSite:restrictedContent: Synthetic site read denied. (COMMAND_ACCESS_DENIED)");
+    await failedDetails.locator("summary").click();
+    const errorDetails = page.locator('#workload-progress [data-status="collected-with-gaps"] details').filter({ hasText: "Collection errors" });
     await errorDetails.locator("summary").click();
     await expect(errorDetails).toContainText("connections: Synthetic connection read denied. (PP_HTTP_403)");
     await expect(errorDetails).not.toContainText("COVERAGE_INCOMPLETE");

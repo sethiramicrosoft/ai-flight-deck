@@ -65,6 +65,13 @@ test("all query plans are read-only and run through injected adapters", async ()
   assert.equal(graphCalls.every(call => call.method === "GET"), true);
   assert.equal(commandCalls.every(call => !/set-|new-|remove-|add-|enable-|disable-/i.test(call.command)), true);
   assert.equal(commandCalls.every(call => call.signal), true);
+  const reports = commandCalls.filter(call => call.command === "Get-SPODataAccessGovernanceInsight");
+  assert.deepEqual(reports.map(call => ({ key: call.evidenceKey, parameters: call.parameters })), [
+    { key: "siteAccessReport",
+      parameters: { ReportEntity: "PermissionsReport", ReportType: "Snapshot", Workload: "SharePoint" } },
+    { key: "dataAccessGovernance",
+      parameters: { ReportEntity: "EveryoneExceptExternalUsersForItems", ReportType: "RecentActivity", Workload: "SharePoint" } }
+  ]);
 });
 
 test("Exchange maps all controls and passes only complete qualifying evidence", () => {

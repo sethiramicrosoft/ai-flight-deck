@@ -11,6 +11,12 @@ param(
     [string]$OutputPath
 )
 $ErrorActionPreference = "Stop"
+class AdminSyntheticHttpException : System.Exception {
+    [int]$StatusCode
+    AdminSyntheticHttpException([int]$status) : base("SENSITIVE_TEST_VALUE response/header/token") {
+        $this.StatusCode = $status
+    }
+}
 $global:adminTestCalls = [System.Collections.Generic.List[object]]::new()
 $global:adminTestScenario = $Scenario
 $global:adminTestConnected = $null
@@ -112,6 +118,11 @@ function global:Connect-IPPSSession {
     [CmdletBinding()]param([switch]$ShowBanner, [switch]$DisableWAM)
     $global:adminTestCalls.Add(@{ command = "Connect-IPPSSession"; disableWAM = [bool]$DisableWAM })
     if ($global:adminTestScenario -in @("signInFailure", "signInAndDisconnectFailure")) { throw "SENSITIVE_TEST_VALUE" }
+    if ($global:adminTestScenario -eq "authConditionalAccess") { throw "SENSITIVE_TEST_VALUE AADSTS53003: private response/header/token SENSITIVE_TEST_VALUE" }
+    if ($global:adminTestScenario -eq "authConsent") { throw "SENSITIVE_TEST_VALUE AADSTS65001: private response/header/token SENSITIVE_TEST_VALUE" }
+    if ($global:adminTestScenario -eq "authUnknownAadsts") { throw "SENSITIVE_TEST_VALUE AADSTS99999: private response/header/token SENSITIVE_TEST_VALUE" }
+    if ($global:adminTestScenario -eq "authHttp401") { throw [AdminSyntheticHttpException]::new(401) }
+    if ($global:adminTestScenario -eq "authCancelled") { throw [System.OperationCanceledException]::new("SENSITIVE_TEST_VALUE") }
     $global:adminTestConnected = "purview"
 }
 function global:Connect-SPOService {
@@ -133,21 +144,53 @@ function global:Disconnect-SPOService {
     if ($global:adminTestScenario -eq "disconnectFailure") { throw "SENSITIVE_TEST_VALUE" }
 }
 
+# This deliberately narrow fixture produces a real PowerShell binding exception. It does not model
+# or certify any tenant cmdlet's supported parameters, enum values, permissions, or licensing.
+function global:Invoke-AdminSyntheticBinding {
+    [CmdletBinding()]param([ValidateSet("SyntheticSupportedValue")][string]$ReportType)
+}
+
 foreach ($commandName in $global:adminTestCommandNames) {
     Set-Item -LiteralPath "Function:\global:$commandName" -Value {
         [CmdletBinding()]
         param(
             [object]$ResultSize, [string[]]$Properties,
             [datetime]$StartDate = [datetime]::MinValue, [datetime]$EndDate = [datetime]::MinValue,
-            [string]$RecordType, [string]$ReportType, [string]$Limit, [switch]$Detailed, [bool]$IncludePersonalSite
+            [string]$RecordType, [string]$ReportType, [string]$ReportEntity, [string]$Workload,
+            [string]$Limit, [switch]$Detailed, [bool]$IncludePersonalSite, [string]$SyntheticCommandName
         )
-        $command = $MyInvocation.MyCommand.Name
+        $command = if ($SyntheticCommandName) { $SyntheticCommandName } else { $MyInvocation.MyCommand.Name }
         $global:adminTestCalls.Add(@{
             command = $command; resultSize = $ResultSize; limit = $Limit; detailed = [bool]$Detailed
-            reportType = $ReportType; includePersonalSite = $IncludePersonalSite; recordType = $RecordType
+            reportType = $ReportType; reportEntity = $ReportEntity; workload = $Workload
+            includePersonalSite = $IncludePersonalSite; recordType = $RecordType
             startDate = $StartDate.ToString("o"); endDate = $EndDate.ToString("o")
         })
         if ($global:adminTestScenario -eq "allFailure") { throw "SENSITIVE_TEST_VALUE" }
+        if ($global:adminTestScenario -eq "allDenied") {
+            throw [System.UnauthorizedAccessException]::new("SENSITIVE_TEST_VALUE response/header/token")
+        }
+        if ($global:adminTestScenario -eq "parameterBinding" -and $command -eq "Get-SPODataAccessGovernanceInsight") {
+            Invoke-AdminSyntheticBinding -ReportType "SENSITIVE_TEST_VALUE"
+        }
+        if ($global:adminTestScenario -eq "unsafeParameterName" -and $command -eq "Get-SPODataAccessGovernanceInsight") {
+            Invoke-AdminSyntheticBinding -SENSITIVE_TEST_VALUE "SENSITIVE_TEST_VALUE"
+        }
+        if ($global:adminTestScenario -eq "missingConnection") {
+            $record = [System.Management.Automation.ErrorRecord]::new(
+                [Exception]::new("SENSITIVE_TEST_VALUE"), "SyntheticConnectionFailure",
+                [System.Management.Automation.ErrorCategory]::ConnectionError, $null)
+            $PSCmdlet.ThrowTerminatingError($record)
+        }
+        if ($global:adminTestScenario -eq "unlicensed") {
+            $record = [System.Management.Automation.ErrorRecord]::new(
+                [Exception]::new("SENSITIVE_TEST_VALUE"), "FeatureNotLicensed",
+                [System.Management.Automation.ErrorCategory]::PermissionDenied, $null)
+            $PSCmdlet.ThrowTerminatingError($record)
+        }
+        if ($global:adminTestScenario -eq "unsupported") { throw [System.NotSupportedException]::new("SENSITIVE_TEST_VALUE") }
+        if ($global:adminTestScenario -eq "throttled") { throw [AdminSyntheticHttpException]::new(429) }
+        if ($global:adminTestScenario -eq "http403") { throw [AdminSyntheticHttpException]::new(403) }
         if ($global:adminTestScenario -eq "information") {
             Write-Host "SENSITIVE_TEST_VALUE"
             Write-Information "SENSITIVE_TEST_VALUE" -InformationAction Continue
@@ -167,6 +210,50 @@ foreach ($commandName in $global:adminTestCommandNames) {
         }
         if ($global:adminTestScenario -eq "empty") { return }
         [pscustomobject]@{ id = "synthetic-$command"; displayName = "Test Unicode $([char]0x2713)" }
+    }
+}
+
+$global:adminTestDagOperation = (Microsoft.PowerShell.Core\Get-Command Get-SPODataAccessGovernanceInsight -CommandType Function).ScriptBlock
+# Documented DAG contract, checked against SPO 16.0.27612.12000. This validates invocation shape only,
+# not availability, report contents, tenant authorization, or licensing.
+function global:Get-SPODataAccessGovernanceInsight {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Everyone", "EveryoneExceptExternalUsers", "EveryoneExceptExternalUsersAtSite",
+            "EveryoneExceptExternalUsersForItems", "PermissionedUsers", "PermissionsReport",
+            "SensitivityLabelForFiles", "SharingLinks_Anyone", "SharingLinks_Guests", "SharingLinks_PeopleInYourOrg")]
+        [string]$ReportEntity,
+        [ValidateSet("Snapshot", "RecentActivity")]
+        [string]$ReportType,
+        [string]$Workload
+    )
+    & $global:adminTestDagOperation -SyntheticCommandName "Get-SPODataAccessGovernanceInsight" `
+        -ReportEntity $ReportEntity -ReportType $ReportType -Workload $Workload -ErrorAction Stop
+}
+
+$dagContractChecks = @()
+if ($Scenario -eq "dagContract") {
+    foreach ($invalidType in @("SitePermissions", "OversharingBaseline")) {
+        $rejected = $false
+        try {
+            Get-SPODataAccessGovernanceInsight -ReportEntity PermissionsReport -ReportType $invalidType -Workload SharePoint -ErrorAction Stop
+        } catch {
+            $rejected = $_.Exception -is [System.Management.Automation.ParameterBindingException]
+        }
+        $dagContractChecks += @{ legacyReportType = $invalidType; rejectedByBinding = $rejected }
+    }
+    $rejected = $false
+    try {
+        Get-SPODataAccessGovernanceInsight -ReportEntity UnsupportedEntity -ReportType Snapshot -Workload SharePoint -ErrorAction Stop
+    } catch {
+        $rejected = $_.Exception -is [System.Management.Automation.ParameterBindingException]
+    }
+    $dagContractChecks += @{ invalidReportEntity = "UnsupportedEntity"; rejectedByBinding = $rejected }
+    $dagCommand = Microsoft.PowerShell.Core\Get-Command Get-SPODataAccessGovernanceInsight -CommandType Function
+    $dagContractChecks += @{
+        reportEntityMandatory = @($dagCommand.Parameters["ReportEntity"].Attributes |
+            Where-Object { $_ -is [System.Management.Automation.ParameterAttribute] -and $_.Mandatory }).Count -eq 1
     }
 }
 
@@ -190,5 +277,6 @@ $result = @{
     outputExists = [System.IO.File]::Exists($output)
     psEdition = $PSVersionTable.PSEdition
     securityProtocolRestored = [Net.ServicePointManager]::SecurityProtocol -eq $originalSecurityProtocol
+    dagContractChecks = $dagContractChecks
 }
 Write-Output ("ADMIN_TEST_RESULT:" + ($result | ConvertTo-Json -Depth 8 -Compress))

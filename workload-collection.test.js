@@ -8,7 +8,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { collectWorkloadEvidence, selectedWorkloads, sharePointAdminUrl, WORKLOADS, PRODUCER_VERSIONS, collectorErrorFromOutput } = require("./workload-collection");
 const { createAdminCommandAdapter } = require("./collector-adapters");
-const { createApp } = require("./server");
+const { createApp, powerShellEnvironment } = require("./server");
 
 const tenantId = "11111111-1111-1111-1111-111111111111";
 const actorId = "22222222-2222-2222-2222-222222222222";
@@ -24,6 +24,20 @@ test("failed processes expose safe connector diagnostics instead of only an exit
   assert.match(collectorErrorFromOutput("other failure", 1).message, /code 1.*collection log/);
   assert.match(collectorErrorFromOutput("AFD_COLLECTOR_ERROR:{bad JSON}", 1).message, /invalid diagnostic output/);
   assert.match(collectorErrorFromOutput('AFD_COLLECTOR_ERROR:{"code":"bad code","message":"not trusted"}', 1).message, /invalid diagnostic fields/);
+});
+
+test("fatal diagnostics retain bounded per-command details and reject malformed fields", () => {
+  const issue = { resource: "sharePointOnline:Get-SPOSite:restrictedContent",
+    code: "COMMAND_ACCESS_DENIED", message: "The service denied this read." };
+  const diagnostic = { code: "WORKLOAD_COLLECTION_FAILED", message: "No commands succeeded.", issues: [issue] };
+  const parse = value => collectorErrorFromOutput(`AFD_COLLECTOR_ERROR:${JSON.stringify(value)}`, 1);
+  assert.deepEqual(parse(diagnostic).issues, [issue]);
+  for (const issues of [{}, [null], Array(32).fill(issue),
+    [{ ...issue, resource: "other:Get-Site" }],
+    [{ ...issue, code: "invalid code" }], [{ ...issue, message: "x".repeat(2049) }]]) {
+    assert.match(parse({ ...diagnostic, issues }).message, /invalid diagnostic fields/);
+  }
+  assert.deepEqual(parse({ ...diagnostic, issues: [{ ...issue, extra: "not forwarded" }] }).issues, [issue]);
 });
 function documentFor(args) {
   const service = args.includes("-Workloads") ? valueOf(args, "-Workloads") : "powerPlatform";
@@ -110,6 +124,7 @@ test("a failed workload cannot substitute stale evidence and does not block othe
         writeOutput(args);
       }
     });
+
     assert.equal(job.workloads[0].status, "failed");
     assert.equal(job.workloads[3].status, "collected-with-gaps");
     fs.writeFileSync(path.join(workspace, "admin-evidence.json"), JSON.stringify(docs.admin));
@@ -119,6 +134,73 @@ test("a failed workload cannot substitute stale evidence and does not block othe
     assert.deepEqual(await adapter({ tenantId, service: "purview", command: "Get-Synthetic" }), [{ observed: true }]);
   });
 });
+
+test("all-command failure details reach the workload panel and persist without admitting evidence", async () => {
+  const issue = { resource: "sharePointOnline:Get-SPOSite:restrictedContent",
+    code: "COMMAND_ACCESS_DENIED", message: "The service denied this read." };
+  for (const wrongScope of [false, true]) await inWorkspace(async workspace => {
+    const job = {};
+    const diagnostic = { code: "WORKLOAD_COLLECTION_FAILED", message: "No commands succeeded.",
+      issues: [{ ...issue, ...(wrongScope ? { resource: "purview:Get-LabelPolicy" } : {}) }] };
+    const docs = await collectWorkloadEvidence({
+      workspace, tenantId, actorId, job, graphRequest: graph, workloads: ["sharePointOnline"],
+      execute: async () => { throw collectorErrorFromOutput(`AFD_COLLECTOR_ERROR:${JSON.stringify(diagnostic)}`, 1); }
+    });
+    assert.equal(job.workloads[0].status, "failed");
+    assert.equal(job.workloads[0].errors, 1);
+    assert.equal(job.workloads[0].issues[0].code,
+      wrongScope ? "DIAGNOSTIC_SCOPE_MISMATCH" : "COMMAND_ACCESS_DENIED");
+    assert.deepEqual(docs.admin.collectionMetadata.workloads.sharePointOnline.issues, job.workloads[0].issues);
+    assert.deepEqual(docs.admin.evidence, {});
+    assert.deepEqual(docs.admin.connections, {});
+    assert.deepEqual(fs.readdirSync(workspace), []);
+  });
+});
+
+test("actual fatal administrator producer diagnostics survive Node ingestion without raw exceptions",
+  { skip: process.platform !== "win32", timeout: 90000 }, async () => {
+    const scopedTenant = "11111111-1111-4111-8111-111111111111";
+    const executable = path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    for (const [scenario, service] of [["allDenied", "sharePointOnline"], ["authConditionalAccess", "purview"]]) {
+      await inWorkspace(async workspace => {
+        const job = {};
+        const documents = await collectWorkloadEvidence({
+          workspace, tenantId: scopedTenant, actorId, job, workloads: [service],
+          graphRequest: async request => request.url.includes("/organization?")
+            ? { value: [{ id: scopedTenant }] } : { webUrl: "https://synthetic.sharepoint.com/" },
+          execute: async args => {
+            const result = spawnSync(executable, [
+              "-NoProfile", "-NonInteractive", "-File",
+              path.join(__dirname, "scanner", "admin-collector-test-harness.ps1"),
+              "-CollectorPath", valueOf(args, "-File"), "-WorkspacePath", valueOf(args, "-WorkspacePath"),
+              "-ExpectedTenant", scopedTenant, "-Workload", service, "-Scenario", scenario,
+              "-CollectionChallenge", valueOf(args, "-CollectionChallenge"), "-OutputPath", valueOf(args, "-OutputPath")
+            ], { env: powerShellEnvironment(executable), encoding: "utf8", timeout: 30000, maxBuffer: 1024 * 1024 });
+            assert.equal(result.status, 0, result.error?.message || result.stderr);
+            assert.doesNotMatch(result.stdout + result.stderr, /SENSITIVE_TEST_VALUE/);
+            const marker = result.stdout.match(/ADMIN_TEST_RESULT:(.+)/);
+            assert.ok(marker);
+            const fixture = JSON.parse(marker[1]);
+            assert.ok(fixture.failure);
+            assert.deepEqual(fixture.files, []);
+            throw collectorErrorFromOutput(result.stderr, 1);
+          }
+        });
+        assert.equal(job.workloads[0].status, "failed");
+        assert.deepEqual(documents.admin.evidence, {});
+        const persisted = documents.admin.collectionMetadata.workloads[service];
+        if (service === "sharePointOnline") {
+          assert.equal(job.workloads[0].issues.length, 7);
+          assert.ok(job.workloads[0].issues.every(issue => issue.code === "COMMAND_ACCESS_DENIED"));
+          assert.deepEqual(persisted.issues, job.workloads[0].issues);
+        } else {
+          assert.match(job.workloads[0].message, /AUTH_CONDITIONAL_ACCESS.*AADSTS53003/);
+          assert.match(persisted.message, /AADSTS53003/);
+        }
+        assert.deepEqual(fs.readdirSync(workspace), []);
+      });
+    }
+  });
 
 test("rejects forged tenant, challenge, producer, stale timestamp and cross-service output", async () => {
   const mutations = [

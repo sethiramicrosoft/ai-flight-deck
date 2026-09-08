@@ -21,10 +21,19 @@ function collectorErrorFromOutput(output, exitCode) {
     } catch {
       return new Error("The connector failed and returned invalid diagnostic output. See the collection log.");
     }
+    const validIssue = issue => typeof issue?.resource === "string" &&
+      /^(exchangeOnline|sharePointOnline|purview):[A-Za-z][A-Za-z0-9-]{0,79}(?::[A-Za-z][A-Za-z0-9]{0,79})?$/.test(issue.resource) &&
+      typeof issue.code === "string" && /^[A-Z0-9_]{1,80}$/.test(issue.code) &&
+      typeof issue.message === "string" && issue.message.length <= 2048;
     if (typeof diagnostic?.code === "string" && /^[A-Z0-9_]{1,80}$/.test(diagnostic.code) &&
-        typeof diagnostic.message === "string" && diagnostic.message.length <= 2048) {
+        typeof diagnostic.message === "string" && diagnostic.message.length <= 2048 &&
+        (diagnostic.issues === undefined ||
+          (Array.isArray(diagnostic.issues) && diagnostic.issues.length <= 31 && diagnostic.issues.every(validIssue)))) {
       const error = new Error(`${diagnostic.code}: ${diagnostic.message}`);
       error.code = diagnostic.code;
+      if (diagnostic.issues) {
+        error.issues = diagnostic.issues.map(({ resource, code, message }) => ({ resource, code, message }));
+      }
       return error;
     }
     return new Error("The connector failed and returned invalid diagnostic fields. See the collection log.");
@@ -163,9 +172,15 @@ async function collectWorkloadEvidence({
       } catch (error) {
         if (signal?.aborted) throw signal.reason;
         const message = controller.signal.aborted ? `${entry.name} collection timed out.` : String(error.message);
-        update(entry, { status: "failed", errors: 1, message, completedAt: now().toISOString() });
+        let issues = controller.signal.aborted ? [] : error.issues || [];
+        if (issues.some(issue => !issue.resource.startsWith(`${entry.id}:`))) {
+          issues = [{ resource: entry.id, code: "DIAGNOSTIC_SCOPE_MISMATCH",
+            message: "The failed connector returned diagnostics for another workload; those details were rejected." }];
+        }
+        const details = issues.length ? { issues } : {};
+        update(entry, { status: "failed", errors: issues.length || 1, message, ...details, completedAt: now().toISOString() });
         if (entry.id !== "powerPlatform") {
-          admin.collectionMetadata.workloads[entry.id] = { status: "failed", message };
+          admin.collectionMetadata.workloads[entry.id] = { status: "failed", message, ...details };
         } else {
           documents.powerPlatform = {
             schema: "ai-flight-deck/power-platform-evidence", version: "1.0.0",

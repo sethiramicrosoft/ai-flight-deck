@@ -470,6 +470,24 @@ modules and their package-management dependencies, which can overlap Windows'
 inbox `Find-Package`, `Install-Package` and `Uninstall-Package` commands.
 Connector failures supply safe structured diagnostics to the workload status
 instead of only a PowerShell exit code.
+When every command fails, the collector still fails without admitting an
+evidence package, but retains bounded per-command error details in the workload
+panel and saved collection outcome. Authentication and command diagnostics use
+fixed explanations and safe error codes, not raw service exceptions or tokens.
+An unclassified connection failure is not automatically labelled a user cancellation.
+If `Get-HybridConfiguration` is unavailable, the collector identifies its
+[on-premises-only scope](https://learn.microsoft.com/powershell/module/exchangepowershell/get-hybridconfiguration)
+rather than implying an Exchange Online role change will expose it. This does
+not establish that hybrid configuration is absent or not applicable.
+
+SharePoint Data Access Governance reads use
+[documented report entities](https://learn.microsoft.com/powershell/module/microsoft.online.sharepoint.powershell/get-spodataaccessgovernanceinsight) and
+`Snapshot` / `RecentActivity` report types. They read existing report metadata,
+not report contents: the site-access query targets SharePoint permissions
+snapshots, and the governance query targets recent Everyone-except-external-users
+item reports. Neither query establishes complete site permissions or all forms
+of oversharing, and neither creates a report.
+
 Windows PowerShell child processes initialize their native module search paths;
 they do not inherit PowerShell 7's module directories. This allows discovery of
 CurrentUser installations, including redirected Documents folders.

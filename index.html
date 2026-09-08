@@ -4607,7 +4607,7 @@
         if (workload.issues?.length) {
           const details = document.createElement("details");
           const summary = document.createElement("summary");
-          summary.textContent = `${workload.acquisitionSummary ? "Collection errors" : "Reported source issues"} (${workload.issues.length} of ${workload.errors})`;
+          summary.textContent = `${workload.acquisitionSummary || workload.status === "failed" ? "Collection errors" : "Reported source issues"} (${workload.issues.length} of ${workload.errors})`;
           details.append(summary);
           for (const issue of workload.issues) {
             const description = document.createElement("p");
@@ -4696,11 +4696,13 @@
         }
         await loadWorkflowArtifact(job.result);
         renderWorkloadProgress(job.workloads || []);
-        const gaps = (job.collectionSummary?.failed || 0) + (job.collectionSummary?.withGaps || 0);
+        const collectionSummary = job.collectionSummary;
+        const collectionMessage = collectionSummary
+          ? ` Workload results: ${collectionSummary.collected || 0} collected; ${collectionSummary.withGaps || 0} collected with gaps; ${collectionSummary.failed || 0} failed. Review the outcomes below.`
+          : " Review the evidence and remaining validation requirements.";
         renderServiceState("ready", (job.action === "verify"
           ? "Verification complete. The Decision page is ready."
-          : job.action === "baseline" ? "Baseline complete. The Assessment page is ready." : "Assessment updated.") + (gaps ? ` ${gaps} workloads have collection gaps; review the outcomes below.` :
-            " Review the evidence and remaining validation requirements."), job.log);
+          : job.action === "baseline" ? "Baseline complete. The Assessment page is ready." : "Assessment updated.") + collectionMessage, job.log);
         await refreshEvidenceSourceStatus();
       }
     }

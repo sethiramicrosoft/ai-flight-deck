@@ -70,6 +70,10 @@ gaps have separate disclosures. If an environment list omits its Dataverse
 endpoint, the app attempts an exact-environment detail read automatically;
 it does not interpret the provisioning-state label as proof of a database.
 
+Failed administrator workloads also show individual command errors when the
+producer supplied them, even if every read failed and no evidence package was
+accepted. Older saved runs cannot recover diagnostics their collector discarded.
+
 The local service rejects stale, malformed, cross-tenant, replayed, or
 unsupported packages before they can affect a control result.
 
