@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { collectWorkloadEvidence, selectedWorkloads, sharePointAdminUrl, WORKLOADS, PRODUCER_VERSIONS } = require("./workload-collection");
+const { collectWorkloadEvidence, selectedWorkloads, sharePointAdminUrl, WORKLOADS, PRODUCER_VERSIONS, collectorErrorFromOutput } = require("./workload-collection");
 const { createAdminCommandAdapter } = require("./collector-adapters");
 const { createApp } = require("./server");
 
@@ -15,6 +15,16 @@ const actorId = "22222222-2222-2222-2222-222222222222";
 const valueOf = (args, name) => args[args.indexOf(name) + 1];
 const graph = async request => request.url.includes("/organization?")
   ? { value: [{ id: tenantId }] } : { webUrl: "https://synthetic.sharepoint.com/" };
+
+test("failed processes expose safe connector diagnostics instead of only an exit code", () => {
+  const output = 'Preparing module...\r\nAFD_COLLECTOR_ERROR:{"code":"MODULE_COMMAND_CONFLICT","message":"Approved dependency update required."}\r\nPowerShell stack text\r\n';
+  const error = collectorErrorFromOutput(output, 1);
+  assert.equal(error.code, "MODULE_COMMAND_CONFLICT");
+  assert.equal(error.message, "MODULE_COMMAND_CONFLICT: Approved dependency update required.");
+  assert.match(collectorErrorFromOutput("other failure", 1).message, /code 1.*collection log/);
+  assert.match(collectorErrorFromOutput("AFD_COLLECTOR_ERROR:{bad JSON}", 1).message, /invalid diagnostic output/);
+  assert.match(collectorErrorFromOutput('AFD_COLLECTOR_ERROR:{"code":"bad code","message":"not trusted"}', 1).message, /invalid diagnostic fields/);
+});
 function documentFor(args) {
   const service = args.includes("-Workloads") ? valueOf(args, "-Workloads") : "powerPlatform";
   const admin = service !== "powerPlatform";

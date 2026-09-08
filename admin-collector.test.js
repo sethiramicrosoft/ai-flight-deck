@@ -182,6 +182,7 @@ test("admin collector installs only missing allowed modules for CurrentUser with
     assert.equal(installs[0].scope, "CurrentUser");
     assert.equal(installs[0].repository, "PSGallery");
     assert.equal(installs[0].force, true);
+    assert.equal(installs[0].allowClobber, true);
     assert.equal(installs[0].confirm, false);
     assert.equal(installs[0].acceptLicense, true);
     assert.equal(installs[0].tls12, true);

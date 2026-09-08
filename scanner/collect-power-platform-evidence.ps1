@@ -82,6 +82,9 @@ catch {
     $problem = Get-PPSafeError $_
     # Avoid raw exception serialization, module diagnostics and token-bearing error bodies.
     [Console]::Error.WriteLine("Power Platform $stage failed [$($problem.code)]. $($problem.message)")
+    [Console]::Error.WriteLine("AFD_COLLECTOR_ERROR:" + (@{
+        code = $problem.code; message = $problem.message
+    } | ConvertTo-Json -Compress))
     exit 1
 }
 finally {

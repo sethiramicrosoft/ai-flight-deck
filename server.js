@@ -29,7 +29,7 @@ const {
   verifySignedAttestation
 } = require("./attestation-evidence");
 const { validateEvidencePackage, graphRequest } = require("./collector-adapters");
-const { selectedWorkloads, collectWorkloadEvidence, PRODUCER_VERSIONS } = require("./workload-collection");
+const { selectedWorkloads, collectWorkloadEvidence, PRODUCER_VERSIONS, collectorErrorFromOutput } = require("./workload-collection");
 const { buildEvidenceCompletionPlan } = require("./evidence-completion");
 const { validateAssessmentAuthority } = require("./evidence-authority");
 
@@ -146,26 +146,41 @@ function abortableDelay(milliseconds, signal) {
   });
 }
 
+function powerShellEnvironment(executable, extraEnv = {}, inherited = process.env) {
+  const environment = { ...inherited, NO_COLOR: "1" };
+  for (const key of Object.keys(environment)) {
+    if (key.toLowerCase() === "flight_deck_graph_access_token") delete environment[key];
+    // Let Windows PowerShell initialize its own native paths, including redirected Documents.
+    if (path.basename(executable).toLowerCase() === "powershell.exe" &&
+        key.toLowerCase() === "psmodulepath") delete environment[key];
+  }
+  return { ...environment, ...extraEnv };
+}
+
 function runPowerShell(job, executable, args, extraEnv = {}, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(signal.reason || new Error("Workflow cancelled."));
       return;
     }
-    const environment = { ...process.env, NO_COLOR: "1" };
-    delete environment.FLIGHT_DECK_GRAPH_ACCESS_TOKEN;
     const child = spawn(executable, args, {
       cwd: path.resolve(__dirname, ".."),
       windowsHide: false,
-      env: { ...environment, ...extraEnv }
+      env: powerShellEnvironment(executable, extraEnv)
     });
     job.pid = child.pid;
-    child.stdout.on("data", chunk => appendLog(job, chunk.toString()));
-    child.stderr.on("data", chunk => appendLog(job, chunk.toString()));
+    let processOutput = "";
+    const captureOutput = chunk => {
+      const text = chunk.toString();
+      processOutput = `${processOutput}${text}`.slice(-MAX_LOG_LENGTH);
+      appendLog(job, text);
+    };
+    child.stdout.on("data", captureOutput);
+    child.stderr.on("data", captureOutput);
     const cancel = () => child.kill();
     signal?.addEventListener("abort", cancel, { once: true });
     child.on("error", reject);
-    child.on("exit", code => {
+    child.on("close", code => {
       signal?.removeEventListener("abort", cancel);
       job.pid = null;
       if (signal?.aborted) {
@@ -175,7 +190,7 @@ function runPowerShell(job, executable, args, extraEnv = {}, signal) {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`The local workflow exited with code ${code}.`));
+        reject(collectorErrorFromOutput(processOutput, code));
       }
     });
   });
@@ -1048,4 +1063,4 @@ if (require.main === module) {
   process.on("SIGINT", () => server.close(() => process.exit(0)));
 }
 
-module.exports = { createApp, createWorkflowRunner, defaultWorkspace, GRAPH_SCOPE_LIST };
+module.exports = { createApp, createWorkflowRunner, defaultWorkspace, GRAPH_SCOPE_LIST, powerShellEnvironment };

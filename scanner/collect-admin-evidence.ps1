@@ -177,13 +177,22 @@ function Import-CollectorModule {
                 Repository = "PSGallery"
                 Scope = "CurrentUser"
                 Force = $true
+                AllowClobber = $true
                 Confirm = $false
                 ErrorAction = "Stop"
             }
             if ((Get-Command Install-Module -ErrorAction Stop).Parameters.ContainsKey("AcceptLicense")) {
                 $installParameters.AcceptLicense = $true
             }
-            Install-Module @installParameters *> $null
+            try {
+                Install-Module @installParameters *> $null
+            } catch {
+                if ($_.FullyQualifiedErrorId -match "CommandAlreadyAvailable") {
+                    $script:failureCode = "MODULE_COMMAND_CONFLICT"
+                    $script:failureMessage = "A Microsoft module dependency conflicts with existing package-management commands. Automatic installation must allow the approved dependency updates."
+                }
+                throw
+            }
         } finally {
             [Net.ServicePointManager]::SecurityProtocol = $originalSecurityProtocol
         }
@@ -478,5 +487,8 @@ Write-Host "Administrator evidence collection finished."
 if (-not $appMode) { Write-Host "Administrator evidence package created: $OutputPath" }
 } catch {
     # Throw a safe stage error, not the service exception or its token-bearing details.
+    [Console]::Error.WriteLine("AFD_COLLECTOR_ERROR:" + (@{
+        code = $failureCode; message = $failureMessage
+    } | ConvertTo-Json -Compress))
     throw "${failureCode}: ${failureMessage}"
 }

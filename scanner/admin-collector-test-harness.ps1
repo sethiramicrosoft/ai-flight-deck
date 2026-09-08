@@ -61,14 +61,21 @@ function global:Install-PackageProvider {
 function global:Install-Module {
     [CmdletBinding(SupportsShouldProcess)]param(
         [string]$Name, [version]$MinimumVersion, [string]$Scope, [string]$Repository,
-        [switch]$Force, [switch]$AcceptLicense
+        [switch]$Force, [switch]$AcceptLicense, [switch]$AllowClobber
     )
     $global:adminTestCalls.Add(@{
         command = "Install-Module"; name = $Name; scope = $Scope; repository = $Repository
-        force = [bool]$Force; acceptLicense = [bool]$AcceptLicense; confirm = [bool]$PSBoundParameters["Confirm"]
+        force = [bool]$Force; acceptLicense = [bool]$AcceptLicense; allowClobber = [bool]$AllowClobber
+        confirm = [bool]$PSBoundParameters["Confirm"]
         tls12 = ([Net.ServicePointManager]::SecurityProtocol -band [Net.SecurityProtocolType]::Tls12) -ne 0
     })
     if ($global:adminTestScenario -eq "installFailure") { throw "SENSITIVE_TEST_VALUE" }
+    if (-not $AllowClobber) {
+        $record = [System.Management.Automation.ErrorRecord]::new(
+            [Exception]::new("Synthetic existing package-management command collision."),
+            "CommandAlreadyAvailable", [System.Management.Automation.ErrorCategory]::ResourceExists, $Name)
+        $PSCmdlet.ThrowTerminatingError($record)
+    }
     $global:adminTestInstalled = $true
 }
 function global:Get-Command {

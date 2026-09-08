@@ -465,6 +465,14 @@ current collection cannot silently substitute a previous successful result.
 
 The schema stays at 1.0.0; the automated administrator producer is 1.1.0.
 Command boundaries, counts, module versions and cleanup failures are retained.
+Automatic installation includes `AllowClobber` for the allowlisted Microsoft
+modules and their package-management dependencies, which can overlap Windows'
+inbox `Find-Package`, `Install-Package` and `Uninstall-Package` commands.
+Connector failures supply safe structured diagnostics to the workload status
+instead of only a PowerShell exit code.
+Windows PowerShell child processes initialize their native module search paths;
+they do not inherit PowerShell 7's module directories. This allows discovery of
+CurrentUser installations, including redirected Documents folders.
 Exchange and Purview bind the service's reported tenant and signed-in account.
 SharePoint's administration module does not expose those identities: they remain
 null and `tenantVerified` remains false. Its connected administration URL must

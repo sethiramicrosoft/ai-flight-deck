@@ -12,6 +12,26 @@ const LABELS = Object.freeze({
   purview: "Microsoft Purview", powerPlatform: "Power Platform and Copilot Studio"
 });
 
+function collectorErrorFromOutput(output, exitCode) {
+  const marker = output.split(/\r?\n/).reverse().find(line => line.startsWith("AFD_COLLECTOR_ERROR:"));
+  if (marker) {
+    let diagnostic;
+    try {
+      diagnostic = JSON.parse(marker.slice("AFD_COLLECTOR_ERROR:".length));
+    } catch {
+      return new Error("The connector failed and returned invalid diagnostic output. See the collection log.");
+    }
+    if (typeof diagnostic?.code === "string" && /^[A-Z0-9_]{1,80}$/.test(diagnostic.code) &&
+        typeof diagnostic.message === "string" && diagnostic.message.length <= 2048) {
+      const error = new Error(`${diagnostic.code}: ${diagnostic.message}`);
+      error.code = diagnostic.code;
+      return error;
+    }
+    return new Error("The connector failed and returned invalid diagnostic fields. See the collection log.");
+  }
+  return new Error(`The local workflow exited with code ${exitCode}. See the collection log.`);
+}
+
 function selectedWorkloads(value = WORKLOADS) {
   if (!Array.isArray(value) || value.some(id => !WORKLOADS.includes(id)) ||
       new Set(value).size !== value.length) {
@@ -186,4 +206,4 @@ async function collectWorkloadEvidence({
   }
 }
 
-module.exports = { WORKLOADS, PRODUCER_VERSIONS, selectedWorkloads, collectWorkloadEvidence, sharePointAdminUrl };
+module.exports = { WORKLOADS, PRODUCER_VERSIONS, selectedWorkloads, collectWorkloadEvidence, sharePointAdminUrl, collectorErrorFromOutput };
