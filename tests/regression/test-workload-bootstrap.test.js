@@ -21,15 +21,15 @@ test("Windows PowerShell gets native module discovery instead of inheriting Powe
     .FLIGHT_DECK_GRAPH_ACCESS_TOKEN, "explicit-synthetic-token");
 });
 
-test("automatic admin bootstrap permits required dependency command overlap without changing repository trust", () => {
-  const source = fs.readFileSync(path.join(root, "scanner", "collect-admin-evidence.ps1"), "utf8");
-  const parameters = source.match(/\$installParameters\s*=\s*@\{([^}]+)\}/);
+test("private downloads avoid dependency command collisions without changing repository trust", () => {
+  const source = fs.readFileSync(path.join(root, "scanner", "FlightDeck.Modules.ps1"), "utf8");
+  const parameters = source.match(/\$saveParameters\s*=\s*@\{([^}]+)\}/);
   assert.ok(parameters);
-  assert.match(parameters[1], /AllowClobber\s*=\s*\$true/);
-  assert.match(parameters[1], /Scope\s*=\s*"CurrentUser"/);
-  assert.match(parameters[1], /Repository\s*=\s*"PSGallery"/);
+  assert.match(parameters[1], /Path\s*=\s*\$root/);
+  assert.match(parameters[1], /Repository\s*=\s*'PSGallery'/);
+  assert.match(source, /Save-Module @saveParameters/);
+  assert.doesNotMatch(parameters[1], /Scope|AllowClobber/);
   assert.doesNotMatch(source, /Set-PSRepository|Set-ExecutionPolicy/);
   const harness = fs.readFileSync(path.join(root, "scanner", "admin-collector-test-harness.ps1"), "utf8");
-  assert.match(harness, /if \(-not \$AllowClobber\)/);
-  assert.match(harness, /CommandAlreadyAvailable/);
+  assert.match(harness, /function global:Install-Module \{ throw/);
 });

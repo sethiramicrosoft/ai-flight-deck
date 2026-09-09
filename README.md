@@ -574,7 +574,8 @@ stops the local service.
 10. Flight Deck opens **Assessment** automatically when the baseline is ready.
 
 The first run may take longer because missing Microsoft authentication and
-administration modules are installed for the current Windows user.
+administration modules and their dependencies are downloaded to the private
+`%LOCALAPPDATA%\AI Flight Deck\PowerShell\Modules` store.
 
 ### Complete evidence the Graph scan cannot collect
 
@@ -655,9 +656,21 @@ snapshots, and the governance query targets recent Everyone-except-external-user
 item reports. Neither query establishes complete site permissions or all forms
 of oversharing, and neither creates a report.
 
-Windows PowerShell child processes initialize their native module search paths;
-they do not inherit PowerShell 7's module directories. This allows discovery of
-CurrentUser installations, including redirected Documents folders.
+Setup, Graph scans and workload collectors share a private module bootstrap.
+Approved modules and dependencies are downloaded with `Save-Module -Path` from
+the official HTTPS PowerShell Gallery into
+`%LOCALAPPDATA%\AI Flight Deck\PowerShell\Modules`. Power Platform remains pinned
+to `2.0.216`; Exchange and SharePoint minimum versions are preserved.
+Each PowerShell host (including Windows PowerShell 5.1 and PowerShell 7's
+SharePoint compatibility session) initializes process-local dependency discovery
+with the private root first and native machine module paths only. Top-level
+modules are imported by their private absolute paths, not reused from redirected
+Documents, even when those copies have newer versions. No global `PSModulePath`,
+execution policy, repository trust or OneDrive settings are changed.
+An absent, network, synced or redirected local storage path fails explicitly;
+there is no fallback to Documents. Existing OneDrive files are not copied,
+deleted or unblocked. Organizational policy still applies to private downloads;
+this storage choice is not a DLP exemption.
 Exchange and Purview bind the service's reported tenant and signed-in account.
 SharePoint's administration module does not expose those identities: they remain
 null and `tenantVerified` remains false. Its connected administration URL must
@@ -757,9 +770,10 @@ The person installing the prototype needs permission to:
 - Run `.cmd` and PowerShell scripts.
 - Install Node.js if it is not already present. Windows may display an
   elevation prompt depending on the device policy and Node.js installer.
-- Install the `Microsoft.Graph.Authentication` module with
-  `-Scope CurrentUser`. This normally does not require local administrator
-  rights.
+- Save `Microsoft.Graph.Authentication` and dependencies into the private
+  `%LOCALAPPDATA%\AI Flight Deck\PowerShell\Modules` directory, normally without
+  local administrator rights. If needed, the NuGet package provider uses its
+  current-user package-provider location (not the Documents module directory).
 - Open a localhost listener on `127.0.0.1:8080`.
 - Create a desktop shortcut if that option is selected.
 
@@ -882,8 +896,11 @@ Do not copy the local evidence workspace into the repository.
 | Windows blocks the downloaded setup file | Open file **Properties**, select **Unblock** if shown, then run `SETUP-AI-Flight-Deck.cmd` again. Follow organizational security policy. |
 | The browser does not open | Manually open `http://127.0.0.1:8080/index.html`. |
 | Port `8080` is already in use | Close the other AI Flight Deck launcher or process using that port, then start again. |
-| Microsoft Graph module installation fails | Open PowerShell as the same Windows user and run `Install-Module Microsoft.Graph.Authentication -Scope CurrentUser`, then restart Flight Deck. |
-| PowerShell Gallery asks to install NuGet or trust PSGallery | Review and accept the prompt if allowed by organizational policy. |
+| Microsoft Graph module download or import fails | Run `SETUP-AI-Flight-Deck.cmd` again as the same Windows user. Check approved Gallery access, local write permissions and package-management availability. Setup uses the private LOCALAPPDATA store; do not install modules into redirected Documents. |
+| Gallery source is rejected or bootstrap cannot run noninteractively | Ask your administrator to verify the official `https://www.powershellgallery.com/api/v2` source and approved package management. Flight Deck does not change repository trust or prompt for it. |
+| Private module storage is unsafe or unavailable | Ask your administrator to verify a local, non-redirected `LOCALAPPDATA` directory outside Documents and OneDrive. Flight Deck stops instead of falling back to a synced directory. |
+| OneDrive DLP notice names an existing module/help file | The updated bootstrap does not reuse those files. Leave blocked files and policy unchanged; ask your administrator to handle existing notices. Private downloads can still be restricted by organizational policy. |
+| A module was already loaded outside the private/native machine paths | Restart through the launcher or use a fresh `-NoProfile` PowerShell host; do not reuse a session that imported Documents modules. |
 | Device sign-in requires approval | Ask a tenant administrator to grant the displayed delegated read permissions. |
 | The page says the integrated scanner is unavailable | Start the product with `Start-AI-Flight-Deck.cmd`; do not open `index.html` directly or use a generic static server. |
 | Many checks remain `Unknown` | Open **What still needs to be checked** and the [connection guide](docs/COLLECTOR-GUIDE.md#a-gap-is-not-always-a-tenant-fault). This version cannot verify 63 checks from returned records; granting more permissions or rescanning will not add that feature. Other checks may need administrator access, licences or a specific owner statement. |

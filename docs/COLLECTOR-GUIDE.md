@@ -572,9 +572,23 @@ Microsoft's tool is MIT-licensed; see [ACKNOWLEDGEMENTS.md](../ACKNOWLEDGEMENTS.
 | Sign-in or consent denied | Check the intended organization/account and displayed permissions; ask an authorized administrator |
 | Role or licence denied | Ask the service owner to check the actual requirement; a suggested administrator role is not a guarantee |
 | Unsupported command or Microsoft interface | Check the service and installed module version; broader permissions may not help |
+| Private module download/import failed | Retry setup for Graph or application-managed workload collection in a fresh no-profile host. Check approved Gallery access, local write permissions and package management; do not install into redirected Documents |
+| Private storage unsafe, or OneDrive DLP notice | Flight Deck requires a local, non-redirected `LOCALAPPDATA` directory outside Documents and OneDrive. Existing blocked files and notices are for your administrator to handle; do not move, delete or unblock them |
 | Partial results, warning, size limit or timeout | Inspect what was returned and what was missed; ask for deeper or more representative information |
 | `SERVICE_TOKEN_REQUIRED` | This version lacks the separate connection to that service; additional Graph permissions cannot supply it |
 | Checks this version cannot perform | Keep the finding for review. The app needs a new connection or verification feature; there may be nothing wrong with your Microsoft settings |
+
+Module downloads use the shared private store
+`%LOCALAPPDATA%\AI Flight Deck\PowerShell\Modules`, including dependencies, via
+`Save-Module -Path` from the validated official HTTPS PowerShell Gallery.
+Graph, Exchange, SharePoint, Purview and Power Platform use this bootstrap;
+Power Platform remains pinned to `2.0.216`. Every host initializes its own
+process-local dependency paths and explicitly imports the private package.
+Redirected Documents modules are not reused. Native machine module paths remain
+available for platform dependencies. No global module path, repository trust,
+execution policy or OneDrive configuration is changed, and no fallback to
+Documents occurs. This does not bypass organizational DLP policy or resolve
+notices for files already in OneDrive.
 | A supported owner statement is missing | Supply the required facts, dates and references through the statement form; do not claim the app independently verified them |
 
 Synthetic tests and browser exercises show how the implementation behaves.

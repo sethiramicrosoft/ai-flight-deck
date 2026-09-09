@@ -96,9 +96,20 @@ Test-PPCase 'Unsupported host reports explicit parent host selection and install
     try { throw 'PP_WINDOWS_POWERSHELL_51_REQUIRED' } catch { $problem = Get-PPSafeError $_ }
     Assert-PPTest ($problem.message -match 'powershell.exe' -and $problem.message -match 'not pwsh.exe') 'Host action is ambiguous'
     $source = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\collect-power-platform-evidence.ps1') -Raw
-    Assert-PPTest ($source -match 'Install-PackageProvider[^\r\n]+-Scope CurrentUser -Force -Confirm:\$false') 'NuGet bootstrap can prompt or install machine-wide'
-    Assert-PPTest ($source -match '(?s)Install-Module[^\r\n]+`[\r\n]+\s+-Scope CurrentUser -Force -AllowClobber -Confirm:\$false') 'Module installation can prompt or install machine-wide'
+    $helper = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\FlightDeck.Modules.ps1') -Raw
+    Assert-PPTest ($helper -match 'Install-PackageProvider[^\r\n]+-Scope CurrentUser -Force -Confirm:\$false') 'NuGet bootstrap can prompt or install machine-wide'
+    Assert-PPTest ($source -match 'Resolve-FdModule -Name \$moduleName -RequiredVersion \$moduleVersion -InstallMissingModules:\$InstallMissingModules') 'Pinned private bootstrap is not used'
+    Assert-PPTest ($helper -match 'Save-Module @saveParameters' -and $helper -match 'Path = \$root') 'Dependencies are not saved privately'
     Assert-PPTest ($source -notmatch 'Set-PSRepository|Set-ExecutionPolicy|Start-Process') 'Global trust/policy mutation or detached child added'
+}
+Test-PPCase 'Private module failures provide local recovery without changing policy' {
+    foreach ($code in @('PP_MODULE_LOCAL_PATH_UNSAFE', 'PP_MODULE_ALREADY_LOADED_OUTSIDE_STORE',
+        'PP_MODULE_GALLERY_SOURCE_REJECTED', 'PP_MODULE_DOWNLOAD_FAILED', 'PP_MODULE_IMPORT_FAILED',
+        'PP_MODULE_INSTALL_DISABLED')) {
+        try { throw $code } catch { $problem = Get-PPSafeError $_ }
+        Assert-PPTest ($problem.code -eq $code) 'Private bootstrap error code was lost'
+        Assert-PPTest ($problem.message -notmatch 'CurrentUser|Automatic read-only collection could not verify this resource') 'Private bootstrap recovery is stale or generic'
+    }
 }
 Test-PPCase 'Real interface fixture produces all seven arrays with actual identity and unknown boundaries' {
     $doc = Invoke-PPTestCollection (New-PPTestOperations)

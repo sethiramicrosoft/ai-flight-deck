@@ -1615,12 +1615,12 @@
             <h3>Prerequisites</h3>
             <ul class="guide-checklist">
               <li><span>Windows PowerShell 7 or Windows PowerShell 5.1.</span></li>
-              <li><span>The Microsoft Graph Authentication module.</span></li>
+              <li><span>The Microsoft Graph Authentication module, prepared by setup in <code>%LOCALAPPDATA%\AI Flight Deck\PowerShell\Modules</code>, not redirected Documents.</span></li>
               <li><span>An account permitted to consent to read-only Graph scopes.</span></li>
               <li><span>Approval to review identity, device, service health, collaboration, security, usage, and SharePoint metadata.</span></li>
               <li><span>Dummy documents only when deliberately creating a test exposure.</span></li>
             </ul>
-            <div class="command-block">Install-Module Microsoft.Graph.Authentication -Scope CurrentUser</div>
+            <div class="command-block">.\SETUP-AI-Flight-Deck.cmd</div>
           </article>
           <article class="card">
             <h3>Read-only collection</h3>

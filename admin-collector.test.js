@@ -83,7 +83,7 @@ for (const [workload, count, connect, disconnect] of [
     assert.ok(Object.values(doc.commandResults).every(result => result.boundary.coverageComplete === false));
     assert.equal(result.calls.filter(call => call.command === connect).length, 1);
     assert.equal(result.calls.filter(call => call.command === disconnect).length, workload === "purview" ? 2 : 1);
-    assert.equal(result.calls.filter(call => call.command === "Install-Module").length, 0);
+    assert.equal(result.calls.filter(call => call.command === "Save-Module").length, 0);
     assert.doesNotMatch(result.stdout, /Import this package|result\.json/);
     if (workload === "sharePointOnline") {
       assert.equal(doc.actorId, null);
@@ -339,21 +339,20 @@ test("unknown Purview authentication failure does not assert cancellation, permi
   assert.doesNotMatch(result.diagnostic.message, /cancel|permission|consent|license/i);
 });
 
-test("admin collector installs only missing allowed modules for CurrentUser without changing trust", { skip }, () => {
+test("admin collector saves only missing allowed modules privately without changing trust", { skip }, () => {
   const missing = runScenario("moduleMissing");
   assert.match(missing.failure, /^MODULE_MISSING:/);
   assert.equal(missing.outputExists, false);
-  assert.equal(missing.calls.filter(call => call.command === "Install-Module").length, 0);
+  assert.equal(missing.calls.filter(call => call.command === "Save-Module").length, 0);
   for (const workload of ["exchangeOnline", "sharePointOnline"]) {
     const result = runScenario("install", workload);
     assert.equal(result.failure, null);
-    const installs = result.calls.filter(call => call.command === "Install-Module");
+    const installs = result.calls.filter(call => call.command === "Save-Module");
     assert.equal(installs.length, 1);
     assert.equal(installs[0].name, workload === "exchangeOnline" ? "ExchangeOnlineManagement" : "Microsoft.Online.SharePoint.PowerShell");
-    assert.equal(installs[0].scope, "CurrentUser");
+    assert.match(installs[0].path, /local-app-data\\AI Flight Deck\\PowerShell\\Modules$/);
     assert.equal(installs[0].repository, "PSGallery");
     assert.equal(installs[0].force, true);
-    assert.equal(installs[0].allowClobber, true);
     assert.equal(installs[0].confirm, false);
     assert.equal(installs[0].acceptLicense, true);
     assert.equal(installs[0].tls12, true);
@@ -362,7 +361,7 @@ test("admin collector installs only missing allowed modules for CurrentUser with
   }
   for (const scenario of ["installFailure", "galleryHijacked"]) {
     const failed = runScenario(scenario);
-    assert.match(failed.failure, /^MODULE_INSTALL_FAILED:/);
+    assert.match(failed.failure, scenario === "galleryHijacked" ? /^MODULE_GALLERY_SOURCE_REJECTED:/ : /^MODULE_DOWNLOAD_FAILED:/);
     assert.equal(failed.outputExists, false);
     assert.equal(failed.securityProtocolRestored, true);
     assert.equal(failed.calls.filter(call => call.command.startsWith("Connect-")).length, 0);

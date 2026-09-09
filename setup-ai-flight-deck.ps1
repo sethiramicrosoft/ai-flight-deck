@@ -156,6 +156,7 @@ try {
         "evidence-completion.js",
         "attestation-evidence.js",
         "scanner\collect-admin-evidence.ps1",
+        "scanner\FlightDeck.Modules.ps1",
         "schema\power-platform-evidence.template.v1.json",
         "scanner\test-live-tenant.ps1"
     )) {
@@ -177,33 +178,10 @@ try {
     Write-Host "Node.js $($node.Version) is ready: $($node.Path)" -ForegroundColor Green
 
     Write-Step 3 "Checking the Microsoft Graph authentication connector"
-    [Net.ServicePointManager]::SecurityProtocol =
-        [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Authentication)) {
-        if (-not (Confirm-Choice "Install Microsoft.Graph.Authentication for the current Windows user?")) {
-            throw "The Microsoft Graph authentication module is required for live tenant scans."
-        }
-        Write-Host "Installing Microsoft.Graph.Authentication from PowerShell Gallery..." -ForegroundColor Yellow
-        if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
-            Write-Host "Installing the NuGet package provider for the current user..." -ForegroundColor Yellow
-            Install-PackageProvider NuGet `
-                -MinimumVersion 2.8.5.201 `
-                -Scope CurrentUser `
-                -Force `
-                -Confirm:$false | Out-Null
-        }
-        Install-Module Microsoft.Graph.Authentication `
-            -Scope CurrentUser `
-            -Force `
-            -AllowClobber `
-            -Confirm:$false
-    }
-    $graphModule = Get-Module -ListAvailable -Name Microsoft.Graph.Authentication |
-        Sort-Object Version -Descending |
-        Select-Object -First 1
-    if (-not $graphModule) {
-        throw "Microsoft.Graph.Authentication could not be installed."
-    }
+    . (Join-Path $PSScriptRoot 'scanner\FlightDeck.Modules.ps1')
+    Write-Host 'Preparing Microsoft.Graph.Authentication in %LOCALAPPDATA%\AI Flight Deck\PowerShell\Modules...'
+    $graphModule = Resolve-FdModule -Name Microsoft.Graph.Authentication -InstallMissingModules
+    Import-FdModule -Module $graphModule
     Write-Host "Microsoft Graph authentication $($graphModule.Version) is ready." -ForegroundColor Green
 
     Write-Step 4 "Checking local port 8080"

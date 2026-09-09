@@ -23,6 +23,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $VerbosePreference = "SilentlyContinue"
 $DebugPreference = "SilentlyContinue"
+. (Join-Path $PSScriptRoot 'FlightDeck.Modules.ps1')
 $evidence = [ordered]@{}
 $observations = [ordered]@{}
 $errors = [ordered]@{}
@@ -560,70 +561,27 @@ function Import-CollectorModule {
         throw "MODULE_NOT_ALLOWED"
     }
     $script:failureCode = "MODULE_DISCOVERY_FAILED"
-    $script:failureMessage = "Could not inspect required module $Name."
-    $available = @(Get-Module -ListAvailable -Name $Name | Where-Object { $_.Version -ge $MinimumVersion } |
-        Sort-Object Version -Descending)
-    if ($available.Count -eq 0) {
-        $script:failureCode = "MODULE_MISSING"
-        $script:failureMessage = "Required module $Name (minimum $MinimumVersion) is unavailable. Enable InstallMissingModules for automatic CurrentUser installation."
-        if (-not $InstallMissingModules) { throw "MODULE_MISSING" }
-        Write-Host "Installing required module $Name for CurrentUser..."
-        $script:failureCode = "MODULE_INSTALL_FAILED"
-        $script:failureMessage = "Automatic CurrentUser installation of $Name failed. Check PowerShell Gallery access and local package-management availability."
-        # Force accepts this install only; never change repository trust or machine execution policy.
-        $repository = Get-PSRepository -Name PSGallery -ErrorAction Stop
-        if ($repository.SourceLocation.TrimEnd('/') -ne "https://www.powershellgallery.com/api/v2") {
-            throw "UNEXPECTED_GALLERY_SOURCE"
+    $script:failureMessage = "Could not inspect required module $Name in the private LOCALAPPDATA store."
+    try {
+        $module = Resolve-FdModule -Name $Name -MinimumVersion $MinimumVersion -InstallMissingModules:$InstallMissingModules
+    } catch {
+        # Only fixed helper diagnostics are safe to expose; never emit package-provider response bodies.
+        if ($_.Exception.Message -match '^(MODULE_[A-Z_]+): ') {
+            $script:failureCode = $Matches[1]
+            $script:failureMessage = $_.Exception.Message
         }
-        $originalSecurityProtocol = [Net.ServicePointManager]::SecurityProtocol
-        try {
-            # Older Windows PowerShell hosts can otherwise negotiate TLS 1.0 with the Gallery.
-            # This setting is process-local and restored; no machine policy or repository trust changes.
-            [Net.ServicePointManager]::SecurityProtocol = $originalSecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-            if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue |
-                Where-Object { $_.Version -ge [version]"2.8.5.201" })) {
-                Install-PackageProvider -Name NuGet -MinimumVersion "2.8.5.201" -Scope CurrentUser `
-                    -Force -Confirm:$false -ErrorAction Stop *> $null
-            }
-            $installParameters = @{
-                Name = $Name
-                MinimumVersion = $MinimumVersion
-                Repository = "PSGallery"
-                Scope = "CurrentUser"
-                Force = $true
-                AllowClobber = $true
-                Confirm = $false
-                ErrorAction = "Stop"
-            }
-            if ((Get-Command Install-Module -ErrorAction Stop).Parameters.ContainsKey("AcceptLicense")) {
-                $installParameters.AcceptLicense = $true
-            }
-            try {
-                Install-Module @installParameters *> $null
-            } catch {
-                if ($_.FullyQualifiedErrorId -match "CommandAlreadyAvailable") {
-                    $script:failureCode = "MODULE_COMMAND_CONFLICT"
-                    $script:failureMessage = "A Microsoft module dependency conflicts with existing package-management commands. Automatic installation must allow the approved dependency updates."
-                }
-                throw
-            }
-        } finally {
-            [Net.ServicePointManager]::SecurityProtocol = $originalSecurityProtocol
-        }
-        $available = @(Get-Module -ListAvailable -Name $Name | Where-Object { $_.Version -ge $MinimumVersion } |
-            Sort-Object Version -Descending)
-        if ($available.Count -eq 0) { throw "MODULE_INSTALL_NOT_FOUND" }
+        throw
     }
     $script:failureCode = "MODULE_IMPORT_FAILED"
-    $script:failureMessage = "Required module $Name could not be loaded in this PowerShell host."
+    $script:failureMessage = "Required private module $Name or a dependency could not be loaded. Retry in a fresh no-profile host; do not reuse blocked Documents modules."
     if ($Name -eq "Microsoft.Online.SharePoint.PowerShell" -and $PSVersionTable.PSEdition -eq "Core") {
         # Microsoft documents Windows PowerShell compatibility import for the SPO management shell.
         if (-not $IsWindows) { throw "SHAREPOINT_REQUIRES_WINDOWS" }
-        Import-Module -Name $available[0].Path -UseWindowsPowerShell -ErrorAction Stop *> $null
+        Import-FdModule -Module $module -UseWindowsPowerShell
     } else {
-        Import-Module -Name $available[0].Path -ErrorAction Stop *> $null
+        Import-FdModule -Module $module
     }
-    $moduleVersions[$Name] = $available[0].Version.ToString()
+    $moduleVersions[$Name] = $module.Version.ToString()
 }
 
 function Assert-Connection {

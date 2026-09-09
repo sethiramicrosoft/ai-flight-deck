@@ -22,7 +22,9 @@ test("guided setup includes every first-run prerequisite and launch step", () =>
   assert.match(setup, /attestation-evidence\.js/);
   assert.match(setup, /collect-admin-evidence\.ps1/);
   assert.match(setup, /power-platform-evidence\.template\.v1\.json/);
-  assert.match(setup, /Install-PackageProvider NuGet/);
+  assert.match(setup, /scanner\\FlightDeck\.Modules\.ps1/);
+  assert.match(setup, /Resolve-FdModule -Name Microsoft\.Graph\.Authentication -InstallMissingModules/);
+  assert.match(read("scanner/FlightDeck.Modules.ps1"), /Install-PackageProvider -Name NuGet/);
   assert.match(setup, /Get-NetTCPConnection/);
   assert.match(setup, /AI Flight Deck\.lnk/);
   assert.match(setup, /Start-AI-Flight-Deck\.cmd/);
@@ -47,6 +49,15 @@ test("README credits Microsoft sources and lists every live delegated scope", ()
       `README must document delegated scope ${displayName}`
     );
   }
+});
+
+test("setup and recovery guidance never sends modules back to redirected Documents", () => {
+  for (const filename of ["README.md", "docs/COLLECTOR-GUIDE.md", "index.html"]) {
+    const source = read(filename);
+    assert.match(source, /%LOCALAPPDATA%\\AI Flight Deck\\PowerShell\\Modules/, filename);
+    assert.doesNotMatch(source, /Install-Module|Scope CurrentUser/, filename);
+  }
+  assert.match(read("index.html"), /class="command-block">\.\\SETUP-AI-Flight-Deck\.cmd</);
 });
 
 test("the user and connection guides are discoverable and their local file links resolve", () => {

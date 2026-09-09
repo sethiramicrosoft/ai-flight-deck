@@ -20,6 +20,7 @@ $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'PowerPlatform.Evidence.ps1')
+. (Join-Path $PSScriptRoot 'FlightDeck.Modules.ps1')
 
 # The official PowerApps module requires Windows PowerShell 5.x / .NET Framework.
 # The app launches this process; only Microsoft browser sign-in/MFA/consent is interactive.
@@ -45,16 +46,14 @@ try {
     # Pin both module identity and version; install automatically only when absent.
     $moduleName = 'Microsoft.PowerApps.Administration.PowerShell'
     $moduleVersion = '2.0.216'
-    if (-not (Get-Module -ListAvailable -Name $moduleName | Where-Object { $_.Version -eq [version]$moduleVersion })) {
-        if (-not $InstallMissingModules) { throw 'PP_MODULE_INSTALL_DISABLED' }
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
-            Install-PackageProvider -Name NuGet -MinimumVersion '2.8.5.201' -Scope CurrentUser -Force -Confirm:$false | Out-Null
-        }
-        Install-Module -Name $moduleName -RequiredVersion $moduleVersion -Repository PSGallery `
-            -Scope CurrentUser -Force -AllowClobber -Confirm:$false -ErrorAction Stop | Out-Null
+    try {
+        $module = Resolve-FdModule -Name $moduleName -RequiredVersion $moduleVersion -InstallMissingModules:$InstallMissingModules
+        Import-FdModule -Module $module
+    } catch {
+        if ($_.Exception.Message -match '^MODULE_MISSING:') { throw 'PP_MODULE_INSTALL_DISABLED' }
+        if ($_.Exception.Message -match '^(MODULE_[A-Z_]+):') { throw "PP_$($Matches[1])" }
+        throw 'PP_MODULE_DOWNLOAD_FAILED'
     }
-    Import-Module $moduleName -RequiredVersion $moduleVersion -ErrorAction Stop -Verbose:$false | Out-Null
     foreach ($name in @('Add-PowerAppsAccount', 'Get-JwtToken', 'Get-AdminPowerAppEnvironment', 'Get-AdminDlpPolicy', 'Get-AdminPowerAppConnector')) {
         if (-not (Get-Command $name -ErrorAction SilentlyContinue)) { throw 'PP_REQUIRED_CMDLET_UNAVAILABLE' }
     }

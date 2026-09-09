@@ -152,7 +152,8 @@ function powerShellEnvironment(executable, extraEnv = {}, inherited = process.en
   const environment = { ...inherited, NO_COLOR: "1" };
   for (const key of Object.keys(environment)) {
     if (key.toLowerCase() === "flight_deck_graph_access_token") delete environment[key];
-    // Let Windows PowerShell initialize its own native paths, including redirected Documents.
+    // Let Windows PowerShell start natively; FlightDeck.Modules.ps1 then replaces
+    // discovery with the private store and native machine paths, never Documents.
     if (path.basename(executable).toLowerCase() === "powershell.exe" &&
         key.toLowerCase() === "psmodulepath") delete environment[key];
   }
@@ -289,12 +290,13 @@ function createWorkflowRunner({
   const consentBroker = new ConsentBroker();
   const installCommand = [
     "-NoProfile",
+    "-NonInteractive",
     "-Command",
     [
       "$ErrorActionPreference = 'Stop'",
-      "if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Authentication)) {",
-      "  Install-Module Microsoft.Graph.Authentication -Scope CurrentUser -Force -AllowClobber -Confirm:$false",
-      "}",
+      `. '${path.join(__dirname, "scanner", "FlightDeck.Modules.ps1").replaceAll("'", "''")}'`,
+      "$module = Resolve-FdModule -Name Microsoft.Graph.Authentication -InstallMissingModules",
+      "Import-FdModule -Module $module",
       "Write-Host 'Microsoft Graph authentication connector is ready.'"
     ].join("; ")
   ];

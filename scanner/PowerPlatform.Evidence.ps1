@@ -119,7 +119,12 @@ function Get-PPSafeError {
     elseif ($message -match '(?i)forbidden|unauthorized|\b403\b') { $code = 'PP_HTTP_403' }
     $description = switch ($code) {
         'PP_WINDOWS_POWERSHELL_51_REQUIRED' { 'Launch this workload with Windows PowerShell 5.1 (powershell.exe), not pwsh.exe. The Microsoft PowerApps administration module requires .NET Framework. Keep the same arguments and parent process-tree cancellation.' }
-        'PP_MODULE_INSTALL_DISABLED' { 'The pinned Power Platform administration module is absent and automatic installation was disabled. Enable application-managed CurrentUser module installation and retry.' }
+        'PP_MODULE_INSTALL_DISABLED' { 'The pinned Power Platform administration module is absent from the private store. Enable application-managed downloads to %LOCALAPPDATA%\AI Flight Deck\PowerShell\Modules and retry.' }
+        'PP_MODULE_LOCAL_PATH_UNSAFE' { 'LOCALAPPDATA must identify an ordinary local directory outside Documents and OneDrive. No fallback or policy change was attempted; ask your administrator to verify the local storage configuration.' }
+        'PP_MODULE_ALREADY_LOADED_OUTSIDE_STORE' { 'Restart collection in a fresh no-profile PowerShell host. A preloaded module was outside the private/native machine paths.' }
+        'PP_MODULE_GALLERY_SOURCE_REJECTED' { 'PSGallery does not point to the official HTTPS PowerShell Gallery. Ask your administrator to verify its configuration; repository trust was not changed.' }
+        'PP_MODULE_DOWNLOAD_FAILED' { 'The pinned module or a dependency could not be saved to the private LOCALAPPDATA store. Check approved Gallery access, local write permissions and package management. Do not move or unblock policy-blocked OneDrive files.' }
+        'PP_MODULE_IMPORT_FAILED' { 'The private module or a dependency could not be loaded. Retry in a fresh no-profile Windows PowerShell 5.1 host with the approved private download.' }
         'PP_HTTP_401' { 'The workload rejected authentication. Sign in again through the application.' }
         'PP_HTTP_403' { 'The workload denied access. An authorized Power Platform administrator and Dataverse reader privileges are required; no roles were changed.' }
         'PP_HTTP_404' { 'The environment does not expose this Dataverse table or operation, or it is not visible to this principal.' }

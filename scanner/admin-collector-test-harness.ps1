@@ -12,6 +12,10 @@ param(
     [int]$MaxSiteDetails = 200
 )
 $ErrorActionPreference = "Stop"
+$env:LOCALAPPDATA = Join-Path $WorkspacePath 'local-app-data'
+foreach ($moduleName in @('ExchangeOnlineManagement', 'Microsoft.Online.SharePoint.PowerShell')) {
+    [IO.Directory]::CreateDirectory((Join-Path $env:LOCALAPPDATA "AI Flight Deck\PowerShell\Modules\$moduleName")) | Out-Null
+}
 class AdminSyntheticHttpException : System.Exception {
     [int]$StatusCode
     AdminSyntheticHttpException([int]$status) : base("SENSITIVE_TEST_VALUE response/header/token") {
@@ -47,18 +51,28 @@ function global:Get-Date {
 
 function global:Get-Module {
     [CmdletBinding()]param([string]$Name, [switch]$ListAvailable)
+    if (-not $ListAvailable) { return }
     $global:adminTestCalls.Add(@{ command = "Get-Module"; name = $Name })
     if ($global:adminTestScenario -in @("moduleMissing", "install", "installFailure", "galleryHijacked") -and
         -not $global:adminTestInstalled) { return }
     [pscustomobject]@{
-        Name = $Name
-        Version = if ($Name -eq "ExchangeOnlineManagement") { [version]"3.7.2" } else { [version]"16.0.26000.0" }
-        Path = "$Name.psd1"
+        Name = Split-Path $Name -Leaf
+        Version = if ((Split-Path $Name -Leaf) -eq "ExchangeOnlineManagement") { [version]"3.7.2" } else { [version]"16.0.26000.0" }
+        Path = Join-Path $Name ((Split-Path $Name -Leaf) + ".psd1")
     }
 }
 function global:Import-Module {
-    [CmdletBinding()]param([string]$Name, [switch]$UseWindowsPowerShell)
+    [CmdletBinding()]param([string]$Name, [switch]$UseWindowsPowerShell, [switch]$Global, [switch]$PassThru)
     $global:adminTestCalls.Add(@{ command = "Import-Module"; name = $Name; compatibility = [bool]$UseWindowsPowerShell })
+}
+function global:Get-PSSession { [CmdletBinding()]param([string]$Name) }
+function global:New-PSSession {
+    [CmdletBinding()]param([switch]$UseWindowsPowerShell, [string]$Name)
+    [pscustomobject]@{ Name = $Name }
+}
+function global:Invoke-Command {
+    [CmdletBinding()]param($Session, [scriptblock]$ScriptBlock, [object[]]$ArgumentList)
+    $global:adminTestCalls.Add(@{ command = "Initialize-CompatibilityModulePath"; session = $Session.Name })
 }
 function global:Get-PSRepository {
     [CmdletBinding()]param([string]$Name)
@@ -73,26 +87,21 @@ function global:Install-PackageProvider {
     [CmdletBinding(SupportsShouldProcess)]param([string]$Name, [version]$MinimumVersion, [string]$Scope, [switch]$Force)
     $global:adminTestCalls.Add(@{ command = "Install-PackageProvider"; name = $Name; scope = $Scope; force = [bool]$Force })
 }
-function global:Install-Module {
+function global:Save-Module {
     [CmdletBinding(SupportsShouldProcess)]param(
-        [string]$Name, [version]$MinimumVersion, [string]$Scope, [string]$Repository,
-        [switch]$Force, [switch]$AcceptLicense, [switch]$AllowClobber
+        [string]$Name, [version]$MinimumVersion, [string]$Path, [string]$Repository,
+        [switch]$Force, [switch]$AcceptLicense
     )
     $global:adminTestCalls.Add(@{
-        command = "Install-Module"; name = $Name; scope = $Scope; repository = $Repository
-        force = [bool]$Force; acceptLicense = [bool]$AcceptLicense; allowClobber = [bool]$AllowClobber
+        command = "Save-Module"; name = $Name; path = $Path; repository = $Repository
+        force = [bool]$Force; acceptLicense = [bool]$AcceptLicense
         confirm = [bool]$PSBoundParameters["Confirm"]
         tls12 = ([Net.ServicePointManager]::SecurityProtocol -band [Net.SecurityProtocolType]::Tls12) -ne 0
     })
     if ($global:adminTestScenario -eq "installFailure") { throw "SENSITIVE_TEST_VALUE" }
-    if (-not $AllowClobber) {
-        $record = [System.Management.Automation.ErrorRecord]::new(
-            [Exception]::new("Synthetic existing package-management command collision."),
-            "CommandAlreadyAvailable", [System.Management.Automation.ErrorCategory]::ResourceExists, $Name)
-        $PSCmdlet.ThrowTerminatingError($record)
-    }
     $global:adminTestInstalled = $true
 }
+function global:Install-Module { throw "Install-Module must never be used by private bootstrap." }
 function global:Get-Command {
     [CmdletBinding()]param([string]$Name, [string[]]$CommandType)
     if ($global:adminTestScenario -eq "missingCommand" -and $Name -eq "Get-HybridConfiguration") { return }

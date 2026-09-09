@@ -65,6 +65,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot "FlightDeck.Common.ps1")
+. (Join-Path $PSScriptRoot "FlightDeck.Modules.ps1")
 
 function Get-FdGraphStatusCode {
     param(
@@ -959,9 +960,8 @@ function Invoke-FdTenantScan {
         Get-FdPropertyValue -Object $scopeContract -Name "requiredPermissions"
     )
 
-    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph.Authentication)) {
-        throw "Microsoft.Graph.Authentication is required. Run: Install-Module Microsoft.Graph.Authentication -Scope CurrentUser"
-    }
+    $graphModule = Resolve-FdModule -Name Microsoft.Graph.Authentication
+    Import-FdModule -Module $graphModule
 
     $ownsConnection = $AuthMode -ne "ExistingContext"
     $graphAccessToken = $null
