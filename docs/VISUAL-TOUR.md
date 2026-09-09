@@ -11,9 +11,11 @@ confirm the result. The other 63 checks do not yet have the software rules neede
 to confirm their results. They can still show useful information and instructions.
 Their presence on a page does not mean they have been completed.
 
-The screenshots use synthetic examples, not a real tenant. Screenshots from
-earlier versions may have shorter labels than the current interface; the
-instructions below describe the current behavior.
+All 14 screenshots were refreshed on **9 September 2026** to show the
+plain-language interface and the revised Setup order. Every image is labelled
+as a synthetic example, not a real Microsoft 365 assessment. The examples
+include incomplete collections and checks the app cannot yet confirm; they
+are not demonstrations of a fully approved rollout.
 
 [Return to the README](../README.md)
 
@@ -54,7 +56,7 @@ Read the scan limits before starting. A scan reads only the information the
 signed-in account can access and stops at documented collection limits.
 One failed service does not mean every service failed. Check each service's result.
 
-[![Choose the assessment evidence path](screenshots/01-setup-overview.png)](screenshots/01-setup-overview.png)
+[![Connect Microsoft 365 and start the first scan](screenshots/01-setup-overview.png)](screenshots/01-setup-overview.png)
 
 ### Choose the people and settings for your pilot
 
@@ -78,7 +80,7 @@ Saving these forms changes only the local Flight Deck records. It does not
 assign licences, grant access, change the public-web setting, inspect an
 on-premises server or send an approval request to the named owner.
 
-[![Record scoped pilot and policy decisions](screenshots/14-setup-decisions.png)](screenshots/14-setup-decisions.png)
+[![Choose pilot participants and record whether Copilot may use public-web information](screenshots/14-setup-decisions.png)](screenshots/14-setup-decisions.png)
 
 ### Work through what still needs to be checked
 
@@ -97,7 +99,7 @@ to continue. Each item identifies the check, explains the next step and links to
 the relevant form or instructions. A suggested contact is not an assigned task.
 Technical errors are available separately for administrators and app maintainers.
 
-[![Prioritize missing evidence](screenshots/02-setup-evidence-center.png)](screenshots/02-setup-evidence-center.png)
+[![Read what still needs to be checked and the next step for each item](screenshots/02-setup-evidence-center.png)](screenshots/02-setup-evidence-center.png)
 
 ### Collect workload evidence
 
@@ -132,7 +134,7 @@ Saved imports are checked for their organization, format, collection date and
 whether they belong to the current collection. Rejected files cannot change a
 readiness result simply by containing a "Pass" label.
 
-[![Collect administrator and Power Platform evidence](screenshots/03-setup-workload-evidence.png)](screenshots/03-setup-workload-evidence.png)
+[![Read separate collection results and errors for each Microsoft service](screenshots/03-setup-workload-evidence.png)](screenshots/03-setup-workload-evidence.png)
 
 ### Record a written answer from the responsible person
 
@@ -150,7 +152,7 @@ or the signer's approval authority. Save it and run another scan to evaluate it.
 Only supported conditional checks can accept a justified "not applicable" answer;
 this is not a way to skip any inconvenient check.
 
-[![Create accountable attestations](screenshots/04-setup-attestation.png)](screenshots/04-setup-attestation.png)
+[![Write the responsible person's answer and add supporting information](screenshots/04-setup-attestation.png)](screenshots/04-setup-attestation.png)
 
 ### Understand what happens after collection
 
@@ -163,7 +165,7 @@ A predicted improvement is not a measured result. The tool can confirm a check
 only when it has current information and the implemented rules for that check.
 The complete real-tenant pilot-to-rollout process has not yet been demonstrated.
 
-[![Follow the operating workflow](screenshots/05-setup-operating-workflow.png)](screenshots/05-setup-operating-workflow.png)
+[![Follow the steps from the first scan to an administrator review and later comparison](screenshots/05-setup-operating-workflow.png)](screenshots/05-setup-operating-workflow.png)
 
 ## 2. Read the assessment
 
@@ -179,7 +181,7 @@ or resources covered and the explanation of missing information. Follow its
 next-step instructions, rather than interpreting a grey or unknown result as a
 misconfigured setting. New written answers are evaluated during the next scan.
 
-[![Review the readiness control plane](screenshots/06-assessment-control-plane.png)](screenshots/06-assessment-control-plane.png)
+[![Select a Microsoft 365 service area and read its readiness checks](screenshots/06-assessment-control-plane.png)](screenshots/06-assessment-control-plane.png)
 
 ### Review SharePoint access and sharing evidence
 
@@ -211,7 +213,10 @@ If there is no usable sharing information, the app can instead explain how a
 missing readiness check prevents a rollout-stage decision. This explanation is
 not a test of someone's actual file access.
 
-[![Review the fixture's available evidence scenarios](screenshots/07-assessment-sharing-review.png)](screenshots/07-assessment-sharing-review.png)
+The example below contains no broad sharing result. It shows how the app
+reports that absence without declaring that the whole organization is safe.
+
+[![Review the message when the sample has no broad sharing result](screenshots/07-assessment-sharing-review.png)](screenshots/07-assessment-sharing-review.png)
 
 ### Open a finding to understand the recommended review
 
@@ -228,7 +233,7 @@ the entire organization safe. If sharing details are unavailable, an explanation
 of missing readiness information may appear instead; do not read that as an
 actual file-permission test.
 
-[![Inspect the fixture's evidence-to-decision trace](screenshots/08-assessment-sharing-result.png)](screenshots/08-assessment-sharing-result.png)
+[![Read the explanation and limitations of an empty sharing result](screenshots/08-assessment-sharing-result.png)](screenshots/08-assessment-sharing-result.png)
 
 ### Review grouped access evidence
 
@@ -249,7 +254,7 @@ every row. These are sampled observations, not a complete tenant inventory.
 The full bounded artifact still loads locally; UI pagination is not a
 million-file backend.
 
-[![Review evidence-backed findings](screenshots/09-assessment-findings.png)](screenshots/09-assessment-findings.png)
+[![Review grouped permissions without mistaking permission records for file counts](screenshots/09-assessment-findings.png)](screenshots/09-assessment-findings.png)
 
 ## 3. Prepare corrections
 
@@ -265,7 +270,7 @@ the tool can collect. Missing information belongs in **What still needs to be
 checked** on Set up; this page concerns proposed changes, not software features
 missing from Flight Deck.
 
-[![Prepare technical corrections](screenshots/10-corrections.png)](screenshots/10-corrections.png)
+[![Select proposed actions for administrator review without changing Microsoft 365](screenshots/10-corrections.png)](screenshots/10-corrections.png)
 
 ## 4. Make the rollout decision
 
@@ -282,7 +287,7 @@ The result is not Microsoft certification or permission to start a production
 rollout. The program owner must make the actual decision using appropriate
 organizational reviews and information beyond this prototype.
 
-[![Review the rollout decision](screenshots/11-decision-summary.png)](screenshots/11-decision-summary.png)
+[![Read why the app cannot yet recommend proceeding with the pilot](screenshots/11-decision-summary.png)](screenshots/11-decision-summary.png)
 
 ### Read the detailed instructions for each check
 
@@ -298,7 +303,7 @@ universal list of Microsoft prerequisites. Download the plan as Markdown to
 share through your usual review process. Downloading it does not send it to
 anyone or establish that a reviewer approved it.
 
-[![Follow the tenant enablement plan](screenshots/12-decision-enablement-plan.png)](screenshots/12-decision-enablement-plan.png)
+[![Open a readiness check to read its administrator instructions](screenshots/12-decision-enablement-plan.png)](screenshots/12-decision-enablement-plan.png)
 
 ### Compare the earlier and later scans
 
@@ -313,7 +318,7 @@ check when the app reevaluates it. Later scans can also show changed results.
 Flight Deck does not continuously watch Microsoft 365, automatically rescan,
 send reminders or prove that every requirement has been resolved.
 
-[![Verify the decision evidence trail](screenshots/13-decision-evidence-trail.png)](screenshots/13-decision-evidence-trail.png)
+[![Find the scan-comparison controls and the records saved for the decision](screenshots/13-decision-evidence-trail.png)](screenshots/13-decision-evidence-trail.png)
 
 ## How the stages connect
 

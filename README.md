@@ -428,9 +428,10 @@ and error explanations, use the [connection guide](docs/COLLECTOR-GUIDE.md).
 
 [![AI Flight Deck: what still needs to be checked](docs/screenshots/02-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
 
-The screenshots use an isolated, explicitly labelled synthetic offline fixture
-data. They do not contain tenant data and are intended to show the product
-experience before a live scan is connected.
+All 14 tour screenshots were refreshed on **9 September 2026** for the
+plain-language interface and revised Setup order. They use explicitly labelled
+synthetic examples, not real tenant data, so you can see the product before
+connecting your organization.
 
 ## Install AI Flight Deck on a Windows computer
 
