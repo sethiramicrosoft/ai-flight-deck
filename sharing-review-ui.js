@@ -33,14 +33,16 @@
     const overview = element("section", undefined, "card sharing-overview");
     overview.setAttribute("aria-label", "Sharing evidence summary");
     overview.append(
-      element("h3", "Review access patterns, not every permission"),
+      element("h3", "Review who can access the sampled files and folders"),
       element("p", `${summary.sitesScanned} scanned sites · ${summary.fileCount} files and ${summary.folderCount} folders observed · ${summary.permissionRecords.toLocaleString()} permission records`),
-      element("p", `${summary.inheritedRecords.toLocaleString()} inherited records are grouped. ${summary.unresolvedInheritedRecords.toLocaleString()} have an unresolved inheritance source. Counts describe sampled evidence, not every item in the tenant.`, "subtitle")
+      element("p", "A permission record describes one way someone can access an item, such as through a group or sharing link. One file can have several records, so the permission count is not the number of files or the number of problems."),
+      element("p", `${summary.inheritedRecords.toLocaleString()} records describe inherited access: access received from a parent folder, library or site rather than granted on the item itself. For ${summary.unresolvedInheritedRecords.toLocaleString()} records, the scan could not identify that parent. Similar records are grouped below so you can review the shared access arrangement instead of thousands of separate rows.`, "subtitle"),
+      element("p", "Start with Access that needs a review. Open a group to inspect its files, folders and recorded permissions, then ask the site or data owner whether that access is intended. This is a sample, not every file in Microsoft 365, and it does not show that anyone actually opened sensitive content.", "subtitle")
     );
     const tabs = element("div", undefined, "actions");
     for (const [bucket, label, count] of [
-      ["review", "Needs access review", summary.reviewGroupCount],
-      ["inventory", "Permission inventory", summary.inventoryGroupCount]
+      ["review", "Access that needs a review", summary.reviewGroupCount],
+      ["inventory", "Other recorded permissions", summary.inventoryGroupCount]
     ]) {
       const tab = button(`${label} (${count})`, () => {
         state.bucket = bucket;
@@ -53,10 +55,10 @@
       tabs.append(tab);
     }
     overview.append(tabs, element("p", state.bucket === "review"
-      ? "Potentially risky access observations need context and owner review. They are not proof that sensitive content was accessed."
-      : "Ordinary user and group grants are inventory, not automatic remediation tasks. Inherited access is never labelled a direct grant.", "subtitle"));
+      ? "These groups contain broad, external or unclear access that deserves a closer look. Review the reason and ask the owner whether the listed people should have access before changing anything."
+      : "These are the ordinary user and group permissions recorded in the sample, not automatic remediation tasks. Their presence alone is not a reason to remove access. This list does not prove that every permission in the organization is appropriate.", "subtitle"));
     const search = element("form", undefined, "sharing-search");
-    const label = element("label", "Find a site, library or access pattern", "field");
+    const label = element("label", "Find a site, document library or type of access", "field");
     const input = element("input");
     input.type = "search";
     input.value = state.query;
@@ -76,8 +78,8 @@
       severity: state.bucket === "review" ? severity : "all"
     });
     const announcement = element("p", page.total
-      ? `Showing groups ${page.offset + 1}-${page.offset + page.items.length} of ${page.total}. Individual records are displayed only when you open a group.`
-      : "No matching groups in the collected scope. This does not establish complete tenant coverage.", "source-status");
+      ? `Showing groups ${page.offset + 1}-${page.offset + page.items.length} of ${page.total}. A group contains related permission records, not a separate task for every file. Open a group to see the individual records.`
+      : "No groups match this filter in the saved sample. Files or sites outside that sample have not been checked here.", "source-status");
     announcement.setAttribute("role", "status");
     announcement.dataset.sharingPage = "";
     announcement.tabIndex = -1;
@@ -90,11 +92,11 @@
         element("p", `${group.siteName} / ${group.libraryName}`, "subtitle"),
         element("p", `${group.affectedItems} distinct sampled items · ${group.permissionRecords} permission records · ${group.originLabel}`),
         element("p", group.reason),
-        element("p", `Owner: ${group.owner || "Owner not assigned"}`, "completion-blocker-meta"),
+        element("p", `Owner named in the collected information: ${group.owner || "Not provided; identify the responsible site or data owner before requesting a change"}`, "completion-blocker-meta"),
         element("p", `Next action: ${group.nextAction}`),
         element("small", group.coverageLabel, "subtitle")
       );
-      const open = button("View grouped evidence", () => run(() => showDetails(container, model, group, open, onError)));
+      const open = button("See the files and permission records", () => run(() => showDetails(container, model, group, open, onError)));
       card.append(open);
       container.append(card);
     }
@@ -114,13 +116,13 @@
     const heading = element("h3", group.title);
     heading.id = "sharing-detail-heading";
     modal.setAttribute("aria-labelledby", heading.id);
-    const close = button("Close evidence", () => modal.close());
+    const close = button("Close permission details", () => modal.close());
     const body = element("div");
     let offset = 0;
     const paint = () => {
       const page = root.FlightDeckSharingReview.getReviewDetails(model, group.id, { offset, limit: 50 });
       body.replaceChildren();
-      const count = element("p", `Records ${page.items.length ? offset + 1 : 0}-${offset + page.items.length} of ${page.total}. At most 50 records are displayed.`, "source-status");
+      const count = element("p", `Records ${page.items.length ? offset + 1 : 0}-${offset + page.items.length} of ${page.total}. At most 50 records are displayed at once. A file can appear more than once if the scan recorded several ways to access it. Use Next records to continue.`, "source-status");
       count.setAttribute("role", "status");
       count.tabIndex = -1;
       const list = element("ul", undefined, "evidence-detail-list");
@@ -132,7 +134,7 @@
           element("span", row.originLabel),
           element("span", row.reason || group.reason),
           element("span", `Action: ${row.nextAction || group.nextAction}`),
-          element("small", `Evidence reference: ${row.evidenceId || "Not provided"}`)
+          element("small", `Saved record reference: ${row.evidenceId || "Not provided"}`)
         );
         list.append(item);
       }

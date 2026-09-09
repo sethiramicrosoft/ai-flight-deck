@@ -164,7 +164,7 @@
     h1[tabindex="-1"]:focus { outline: none; }
     h2 { font-size: 20px; letter-spacing: -.02em; }
     h3 { font-size: 15px; }
-    .subtitle { margin: 6px 0 0; color: var(--cp-text-muted); max-width: 760px; }
+    .subtitle { margin: 6px 0 0; color: var(--cp-text-muted); max-width: 760px; line-height: 1.55; }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .btn {
       border: 1px solid var(--cp-border);
@@ -553,7 +553,7 @@
     }
     .control-detail summary {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
       gap: 10px;
       align-items: center;
       padding: 10px;
@@ -561,16 +561,18 @@
     }
     .control-detail summary::marker { color: var(--cp-accent); }
     .control-heading { min-width: 0; }
-    .control-heading small { display: block; color: var(--cp-accent); font: 700 9px Consolas, "Courier New", Courier, monospace; }
-    .control-heading strong { display: block; margin-top: 3px; font-size: 11px; line-height: 1.35; }
+    .control-heading small { display: block; color: var(--cp-accent); font: 700 11px Consolas, "Courier New", Courier, monospace; overflow-wrap: anywhere; }
+    .control-heading strong { display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
     .control-badge {
       padding: 4px 7px;
       border: 1px solid var(--cp-border);
       border-radius: 99px;
       color: var(--cp-text-muted);
-      font-size: 9px;
-      font-weight: 800;
-      text-transform: uppercase;
+      font-size: 11px;
+      font-weight: 650;
+      justify-self: end;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
     .control-detail.pass .control-badge { border-color: var(--cp-success); color: var(--cp-success); }
     .control-detail.fail .control-badge, .control-detail.expired .control-badge { border-color: var(--cp-danger); color: var(--cp-danger); }
@@ -1047,6 +1049,9 @@
       .field-grid, .source-metrics { grid-template-columns: 1fr; }
       .completion-blocker { grid-template-columns: 1fr; }
       .completion-state { justify-self: start; }
+      .section-head { flex-direction: column; align-items: stretch; }
+      .control-detail summary { grid-template-columns: minmax(0, 1fr); }
+      .control-badge { justify-self: start; }
       .mission-map-wrap { min-height: auto; padding: 18px; }
       .mission-map {
         position: static;
@@ -1097,16 +1102,16 @@
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">AF</div>
-        <div><strong>AI Flight Deck</strong><span>Copilot estate mission control</span></div>
+        <div><strong>AI Flight Deck</strong><span>Microsoft 365 pilot readiness</span></div>
       </div>
       <nav aria-label="Primary navigation">
-        <button class="nav-item active" data-page="guide" aria-current="page"><span class="nav-icon" aria-hidden="true">1</span>Set up</button>
-        <button class="nav-item" data-page="overview"><span class="nav-icon" aria-hidden="true">2</span>Assessment</button>
-        <button class="nav-item" data-page="remediation"><span class="nav-icon" aria-hidden="true">3</span>Corrections</button>
-        <button class="nav-item" data-page="clearance"><span class="nav-icon" aria-hidden="true">4</span>Decision</button>
+        <button class="nav-item active" data-page="guide" aria-current="page"><span class="nav-icon" aria-hidden="true">1</span>Set up your pilot</button>
+        <button class="nav-item" data-page="overview"><span class="nav-icon" aria-hidden="true">2</span>Review assessment</button>
+        <button class="nav-item" data-page="remediation"><span class="nav-icon" aria-hidden="true">3</span>Plan corrections</button>
+        <button class="nav-item" data-page="clearance"><span class="nav-icon" aria-hidden="true">4</span>Review pilot decision</button>
       </nav>
       <div class="tenant">
-        <div class="tenant-label">Tenant data source</div>
+        <div class="tenant-label">Microsoft 365 organization being reviewed</div>
         <strong>Contoso Aviation</strong>
         <small id="tenant-status">Synthetic demonstration data</small>
       </div>
@@ -1115,15 +1120,15 @@
     <main>
       <header class="topbar">
         <div>
-          <p class="eyebrow">Copilot estate mission control</p>
-          <h1 id="page-title">Set up your estate assessment</h1>
-          <p class="subtitle" id="page-subtitle">Understand the required access, run a read-only scan, and import the result.</p>
+          <p class="eyebrow">Microsoft 365 Copilot pilot readiness</p>
+          <h1 id="page-title">Connect Microsoft 365 and choose your pilot</h1>
+          <p class="subtitle" id="page-subtitle">Start with a read-only scan, then choose the people and settings to assess. This app records information and recommendations; it does not enable Copilot or change Microsoft 365 settings.</p>
         </div>
         <div class="actions">
           <button class="btn" id="import-button">Import existing scan</button>
           <input type="file" id="scan-file" accept=".json,application/json" hidden>
           <button class="btn" id="export-button">Export review summary (CSV)</button>
-          <button class="btn" id="export-sharing-evidence" disabled>Export collected evidence (CSV)</button>
+          <button class="btn" id="export-sharing-evidence" disabled>Export collected permission records (CSV)</button>
           <button class="btn icon-btn" id="theme-button" aria-label="Toggle color theme">◐</button>
         </div>
       </header>
@@ -1131,6 +1136,11 @@
       <div class="error-banner" id="import-error" role="alert" hidden></div>
 
       <section class="page" id="overview">
+        <article class="card" data-page-help="overview" style="margin-bottom:16px">
+          <h2>Understand what the scan did and did not check</h2>
+          <p class="subtitle">This assessment combines collected Microsoft 365 settings, imported reports, and statements from responsible people. These are called <strong>evidence</strong>. Each readiness check, also called a control, compares that information with a rule defined by Flight Deck. Open a service area below to see the rule, the information used, what is missing, and the next step.</p>
+          <p class="subtitle">A successful connection means the app could read a service, not that all its checks passed. This version supports automatic validation for 3 checks and owner statements for 11 checks; 63 of the 77 checks do not yet have a supported validation method. Missing information does not prove that your organization is incorrectly configured. The AFD identifiers belong to this app, not a Microsoft certification standard.</p>
+        </article>
         <article class="card" id="assessment-upstream-summary" hidden></article>
         <article class="card decision-panel" id="decision-panel" role="status" aria-live="polite" aria-atomic="true">
           <div>
@@ -1148,12 +1158,12 @@
         </article>
         <div class="grid metrics">
           <article class="card metric-action" data-go="findings" role="button" tabindex="0" aria-label="Explain the sharing readiness score">
-            <div class="metric-label">Sharing posture signal</div>
+            <div class="metric-label">Sharing review score</div>
             <div class="metric-value" id="overview-score">64</div>
             <div class="metric-note warning" id="score-note">Select to see how this score was calculated</div>
           </article>
           <article class="card metric-action" data-go="findings" role="button" tabindex="0" aria-label="Review critical exposure details">
-            <div class="metric-label" id="critical-label">Critical sharing evidence</div>
+            <div class="metric-label" id="critical-label">Sharing items marked critical</div>
             <div class="metric-value danger" id="critical-count">3</div>
             <div class="metric-note" id="critical-note">Select to review the evidence</div>
           </article>
@@ -1170,53 +1180,62 @@
         </div>
 
         <div class="section-head">
-          <div><h2>Microsoft 365 Copilot estate readiness coverage</h2><p>Move the pointer across the 3D control plane and select a system to inspect its evidence mission.</p></div>
+          <div><h2>Which Microsoft 365 areas have been checked?</h2><p>Select a service area to open its readiness checks. The counts describe how much information the app can assess, not service availability. “Some checks assessed” means there are still gaps; “No checks assessed” may mean missing access, missing information, or an unsupported check.</p></div>
           <div class="actions">
             <span class="badge" id="scan-timestamp">No live scan imported</span>
-            <button class="btn" id="export-controls-csv" disabled>Export controls CSV</button>
+            <button class="btn" id="export-controls-csv" disabled>Export readiness checks (CSV)</button>
           </div>
         </div>
         <article class="card mission-control" id="dimension-card">
-          <div class="empty-state">Loading the readiness control catalogue...</div>
+          <div class="empty-state">Loading the list of readiness checks and their requirements...</div>
         </article>
+        <details class="card" style="margin-top:16px">
+          <summary>How to interpret sharing counts, scores, and downloads</summary>
+          <p class="subtitle">A displayed sharing score starts at 100 and subtracts points under the app's sharing rules; it is not a percentage of Copilot readiness. Missing required scan information can make that score unavailable. Review-priority counts describe records flagged for attention, not proven incidents. Permission counts are not unique-file counts, and an audience estimate is not a count of people who actually opened an item.</p>
+          <p class="subtitle">The review-summary CSV describes grouped results. The collected-permission CSV contains the underlying records from the scan, not all permissions in Microsoft 365. The readiness-check CSV records the app's check results and supporting information. Downloading these files does not send them to administrators; review them before sharing through your organization's approved process.</p>
+        </details>
 
         <div class="section-head">
-          <div><h2 id="scenario-section-title">Priority simulation scenarios</h2><p id="scenario-section-copy">Test realistic questions against effective permissions and policy controls.</p></div>
-          <button class="btn primary" id="open-simulator" data-go="simulator">Open simulator</button>
+          <div><h2 id="scenario-section-title">Results to review first</h2><p id="scenario-section-copy">Choose a saved result to understand its meaning, limitations, and recommended follow-up.</p></div>
+          <button class="btn primary" id="open-simulator" data-go="simulator">Explain a result</button>
         </div>
         <div class="grid scenario-grid" id="overview-scenarios"></div>
       </section>
 
       <section class="page" id="simulator">
+        <article class="card" data-page-help="simulator" style="margin-bottom:16px">
+          <h2>Understand one result before deciding what to do</h2>
+          <p class="subtitle">Select a card, read its review question, then run the review to see the information behind it and the recommended follow-up. This is an explanation of saved scan results, not a new security test. It does not send a prompt to Copilot, open document contents, or prove that a person could obtain a particular Copilot answer. Demonstration examples use fictional information.</p>
+        </article>
         <div class="grid two simulator-shell">
           <div>
             <div class="section-head" style="margin-top:0">
-              <div><h2 id="simulator-heading">Choose an adversarial scenario</h2><p id="simulator-copy">Simulations are read-only and use effective access metadata.</p></div>
+              <div><h2 id="simulator-heading">Choose a result to understand</h2><p id="simulator-copy">Read the saved sharing information and the questions an administrator or site owner should review.</p></div>
             </div>
             <div class="grid scenario-grid" id="simulator-scenarios"></div>
             <article class="card simulation-state">
-              <h3 id="simulation-prompt-label">Simulated Copilot request</h3>
+              <h3 id="simulation-prompt-label">Question for this review</h3>
               <div class="prompt-box" id="simulation-prompt"></div>
               <div class="steps" id="simulation-steps">
-                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Resolve requesting user's effective identity</span><span class="step-status sr-only"></span></div>
-                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Traverse groups, sites and inherited permissions</span><span class="step-status sr-only"></span></div>
-                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Match discoverable content to sensitivity signals</span><span class="step-status sr-only"></span></div>
-                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Evaluate policy controls and calculate affected audience</span><span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Read the saved sharing setting</span><span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Describe the possible audience</span><span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Identify what the scan cannot prove</span><span class="step-status sr-only"></span></div>
+                <div class="step"><span class="step-dot" aria-hidden="true"></span><span class="step-copy">Show the review or restriction to consider</span><span class="step-status sr-only"></span></div>
               </div>
               <div id="simulation-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-              <button class="btn primary" id="run-simulation" style="margin-top:18px">Run risk simulation</button>
+              <button class="btn primary" id="run-simulation" style="margin-top:18px">Explain this result</button>
             </article>
           </div>
           <aside>
             <article class="card">
-              <div class="tenant-label" id="simulation-mode-label">Simulation mode</div>
-              <h2 style="margin:7px 0" id="simulation-mode-title">Pre-deployment</h2>
-              <p class="subtitle" id="simulation-mode-copy">No prompts are submitted to a production AI system. AI Flight Deck models discoverability from metadata and policy state.</p>
+              <div class="tenant-label" id="simulation-mode-label">What this review does</div>
+              <h2 style="margin:7px 0" id="simulation-mode-title">Review before enabling Copilot</h2>
+              <p class="subtitle" id="simulation-mode-copy">The app explains saved settings and possible access. It does not send prompts to Copilot or prove that document contents were retrieved.</p>
               <div class="timeline">
-                <div class="phase complete" data-phase="1">1. Assess</div>
-                <div class="phase current" data-phase="2">2. Simulate</div>
-                <div class="phase" data-phase="3">3. Act</div>
-                <div class="phase" data-phase="4">4. Prove</div>
+                <div class="phase complete" data-phase="1">1. Read the scan</div>
+                <div class="phase current" data-phase="2">2. Understand the result</div>
+                <div class="phase" data-phase="3">3. Plan a correction</div>
+                <div class="phase" data-phase="4">4. Compare a later scan</div>
               </div>
             </article>
             <article class="card result-panel" id="simulation-result">
@@ -1224,9 +1243,9 @@
                 <strong id="result-title">Access review required</strong>
                 <p id="result-copy"></p>
               </div>
-              <h3 style="margin-top:20px" id="result-path-title">Permission attack path</h3>
+              <h3 style="margin-top:20px" id="result-path-title">Information behind this result</h3>
               <div class="path" id="result-path"></div>
-              <button class="btn" data-go="remediation">Review remediation</button>
+              <button class="btn" data-go="remediation">Choose corrections for administrator review</button>
             </article>
           </aside>
         </div>
@@ -1234,9 +1253,9 @@
 
       <section class="page" id="findings">
         <div class="toolbar">
-          <div>
-            <h2 style="margin-bottom:4px">Grouped SharePoint access evidence</h2>
-            <p class="subtitle">Review grouped access patterns. Ordinary permissions remain inventory; sampled evidence is not a complete tenant assessment.</p>
+          <div data-page-help="findings">
+            <h2 style="margin-bottom:4px">Review who may access the collected SharePoint items</h2>
+            <p class="subtitle">Similar sharing records are grouped so that you can review a site or sharing pattern together rather than one permission at a time. Open a group to inspect its records and ask the site owner whether that access is intended. Counts of permission records are not counts of unique files: one item can have several permissions. Normal permissions are listed for context and are not automatically problems. The scan covers only the sites and items it collected, and does not prove what Copilot can retrieve.</p>
           </div>
           <select id="severity-filter" aria-label="Filter findings by severity">
             <option value="all">All severities</option>
@@ -1247,82 +1266,92 @@
         </div>
         <div class="actions">
           <button class="btn" id="export-grouped-summary">Export review summary (CSV)</button>
-          <button class="btn" id="export-grouped-evidence" disabled>Export collected evidence (CSV)</button>
+          <button class="btn" id="export-grouped-evidence" disabled>Export collected permission records (CSV)</button>
         </div>
         <div class="finding-list" id="finding-list"></div>
       </section>
 
       <section class="page" id="remediation">
+        <article class="card" data-page-help="remediation" style="margin-bottom:16px">
+          <h2>Prepare a proposal, not an automatic change</h2>
+          <p class="subtitle">Use this page to select follow-up actions and download a review file for your administrators. Read the reason for each item before selecting it: some items need a setting reviewed, while others need more information before a decision is possible. Ask the responsible administrator or site owner to confirm the scope, obtain approval, and make any necessary changes in Microsoft 365 outside this app.</p>
+          <p class="subtitle">Selecting a checkbox only adds an action to your plan. It does not assign a person, approve the action, or fix a setting. After approved work is complete, use the Decision page to collect a later scan and compare it with the first saved scan. Predicted score changes are examples for planning, not proof of an improvement.</p>
+        </article>
         <div class="grid two">
           <article class="card">
             <div class="section-head" style="margin-top:0">
-              <div><h2>Recommended corrections</h2><p>Select evidence-linked controls for administrator review. These selections do not change the tenant.</p></div>
-              <span class="badge" id="applied-count">0 of 4 modelled</span>
+              <div><h2>Choose actions to include in the review file</h2><p>Read each recommendation and select the checkbox beside actions you want an administrator to review. Include information-gathering tasks as well as proposed setting changes when relevant.</p></div>
+              <span class="badge" id="applied-count">0 of 4 actions selected</span>
             </div>
             <div id="remediation-list"></div>
           </article>
           <aside>
             <article class="card">
-              <div class="metric-label">Forecast sharing readiness</div>
+              <div class="metric-label">Estimated sharing score after selected actions</div>
               <div class="metric-value" id="forecast-score">64</div>
               <div class="progress-track"><div class="progress-fill" id="forecast-progress"></div></div>
-              <p class="subtitle" style="margin-top:12px" id="forecast-copy">Model controls to see the expected reduction in AI exposure.</p>
+              <p class="subtitle" style="margin-top:12px" id="forecast-copy">Select actions to prepare a plan. Any estimated score is a planning example; only a later comparable scan can measure changes.</p>
               <div id="remediation-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
             </article>
             <article class="card" style="margin-top:16px">
-              <div class="tenant-label">Act</div>
-              <h3 style="margin-top:7px">Administrator remediation plan</h3>
+              <div class="tenant-label">File for administrator review</div>
+              <h3 style="margin-top:7px">Download your proposed correction plan</h3>
               <p class="subtitle" id="package-copy">Select corrections to download a JSON review file. An administrator must validate and implement each action outside AI Flight Deck, then return here and run verification.</p>
-              <button class="btn primary" id="generate-package" style="margin-top:14px">Export administrator remediation plan</button>
+              <button class="btn primary" id="generate-package" style="margin-top:14px">Download proposed actions (JSON)</button>
             </article>
             <article class="card" style="margin-top:16px">
-              <h3>Change-control boundary</h3>
-              <p class="subtitle">AI Flight Deck generates evidence and approved actions but does not silently change tenant configuration. Production execution must use supported APIs, least privilege, explicit approval, verification, and rollback.</p>
+              <h3>Who makes and approves changes?</h3>
+              <p class="subtitle">Your organization does. Flight Deck does not change Microsoft 365 configuration or grant approval. Administrators must use your normal approval process, confirm that the proposed change is appropriate, document how to undo it, and check the result afterward.</p>
             </article>
           </aside>
         </div>
       </section>
 
       <section class="page" id="clearance">
+        <article class="card" data-page-help="clearance" style="margin-bottom:16px">
+          <h2>Review the recommendation and the work still required</h2>
+          <p class="subtitle">This page brings together the app's readiness-check results and any comparison between scans. Read the recommendation, open the unresolved checks, and use the full plan to agree follow-up work with the appropriate people. The first saved scan is the <strong>baseline</strong>; a later scan collected for comparison is <strong>verification</strong>.</p>
+          <p class="subtitle">The recommendation applies Flight Deck's own rules. It is not Microsoft approval, compliance certification, or permission to enable Copilot. A successful sharing comparison only demonstrates changes within the comparable collected scope; it does not establish that every Microsoft 365 service, file, or user is ready. Your organization remains responsible for the pilot decision.</p>
+        </article>
         <article class="card" id="decision-upstream-summary" hidden></article>
         <article class="card clearance" id="clearance-card" role="status" aria-live="polite" aria-atomic="true">
           <div class="clearance-icon" id="clearance-icon" aria-hidden="true">!</div>
-          <p class="eyebrow">Estate readiness decision</p>
-          <h2 class="clearance-status" id="clearance-status">Estate readiness evidence is incomplete</h2>
-          <p class="clearance-copy" id="clearance-copy">The current collector measures a bounded SharePoint sharing signal. It cannot determine Microsoft 365 Copilot readiness until all required estate domains are assessed.</p>
+          <p class="eyebrow">Recommendation under Flight Deck's readiness rules</p>
+          <h2 class="clearance-status" id="clearance-status">There is not enough information for a readiness recommendation</h2>
+          <p class="clearance-copy" id="clearance-copy">The app has not assessed all required service areas. Review the missing checks below before using this report to support a pilot decision.</p>
           <div class="clearance-facts">
-            <div class="clearance-fact"><strong id="clearance-score">64</strong><span>Sharing signal</span></div>
-            <div class="clearance-fact"><strong id="clearance-open">3</strong><span>Sharing findings</span></div>
-            <div class="clearance-fact"><strong id="clearance-users">0/13</strong><span>Estate systems online</span></div>
+            <div class="clearance-fact"><strong id="clearance-score">64</strong><span>Sharing review score, not overall readiness</span></div>
+            <div class="clearance-fact"><strong id="clearance-open">3</strong><span id="clearance-open-label">Sharing items for review</span></div>
+            <div class="clearance-fact"><strong id="clearance-users">0/13</strong><span>Service areas with complete assessed coverage</span></div>
           </div>
           <div class="actions" style="justify-content:center;margin-top:24px">
             <button class="btn" data-go="remediation">Review proposed corrections</button>
-            <button class="btn" id="decision-export-csv" disabled>Export decision evidence CSV</button>
-            <button class="btn primary" id="download-clearance" disabled>Download decision record</button>
+            <button class="btn" id="decision-export-csv" disabled>Export check results (CSV)</button>
+            <button class="btn primary" id="download-clearance" disabled>Download recommendation and scan comparison</button>
           </div>
         </article>
         <article class="card" style="margin-top:16px">
           <div class="section-head" style="margin-top:0">
-            <div><h2>Decision blockers</h2><p>Open the required action, implementation instructions, and supporting Microsoft guidance for each listed blocker.</p></div>
+            <div><h2>Checks that still need attention before a decision</h2><p>This short list shows up to 12 unresolved checks, with failed checks first. Open a row to learn what information or action is needed and where an administrator can investigate. An unknown or expired result is not a confirmed configuration problem. Use the full plan below for the remaining checks.</p></div>
           </div>
           <div class="decision-blocker-list" id="decision-blockers"></div>
         </article>
         <article class="card" style="margin-top:16px">
           <div class="section-head" style="margin-top:0">
             <div>
-              <h2>Tenant-wide Copilot enablement plan</h2>
-              <p>Accountable owners, administration paths, implementation steps, collection boundaries, and supporting Microsoft references for all 77 controls.</p>
+              <h2>Full readiness checklist and instructions for administrators</h2>
+              <p>This plan lists all 77 Flight Deck readiness checks, not 77 automatically validated Microsoft requirements. Expand a check for suggested responsible roles, the relevant admin page, required information, and instructions. Suggested roles are not people assigned to the work. Filter the list to focus your review, or download the complete plan, including completed checks. Reading a setting or importing a report does not by itself make a check pass.</p>
             </div>
             <div class="actions enablement-actions">
-              <select id="enablement-filter" aria-label="Filter tenant enablement controls">
+              <select id="enablement-filter" aria-label="Filter readiness checks by work required">
                 <option value="remaining">Remaining requirements</option>
-                <option value="action">Action required</option>
-                <option value="evidence">Evidence required</option>
-                <option value="review">Owner review</option>
-                <option value="complete">Complete</option>
-                <option value="all">All controls</option>
+                <option value="action">Setting or action to review</option>
+                <option value="evidence">Information still needed</option>
+                <option value="review">Decision needed from an owner</option>
+                <option value="complete">Accepted by the app's rules</option>
+                <option value="all">All readiness checks</option>
               </select>
-              <button class="btn primary" id="download-enablement-plan" disabled>Download complete enablement plan</button>
+              <button class="btn primary" id="download-enablement-plan" disabled>Download all checks and administrator instructions</button>
             </div>
           </div>
           <div class="enablement-summary" id="enablement-summary"></div>
@@ -1332,32 +1361,33 @@
         <div class="grid two">
           <article class="card">
             <div class="section-head" style="margin-top:0">
-              <div><h2>Verify sharing corrections</h2><p>After administrators complete approved sharing changes, run verification. This verifies the sharing collector only; it does not complete the estate-wide readiness decision.</p></div>
+              <div><h2>Compare sharing access before and after administrator changes</h2><p>After approved changes are made outside this app, collect a later scan using the same scope and settings as the first saved scan. Flight Deck compares the two scans for removed, remaining, or newly observed sharing records. A different scope or incomplete scan may prevent a reliable comparison. This comparison is about collected sharing information, not all readiness checks.</p></div>
               <div class="actions">
-                <button class="btn primary" id="verify-workflow" disabled>Verify corrections and refresh decision</button>
-                <button class="btn" id="verification-button">Import existing comparison</button>
+                <button class="btn primary" id="verify-workflow" disabled>Run a later scan and compare sharing</button>
+                <button class="btn" id="verification-button">Import a saved scan comparison</button>
               </div>
               <input type="file" id="verification-file" accept=".json,application/json" hidden>
             </div>
-            <div id="verification-empty" class="prompt-box">No sharing comparison report has been imported. Verification can prove sharing improvement, but an estate-wide decision also requires licensing, identity, devices, network, compliance, security, Copilot configuration, agents, and adoption evidence.</div>
+            <div id="verification-empty" class="prompt-box">No comparison is loaded yet. First collect a baseline scan, have administrators review and complete approved work, then run a later scan for comparison. A lower sharing score penalty or fewer records does not establish readiness across licensing, identity, devices, network, compliance, security, Copilot settings, agents, and adoption.</div>
             <div id="verification-result" hidden>
               <div class="assurance-grid">
-                <div class="assurance-metric"><span>Readiness change</span><strong id="verified-score-delta">Not available</strong></div>
-                <div class="assurance-metric"><span>Critical paths</span><strong id="verified-critical-delta">Not available</strong></div>
-                <div class="assurance-metric"><span>Exposed items</span><strong id="verified-exposure-delta">Not available</strong></div>
-                <div class="assurance-metric"><span>Verification status</span><strong id="verified-status">Not available</strong></div>
+                <div class="assurance-metric"><span>Change in sharing review score</span><strong id="verified-score-delta">Not available</strong></div>
+                <div class="assurance-metric"><span>Change in critical sharing records</span><strong id="verified-critical-delta">Not available</strong></div>
+                <div class="assurance-metric"><span>Change in shared items counted</span><strong id="verified-exposure-delta">Not available</strong></div>
+                <div class="assurance-metric"><span>Scan comparison result</span><strong id="verified-status">Not available</strong></div>
               </div>
               <p class="subtitle" id="verified-copy" style="margin-top:14px"></p>
               <div class="prompt-box" id="verification-change-details" hidden></div>
             </div>
           </article>
           <article class="card">
-            <h2>Decision evidence trail</h2>
+            <h2>What has been saved for this decision?</h2>
+            <p class="subtitle">Read this history to distinguish the first scan, proposed actions, and a later comparison. A plan entry records your selection, not administrator approval or completed work.</p>
             <div class="evidence-log">
-              <div class="evidence-entry complete"><span class="evidence-dot"></span><div><strong>Baseline evidence collected</strong><small id="baseline-evidence">Synthetic demonstration baseline loaded.</small></div></div>
-              <div class="evidence-entry current" id="package-evidence"><span class="evidence-dot"></span><div><strong>Remediation package</strong><small>Awaiting approved action package.</small></div></div>
-              <div class="evidence-entry" id="verification-evidence"><span class="evidence-dot"></span><div><strong>Post-change verification</strong><small>Awaiting an authoritative comparison report.</small></div></div>
-              <div class="evidence-entry" id="clearance-evidence"><span class="evidence-dot"></span><div><strong>Estate-wide readiness decision</strong><small>Unavailable until all required readiness domains have sufficient evidence.</small></div></div>
+              <div class="evidence-entry complete"><span class="evidence-dot"></span><div><strong>First saved scan</strong><small id="baseline-evidence">Fictional example data is loaded, not a scan of your organization.</small></div></div>
+              <div class="evidence-entry current" id="package-evidence"><span class="evidence-dot"></span><div><strong>Proposed actions downloaded for review</strong><small>No actions downloaded yet. A download does not mean approval or implementation.</small></div></div>
+              <div class="evidence-entry" id="verification-evidence"><span class="evidence-dot"></span><div><strong>Later scan compared with the first scan</strong><small>No accepted scan comparison is loaded.</small></div></div>
+              <div class="evidence-entry" id="clearance-evidence"><span class="evidence-dot"></span><div><strong>Readiness recommendation</strong><small>Requires accepted, current information for the app's required readiness checks.</small></div></div>
             </div>
           </article>
         </div>
@@ -1365,26 +1395,27 @@
 
       <section class="page active" id="guide">
         <div class="guide-intro">
-          <article class="card">
+          <article class="card" data-page-help="guide">
             <p class="eyebrow">Step 1 of 4</p>
-            <h2>Set up an estate-wide Copilot readiness assessment</h2>
-            <p class="subtitle">Connect to your tenant. The app runs the read-only collectors, processes the evidence, and shows the remaining readiness gaps.</p>
+            <h2>Start by reading settings from your Microsoft 365 organization</h2>
+            <p class="subtitle">Your Microsoft 365 organization is called a tenant. Connect with an approved administrator account so Flight Deck can read available settings, permissions, and reports. The first saved scan is called the baseline. After it loads, choose the people for your pilot and record the settings and decisions below. The app uses this information to explain what has been checked and what still needs attention.</p>
             <div class="source-status" id="automatic-workload-notice" style="margin-top:12px" aria-labelledby="automatic-workload-title">
-              <strong id="automatic-workload-title">Automatic workload collection</strong>
-              <p>Exchange Online, SharePoint Online, Microsoft Purview, and Power Platform / Copilot Studio run from the app alongside the Graph scan. Missing connectors are installed for your Windows user. Evidence is saved and processed automatically: no scripts to run, exports to assemble, or JSON templates to fill.</p>
-              <p>Complete Microsoft's sign-in, MFA, or consent prompts for each service when requested. Your account still needs the relevant workload access. Collection errors and unsupported observations remain visible gaps, never automatic Pass results. Accountable owner decisions still require human approval.</p>
+              <strong id="automatic-workload-title">What happens when you connect and scan?</strong>
+              <p>The app uses Microsoft Graph to read available organization information and also attempts to connect to Exchange Online, SharePoint Online, Microsoft Purview, and Power Platform / Copilot Studio. These service-specific readers are called collectors. Missing connector software may be installed for your Windows user, and scan results are saved locally. You do not need to assemble report packages for the normal scan.</p>
+              <p>Complete Microsoft sign-in, multifactor authentication, and permission prompts for each service when requested. One successful sign-in does not grant access to every service. If a connection fails, read its message below and use the connection guide to identify the administrator role or permission required. Collected settings are not automatically accepted as passed checks: this version validates 3 checks automatically, supports 11 owner-statement checks, and cannot validate the other 63 checks.</p>
+              <p><a class="doc-link" href="https://github.com/sethiramicrosoft/ai-flight-deck/blob/main/docs/COLLECTOR-GUIDE.md" target="_blank" rel="noopener noreferrer">Read the service-by-service connection guide: access, sign-in, collection limits, and troubleshooting</a><br><a class="doc-link" href="https://github.com/sethiramicrosoft/ai-flight-deck/blob/main/README.md" target="_blank" rel="noopener noreferrer">Read the application guide: installation, workflow, and supported features</a></p>
             </div>
             <div class="actions" style="margin-top:18px">
               <button class="btn primary" id="connect-scan">Connect and scan tenant</button>
               <button class="btn" id="collect-workloads" type="button" disabled>Collect workload evidence</button>
-              <button class="btn" data-scroll="readiness-file">Import Microsoft readiness</button>
-              <button class="btn" data-scroll="assessment-file">Import Microsoft assessment</button>
+              <button class="btn" data-scroll="readiness-file">Import an optional readiness report</button>
+              <button class="btn" data-scroll="assessment-file">Import an optional Microsoft assessment</button>
               <button class="btn" id="cancel-workflow" hidden>Cancel active scan</button>
               <button class="btn" id="guide-import-scan">Import existing scan</button>
             </div>
             <div class="service-panel" id="service-panel" role="status" aria-live="polite" aria-atomic="true">
               <div class="service-status"><span class="service-dot" aria-hidden="true"></span><span id="service-status">Checking the local scanner...</span></div>
-              <p class="subtitle" id="service-help">Microsoft Graph uses the sign-in code below. Workload connectors can open separate Microsoft sign-in windows. Keep this app open; progress and collection errors appear here. Collect workload evidence updates an existing baseline without repeating the SharePoint sharing scan.</p>
+              <p class="subtitle" id="service-help">Microsoft Graph uses the sign-in code below. Other services may open separate Microsoft sign-in windows. Keep this app open to see progress and errors. “Collect workload evidence” means read updated information from connected Microsoft 365 services and add it to the first saved scan. It does not repeat the SharePoint sharing scan and is not the later scan used to compare corrections.</p>
               <div class="guide-callout" id="auth-instructions" style="margin-top:12px" hidden>
                 <strong>Microsoft sign-in code</strong>
                 <span id="auth-code"></span>
@@ -1406,14 +1437,17 @@
           </article>
         </div>
 
+        <article class="card" id="setup-decision-forms" style="margin-top:16px"></article>
+        <p class="subtitle" style="margin-top:12px">Complete the initial sign-in and load the first scan before selecting pilot people. A <strong>cohort</strong> means the people you select for that pilot, not every user in the organization. Saving choices here records your plan; it does not add group members, assign licences, or enable Copilot.</p>
+
         <div class="section-head" id="microsoft-evidence-section">
-          <div><h2>Microsoft evidence sources</h2><p>Combine Microsoft reports with the live tenant scan. Imported evidence never replaces a fresh conclusive live result.</p></div>
+          <div><h2>Optional: add reports you already exported from Microsoft</h2><p>Use these imports if you already have the relevant CSV files. They add report information to the assessment; they are not required just to start the scan. Record the report's date so the app can assess its age. An import does not override a current, conclusive live check, and an unrecognized row cannot establish that a readiness requirement has been met.</p></div>
         </div>
         <div class="evidence-source-grid">
           <article class="card">
-            <p class="eyebrow">Fast path</p>
+            <p class="eyebrow">Optional user activity and licence report</p>
             <h3>Microsoft 365 Copilot Readiness report</h3>
-            <p class="subtitle">Import the CSV exported from the Microsoft 365 admin center. It provides 28-day activity, licence, eligible update-channel, and suggested-candidate evidence.</p>
+            <p class="subtitle">Choose the Microsoft 365 Copilot Readiness CSV exported from the Microsoft 365 admin center and enter its report date. It describes 28-day application activity, licences, eligible update channels, and suggested pilot candidates. A suggestion is not an approved participant, and aggregate activity does not prove that each selected person meets every requirement.</p>
             <div class="field-grid">
               <label class="field">Report as-of date
                 <input type="date" id="readiness-reported-at">
@@ -1427,11 +1461,11 @@
             </div>
             <div class="source-status" id="readiness-source-status">No Microsoft 365 Copilot Readiness report imported.</div>
             <div id="cohort-builder" hidden>
-              <h3 style="margin-top:18px">Approve a named pilot cohort</h3>
-              <p class="subtitle">Select identified users, name the accountable owner, then save. Rerun the live scan to resolve the selected users to Microsoft Graph identities.</p>
+              <h3 style="margin-top:18px">Choose pilot participants from this report</h3>
+              <p class="subtitle">Select the people your organization has agreed to include, enter a name for the pilot and the person responsible, then save the selection. This saved group is called a cohort. Rerun the scan to match the selected users to their Microsoft 365 accounts. Saving does not assign licences, change group membership, or independently verify approval.</p>
               <div class="candidate-list" id="candidate-list"></div>
               <div class="field-grid">
-                <label class="field">Cohort name
+                <label class="field">Name for this pilot group
                   <input type="text" id="cohort-name" value="Microsoft 365 Copilot pilot">
                 </label>
                 <label class="field">Accountable owner
@@ -1439,20 +1473,20 @@
                 </label>
               </div>
               <div class="actions" style="margin-top:12px">
-                <button class="btn" id="save-cohort" type="button">Save approved cohort</button>
+                <button class="btn" id="save-cohort" type="button">Save selected pilot participants</button>
               </div>
               <div class="source-status" id="cohort-status" hidden></div>
             </div>
           </article>
           <article class="card">
-            <p class="eyebrow">Microsoft assessment path</p>
+            <p class="eyebrow">Optional results from Microsoft's assessment tool</p>
             <h3>Microsoft automated readiness assessment</h3>
-            <p class="subtitle">Import the assessment's recommendation CSV. Exact checks from a pinned source revision are mapped conservatively; every unverified row remains staged for review.</p>
+            <p class="subtitle">Choose the recommendation CSV produced by Microsoft's automated readiness assessment. Enter its date and the tool version or source-code revision that produced it. Flight Deck recognizes specific checks from supported versions; other rows remain available for review but do not count as validated results. A successful file import is not a successful readiness assessment.</p>
             <div class="field-grid">
               <label class="field">Assessment as-of date
                 <input type="date" id="assessment-reported-at">
               </label>
-              <label class="field">Upstream commit or release
+              <label class="field">Microsoft assessment tool version or source-code commit
                 <input type="text" id="assessment-version" value="f542406ffba2066d943643de8d7a87b755b98cab">
               </label>
             </div>
@@ -1468,50 +1502,49 @@
 
         <div class="section-head">
           <div>
-            <h2>Evidence completion center</h2>
-            <p>Separate your decisions, confirmed administrator actions, and limitations in the app. An unverified check does not mean your tenant is misconfigured.</p>
+            <h2>What still needs to be checked</h2>
+            <p>Review what is missing before you use this assessment to make a pilot decision. Some items need a choice from you, some need an administrator to collect information or review a setting, and some cannot be checked by this version of Flight Deck. Each item explains the next step. A check with missing information is not proof of a problem in Microsoft 365.</p>
           </div>
         </div>
         <article class="card">
           <div class="assurance-grid" id="completion-summary" role="status" aria-live="polite" aria-atomic="true">
-            <div class="assurance-metric"><span>Current mission</span><strong>Loading</strong></div>
-            <div class="assurance-metric"><span>Complete</span><strong>0</strong></div>
-            <div class="assurance-metric"><span>Evidence required</span><strong>77</strong></div>
-            <div class="assurance-metric"><span>Configuration action</span><strong>0</strong></div>
+            <div class="assurance-metric"><span>Stage being reviewed</span><strong>Loading</strong></div>
+            <div class="assurance-metric"><span>Checks accepted by the app</span><strong>0</strong></div>
+            <div class="assurance-metric"><span>Checks not yet accepted</span><strong>77</strong></div>
+            <div class="assurance-metric"><span>Checks needing a setting or action reviewed</span><strong>0</strong></div>
           </div>
           <ul class="completion-blockers" id="completion-blockers" role="list" aria-live="polite"></ul>
         </article>
-        <article class="card" id="setup-decision-forms" style="margin-top:16px"></article>
         <details class="card" id="advanced-evidence-imports" style="margin-top:16px">
-          <summary>Advanced: import an existing evidence package (optional)</summary>
-          <p class="subtitle">Automatic collection does not use these upload controls. They are retained for existing offline workflows.</p>
+          <summary>Optional advanced workflow: import information collected outside this app</summary>
+          <p class="subtitle">Skip this section for the normal connected scan. These controls are for administrators who already use a compatible offline collection script or package. The app checks the package's source, scope, timing, and integrity before considering its contents. Accepting a package does not prove that its settings meet a readiness requirement.</p>
         <div class="evidence-source-grid" style="margin-top:16px">
           <article class="card">
             <p class="eyebrow">Optional offline compatibility</p>
-            <h3>Import administrator evidence</h3>
-            <p class="subtitle">Use only if you already maintain an offline collection workflow. Create a collection challenge after your baseline scan and import its output within 30 minutes. The normal scan handles collection and ingestion without this step.</p>
+            <h3>Import an administrator's collected settings</h3>
+            <p class="subtitle">After the first scan, create a collection request, also called a challenge. It ties the offline collection to the current scan. Use that request with the compatible collector, then import its JSON output within 30 minutes. The app adds a local integrity seal so it can detect later alteration; that seal does not independently inspect the settings. The normal connected scan handles these steps for you.</p>
             <label class="field" style="margin-top:12px">Administrator evidence package
               <input type="file" id="admin-evidence-file" accept=".json,application/json">
             </label>
             <div class="actions" style="margin-top:12px">
-              <button class="btn" id="prepare-admin-evidence" type="button">Create collection challenge</button>
-              <button class="btn primary" id="import-admin-evidence" type="button">Import administrator evidence</button>
-              <a class="btn" href="scanner/collect-admin-evidence.ps1" download>Download collector</a>
+              <button class="btn" id="prepare-admin-evidence" type="button">Create a time-limited collection request</button>
+              <button class="btn primary" id="import-admin-evidence" type="button">Import collected settings (JSON)</button>
+              <a class="btn" href="scanner/collect-admin-evidence.ps1" download>Download the administrator collection script</a>
             </div>
             <pre class="service-log" id="admin-evidence-challenge" hidden></pre>
             <div class="source-status" id="admin-evidence-status" role="status" aria-live="polite">No locally sealed administrator evidence package is available.</div>
           </article>
           <article class="card" id="power-platform-manual-evidence" tabindex="-1" aria-label="Optional Power Platform evidence import">
             <p class="eyebrow">Optional offline compatibility</p>
-            <h3>Import Power Platform evidence</h3>
-            <p class="subtitle" id="power-platform-manual-boundary">The app collects Power Platform evidence automatically. This optional importer accepts a compatible offline package with a current baseline collection challenge; it is not required to run the tool.</p>
-            <p class="source-status"><strong>After import:</strong> The app checks the package and protects it against alteration. It does not independently verify the exports or automatically mark controls as Pass. Power Platform controls without a supported observation-validation path remain Unknown. The owner statement for AFD-PPA-005 uses the separate attestation form below.</p>
+            <h3>Import Power Platform settings collected offline</h3>
+            <p class="subtitle" id="power-platform-manual-boundary">The connected scan already attempts Power Platform collection. Use this alternative only for a compatible offline JSON package. Create a time-limited collection request for the current first scan, collect the information using that request, then import the output. This upload is not a prerequisite for running the app.</p>
+            <p class="source-status"><strong>What happens after import?</strong> The app checks the package and protects it against alteration. It does not independently verify the exports or automatically mark readiness checks as passed. A check remains unknown when this version cannot validate the reported setting. To record the responsible person's review for AFD-PPA-005, use the owner-statement form below instead.</p>
             <label class="field" style="margin-top:12px">Power Platform evidence package
               <input type="file" id="power-platform-evidence-file" accept=".json,application/json" aria-describedby="power-platform-manual-boundary">
             </label>
             <div class="actions" style="margin-top:12px">
-              <button class="btn" id="prepare-power-platform-evidence" type="button">Create collection challenge</button>
-              <button class="btn primary" id="import-power-platform-evidence" type="button">Import Power Platform evidence</button>
+              <button class="btn" id="prepare-power-platform-evidence" type="button">Create a time-limited collection request</button>
+              <button class="btn primary" id="import-power-platform-evidence" type="button">Import Power Platform settings (JSON)</button>
               <a class="btn" href="schema/power-platform-evidence.template.v1.json" download>Download blank JSON template</a>
             </div>
             <pre class="service-log" id="power-platform-evidence-challenge" hidden></pre>
@@ -1520,43 +1553,44 @@
         </div>
         </details>
         <article class="card" style="margin-top:16px">
-          <p class="eyebrow">Accountable human decision</p>
-          <h3>Create a locally sealed attestation</h3>
-          <p class="subtitle">Use only for controls explicitly classified as Attested. The accountable owner supplies the statement and supporting JSON; AI Flight Deck binds it to the tenant, approved cohort, control, signer, and control-specific expiry window.</p>
+          <p class="eyebrow">For checks that require a responsible person's statement</p>
+          <h3>Record a written answer from the responsible person</h3>
+          <p class="subtitle">Some requirements, such as an agreed pilot plan or an owner review, cannot be established by reading a setting. For the 11 supported owner-statement checks, select the requirement below, describe what was reviewed and for which pilot people, supply the required supporting data and references, and set an expiry date. This record is called an <strong>attestation</strong>. Do not use it to bypass a check that needs a supported automatic validation method.</p>
+          <p class="subtitle">The app records the signed-in scan account, organization, selected pilot group, check, and expiry, then protects the saved statement against later alteration. This local seal does not prove that the statement is true or that an independent reviewer inspected the setting. Only record an approval that has actually been given; run a new scan afterward to evaluate the saved statement.</p>
           <div class="field-grid">
-            <label class="field">Attested control
+            <label class="field">Readiness requirement being confirmed
               <select id="attestation-control"></select>
             </label>
-            <label class="field">Decision
+            <label class="field">What did the review conclude?
               <select id="attestation-decision">
-                <option value="Pass">Pass</option>
-                <option value="Fail">Fail</option>
-                <option value="Warning">Warning</option>
-                <option value="NotApplicable">Not applicable</option>
+                <option value="Pass">Requirement met (Pass)</option>
+                <option value="Fail">Requirement not met (Fail)</option>
+                <option value="Warning">Needs attention (Warning)</option>
+                <option value="NotApplicable">Does not apply to this pilot</option>
               </select>
             </label>
-            <label class="field">Authenticated attester
-              <input type="text" id="attestation-owner" readonly aria-readonly="true" placeholder="Loaded from the verified scan actor">
+            <label class="field">Signed-in account recorded with the statement
+              <input type="text" id="attestation-owner" readonly aria-readonly="true" placeholder="Available after an authenticated scan">
             </label>
-            <label class="field">Expires at
+            <label class="field">When must this statement be reviewed again?
               <input type="datetime-local" id="attestation-expiry" aria-describedby="attestation-expiry-hint">
-              <small id="attestation-expiry-hint">Select a control to load its maximum evidence lifetime.</small>
+              <small id="attestation-expiry-hint">Select a requirement to see how long this statement may remain valid.</small>
             </label>
           </div>
-          <label class="field" style="margin-top:12px">Statement
-            <textarea id="attestation-statement" placeholder="State exactly what was reviewed, approved, and for which cohort."></textarea>
+          <label class="field" style="margin-top:12px">Describe what was reviewed and confirmed
+            <textarea id="attestation-statement" placeholder="Name the pilot people or group, what you reviewed, who approved it, and the date. Do not claim an approval that has not happened."></textarea>
           </label>
-          <label class="field" style="margin-top:12px">Supporting data (JSON object)
+          <label class="field" style="margin-top:12px">Required supporting fields (JSON; replace example values with reviewed facts)
             <textarea id="attestation-data">{}</textarea>
           </label>
           <div class="source-status" id="attestation-guidance" role="note">
-            Select a control to see the evidence required to clear it.
+            Select a requirement to see the supporting information needed. Example values are not confirmed facts.
           </div>
-          <label class="field" style="margin-top:12px">Evidence references (one URL or identifier per line)
+          <label class="field" style="margin-top:12px">References to the reviewed records (one URL or record identifier per line)
             <textarea id="attestation-references"></textarea>
           </label>
           <div id="not-applicable-fields" hidden>
-            <p class="subtitle">Not applicable means this control legitimately does not apply to the approved cohort. It requires a named approver, reason, and bounded expiry.</p>
+            <p class="subtitle">Choose “Does not apply” only when the requirement genuinely does not apply to the selected pilot people. Missing information is not a reason to exclude a requirement. Record the approver, the reason, the scope reference, and a date to review the exception.</p>
             <div class="field-grid">
               <label class="field">Approved by
                 <input type="text" id="attestation-approved-by" aria-required="true">
@@ -1568,9 +1602,9 @@
           </div>
           <div id="not-applicable-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
           <div class="actions" style="margin-top:12px">
-            <button class="btn primary" id="create-attestation" type="button">Create sealed attestation</button>
+            <button class="btn primary" id="create-attestation" type="button">Save the reviewed statement locally</button>
           </div>
-          <div class="source-status" id="attestation-status" role="status" aria-live="polite">Load a live baseline with an approved cohort before creating accountable evidence.</div>
+          <div class="source-status" id="attestation-status" role="status" aria-live="polite">Load an authenticated first scan and a selected pilot group before saving an owner statement.</div>
         </article>
 
         <div class="section-head">
@@ -1593,7 +1627,7 @@
             <ul class="guide-checklist">
               <li><span>Microsoft Graph consent is requested only for the read scopes used by enabled collectors.</span></li>
               <li><span>Exchange, SharePoint administration, Purview, Defender, and Power Platform require their own authenticated workload adapters.</span></li>
-              <li><span>Human governance controls require current, attributable, signed attestations.</span></li>
+              <li><span>Requirements about human decisions need a current statement from the responsible person, linked to the selected pilot and its supporting records.</span></li>
             </ul>
             <div class="guide-callout" style="margin-top:16px">
               <strong>Collection boundary</strong>
@@ -1616,18 +1650,18 @@
           <article class="card guide-step">
             <div class="guide-step-number">2</div>
             <div>
-              <h3>Let the tool capture the baseline</h3>
-              <p>The product runs the bounded read-only scan, stores the evidence in the protected user-local workspace, and opens Assessment automatically. You do not need to find or import a JSON file.</p>
+              <h3>Wait for the first scan, then choose your pilot people</h3>
+              <p>The app reads the configured sample of information, saves this first scan as the baseline in your local workspace, and opens Assessment. Return to Set up to choose the pilot people and record the required decisions. You do not need to find a JSON file for a scan started in the app.</p>
             </div>
           </article>
           <article class="card guide-step">
             <div class="guide-step-number">3</div>
             <div>
-              <h3>Import and assess</h3>
-              <p>Start with the thirteen-domain estate mission map. Every collector is attempted, and each unavailable permission, licence, workload connection, network test, or attestation is shown against the exact blocked control. Manual import remains available for existing artifacts or offline review.</p>
+              <h3>Review the results for each service area</h3>
+              <p>Open Assessment and select one of the 13 service areas to read its checks. Review connection errors separately from check results: reading a service does not mean every requirement passed. Add optional reports if available, then use “What still needs to be checked” on Set up to find decisions, administrator follow-up, and checks this version cannot perform.</p>
               <div class="actions" style="margin-top:12px">
-                <button class="btn" data-go="overview">Open overview</button>
-                <button class="btn" data-go="findings">Review findings</button>
+                <button class="btn" data-go="overview">Open the assessment</button>
+                <button class="btn" data-go="findings">Review collected sharing records</button>
               </div>
             </div>
           </article>
@@ -1635,19 +1669,19 @@
             <div class="guide-step-number">4</div>
             <div>
               <h3>Understand the risk</h3>
-              <p>Open each finding to understand the rule, source, evidence identifier, severity, and affected resource. Demonstration scenarios show how inherited Microsoft 365 access can become Copilot exposure. Live simulation remains unavailable until the collector has effective permission paths.</p>
+              <p>Open a sharing result to see the location, permission, possible audience, and recommended owner review. For example, a link usable by everyone in the organization may be intentional; ask the site owner before proposing a restriction. The app explains saved information and fictional examples. It does not send test prompts to Copilot or prove that sensitive content was disclosed.</p>
               <div class="actions" style="margin-top:12px">
-                <button class="btn" data-go="simulator">Open simulator</button>
+                <button class="btn" data-go="simulator">Explain a sharing or readiness result</button>
               </div>
             </div>
           </article>
           <article class="card guide-step">
             <div class="guide-step-number">5</div>
             <div>
-              <h3>Prepare approved corrections</h3>
-              <p>On the Remediation plan page, select evidence-linked actions and generate the action package. This is a proposal for administrator review. Selecting an action does not mean the control has been applied.</p>
+              <h3>Select proposed corrections for review</h3>
+              <p>On Plan corrections, select the follow-up actions you want included in the downloadable JSON review file. Give the proposal to your administrators through your normal process. Selecting or downloading an action does not approve it, assign it to a person, or apply a setting change.</p>
               <div class="actions" style="margin-top:12px">
-                <button class="btn" data-go="remediation">Open remediation plan</button>
+                <button class="btn" data-go="remediation">Choose proposed corrections</button>
               </div>
             </div>
           </article>
@@ -1661,8 +1695,8 @@
           <article class="card guide-step">
             <div class="guide-step-number">7</div>
             <div>
-              <h3>Capture verification and compare</h3>
-              <p>Select <strong>Verify corrections and refresh decision</strong>. The tool rescans the sharing scope and proves whether those corrections worked. A successful comparison verifies sharing controls only and never substitutes for the remaining estate domains.</p>
+              <h3>Collect a later scan and compare the same sharing scope</h3>
+              <p>On Review pilot decision, select <strong>Run a later scan and compare sharing</strong>. This later scan is called verification. The app checks whether comparable sharing records changed, remained, or appeared. It cannot prove that every correction was effective outside the scanned scope, and it does not replace the other readiness checks.</p>
               <div class="actions" style="margin-top:12px">
                 <button class="btn" data-go="clearance">Open rollout decision</button>
               </div>
@@ -1671,19 +1705,19 @@
         </div>
 
         <div class="section-head">
-          <div><h2>How the estate-wide decision works</h2><p>No single collector or score can approve Microsoft 365 Copilot rollout.</p></div>
+          <div><h2>How to interpret the readiness and comparison results</h2><p>Read the meaning before deciding what to do. A missing result is different from a failed requirement, and a successful sharing comparison is different from overall pilot readiness.</p></div>
         </div>
         <article class="card guide-table-wrap">
           <table class="guide-table">
             <caption class="sr-only">Copilot rollout decision rules and recommended actions</caption>
             <thead><tr><th scope="col">Assessment result</th><th scope="col">What it means</th><th scope="col">Recommended action</th></tr></thead>
             <tbody>
-              <tr><td>Domain not collected</td><td>A required estate domain has no evidence.</td><td><strong>No estate decision.</strong> Connect the required collector or complete the organizational assessment.</td></tr>
-              <tr><td>Domain partial</td><td>Some evidence exists, but important controls or populations remain outside scope.</td><td>Review the stated gaps and collect the missing evidence.</td></tr>
-              <tr><td>Sharing finding</td><td>The SharePoint collector found anonymous sharing, organization-wide sharing, or a public workspace requiring validation.</td><td>Confirm intent with the owner, correct unjustified access, and verify again.</td></tr>
-              <tr><td>Sharing drift</td><td>The newer sharing scan has worse counts or newly opened evidence.</td><td>Investigate the changed evidence while continuing the estate assessment.</td></tr>
-              <tr><td>Sharing controls verified</td><td>The approved sharing changes were proven by comparable scans.</td><td>Mark only the sharing workstream as verified. Continue licensing, identity, devices, network, compliance, security, Copilot configuration, agents, and adoption assessment.</td></tr>
-              <tr><td>Estate decision available</td><td>Every required domain has sufficient, current evidence and the approved pilot cohort meets all mandatory gates.</td><td>Present the evidence-backed pilot recommendation to the accountable decision owner.</td></tr>
+              <tr><td>No checks assessed in a service area</td><td>The app has no usable check results for that area. It may lack access, current information, or a supported validation method.</td><td>Read the limitation. Ask an administrator to address collection requirements where supported; do not assume the service is misconfigured.</td></tr>
+              <tr><td>Some checks assessed</td><td>The app can assess only part of the service area or selected population.</td><td>Review the missing checks and the people or resources outside the assessed scope.</td></tr>
+              <tr><td>Sharing item needs review</td><td>A recorded link or public group may allow wider access than the owner intended.</td><td>Ask the owner whether access is appropriate. Propose changes only when justified and approved.</td></tr>
+              <tr><td>New or worse sharing results</td><td>The later scan found added sharing records or worse counts. Technical reports may call this drift.</td><td>Review the changed records against the first scan. New access may be intentional; it is not automatic proof of disclosure.</td></tr>
+              <tr><td>Sharing comparison meets the app's rules</td><td>Comparable scans show the required improvement within the collected sharing scope.</td><td>Record the limited result, then continue the other readiness reviews. Do not treat it as organization-wide approval.</td></tr>
+              <tr><td>Readiness recommendation available</td><td>The app has enough accepted, current information to apply its rules to the selected pilot.</td><td>Present the recommendation, remaining conditions, and limitations to the person responsible for the pilot decision. This is not certification.</td></tr>
             </tbody>
           </table>
         </article>
@@ -1692,27 +1726,27 @@
           <div><h2>What each stage is for</h2><p>Use the four stages as one connected decision process.</p></div>
         </div>
         <div class="grid two">
-          <article class="card"><h3>1. Set up</h3><p class="subtitle">Explains permissions, boundaries, commands, roles, and the evidence workflow.</p></article>
-          <article class="card"><h3>2. Assessment</h3><p class="subtitle">Maps thirteen estate-readiness systems as online, degraded, or unscanned, then presents evidence from connected collectors.</p></article>
-          <article class="card"><h3>3. Corrections</h3><p class="subtitle">Packages proposed actions for approval. Forecast values are planning aids, not tenant changes or proof.</p></article>
-          <article class="card"><h3>4. Decision</h3><p class="subtitle">Separates verified sharing changes from the estate-wide readiness decision, which remains unavailable until every mandatory domain has sufficient evidence.</p></article>
+          <article class="card"><h3>1. Set up your pilot</h3><p class="subtitle">Sign in and collect the first scan, choose pilot participants, and record decisions. Add existing reports if needed. Use the outstanding-check list to identify your next action.</p></article>
+          <article class="card"><h3>2. Review assessment</h3><p class="subtitle">Open each of the 13 service areas to see which requirements were assessed and which remain unknown. Inspect sharing records before treating broad access as a problem.</p></article>
+          <article class="card"><h3>3. Plan corrections</h3><p class="subtitle">Select proposed actions and download a review file. Administrators must approve and implement any changes outside the app; selecting an action does not fix anything.</p></article>
+          <article class="card"><h3>4. Review pilot decision</h3><p class="subtitle">Read the recommendation, unresolved requirements, and administrator instructions. Compare a later scan after approved changes. An improvement in sharing alone does not establish overall readiness.</p></article>
         </div>
 
         <div class="section-head">
-          <div><h2>Required estate domains before enabling Copilot</h2><p>Sharing is one workstream inside the complete deployment decision.</p></div>
+          <div><h2>Topics your organization still needs to review</h2><p>A sharing review is only one part of preparing a Copilot pilot. Use these topics to agree responsibilities with your administrators and program owner, including checks the app cannot currently validate.</p></div>
         </div>
         <article class="card">
           <ul class="guide-checklist">
             <li><span>Confirm Microsoft 365 Copilot licensing and supported user prerequisites.</span></li>
-            <li><span>Review Entra identity protection, MFA, Conditional Access, and privileged roles.</span></li>
-            <li><span>Confirm Purview sensitivity labels, DLP, retention, and information-protection requirements.</span></li>
-            <li><span>Review Defender posture, managed devices, and incident-response processes.</span></li>
+            <li><span>Review Microsoft Entra sign-in protection, multifactor authentication (MFA), Conditional Access rules, and administrator permissions.</span></li>
+            <li><span>Review Microsoft Purview sensitivity labels, data loss prevention (DLP) rules, retention, and information-protection requirements.</span></li>
+            <li><span>Review Microsoft Defender security settings, managed devices, and the process for responding to incidents.</span></li>
             <li><span>Approve the pilot population, support model, adoption plan, communications, and success measures.</span></li>
-            <li><span>Continue rescanning after rollout so newly opened sharing evidence stops expansion until it is reviewed.</span></li>
+            <li><span>After rollout, collect later scans and review newly observed sharing records before deciding whether to expand the pilot. Flight Deck does not automatically stop rollout.</span></li>
           </ul>
           <div class="guide-callout" style="margin-top:18px">
             <strong>Decision boundary</strong>
-            AI Flight Deck provides decision support, not compliance certification. The current live connector supplies partial identity and SharePoint sharing evidence. The estate decision remains unavailable until licensing, identity controls, devices, network, compliance, security, Copilot configuration, agents, and adoption evidence are connected.
+            AI Flight Deck supports your review; it does not certify compliance or authorize rollout. Connections can collect information even when the app has no supported way to validate the corresponding check. In this version, 3 checks support automatic validation, 11 support owner statements, and 63 remain unsupported. Your organization must review those limitations rather than treating connection success as readiness.
           </div>
         </article>
       </section>
@@ -1720,10 +1754,10 @@
   </div>
 
   <nav class="mobile-nav" aria-label="Mobile navigation">
-    <button class="nav-item active" data-page="guide" aria-current="page"><span class="nav-icon" aria-hidden="true">1</span>Set up</button>
-    <button class="nav-item" data-page="overview"><span class="nav-icon" aria-hidden="true">2</span>Assessment</button>
-    <button class="nav-item" data-page="remediation"><span class="nav-icon" aria-hidden="true">3</span>Corrections</button>
-    <button class="nav-item" data-page="clearance"><span class="nav-icon" aria-hidden="true">4</span>Decision</button>
+    <button class="nav-item active" data-page="guide" aria-current="page"><span class="nav-icon" aria-hidden="true">1</span>Set up pilot</button>
+    <button class="nav-item" data-page="overview"><span class="nav-icon" aria-hidden="true">2</span>Review results</button>
+    <button class="nav-item" data-page="remediation"><span class="nav-icon" aria-hidden="true">3</span>Plan corrections</button>
+    <button class="nav-item" data-page="clearance"><span class="nav-icon" aria-hidden="true">4</span>Pilot decision</button>
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
@@ -1841,19 +1875,19 @@
     ];
 
     const demoRemediations = [
-      { id: "rcd", title: "Enable Restricted Content Discovery on nine sites", copy: "Prevent broad Copilot discovery while preserving direct user access and site collaboration.", gain: 12, critical: 1, users: 1320, effort: "Low effort" },
+      { id: "rcd", title: "Review Restricted Content Discovery for nine example sites", copy: "In this fictional example, ask a SharePoint administrator whether limiting content discovery is appropriate. This setting is not a substitute for reviewing who has permission to access the sites.", gain: 12, critical: 1, users: 1320, effort: "Low effort" },
       { id: "groups", title: "Remove stale users from privileged collaboration groups", copy: "Review HR Project Alumni and All Employees inheritance before the Copilot pilot.", gain: 9, critical: 1, users: 327, effort: "Medium effort" },
-      { id: "rac", title: "Apply Restricted Access Control to Strategy Hub", copy: "Require membership in the approved Strategy security group for site and AI-grounded access.", gain: 10, critical: 1, users: 2571, effort: "Medium effort" },
-      { id: "labels", title: "Publish labels and DLP controls for high-risk content", copy: "Extend sensitivity classification and policy coverage to acquisition, compensation, and finance content.", gain: 5, critical: 0, users: 0, effort: "High effort" }
+      { id: "rac", title: "Review Restricted Access Control for the example Strategy Hub site", copy: "Ask the administrator to assess restricting site access to members of the approved Strategy security group. Confirm the business need and approval before changing access; the app does not apply this restriction.", gain: 10, critical: 1, users: 2571, effort: "Medium effort" },
+      { id: "labels", title: "Review sensitivity labels and data loss prevention rules", copy: "In this fictional example, ask the compliance administrator to review how acquisition, compensation, and finance information is labelled and protected. DLP means data loss prevention. The predicted score is not proof that those protections work.", gain: 5, critical: 0, users: 0, effort: "High effort" }
     ];
 
     const pageMeta = {
-      overview: ["Estate readiness assessment", "Review collected evidence, missing readiness domains, and sharing findings."],
-      simulator: ["Copilot risk simulator", "Model realistic exposure paths before enabling AI."],
-      findings: ["Sharing evidence details", "Review the sharing signals collected from Microsoft Graph."],
-      remediation: ["Corrections for administrator review", "Queue evidence-linked changes, obtain approval, and verify them with a new scan."],
-      clearance: ["Estate readiness decision", "Separate verified sharing improvement from the remaining estate-wide readiness evidence."],
-      guide: ["Set up your estate assessment", "Connect evidence sources required for a Microsoft 365 Copilot readiness decision."]
+      overview: ["Review your Microsoft 365 readiness assessment", "See what the saved scan checked, where information is missing, and which results need a person to review them."],
+      simulator: ["Understand a sharing or readiness result", "Choose a saved result to see the information behind it and the next review step. This does not test Copilot or change settings."],
+      findings: ["Review SharePoint access and sharing", "Inspect collected permission records, understand the possible audience, and confirm with site owners whether access is intended."],
+      remediation: ["Plan corrections for administrator review", "Select proposed actions for a downloadable review file. Administrators approve and make changes outside this app; a later scan is needed to measure the result."],
+      clearance: ["Review the recommendation for your Copilot pilot", "Check unresolved requirements and compare sharing scans. Flight Deck's recommendation supports, but does not replace, your organization's decision."],
+      guide: ["Connect Microsoft 365 and choose your pilot", "Collect the first read-only scan, choose the pilot participants, and record the decisions needed for the assessment. The app does not enable Copilot or change Microsoft 365 settings."]
     };
 
     const MAX_SCAN_FILE_BYTES = 50 * 1024 * 1024;
@@ -1934,17 +1968,37 @@
       blastRadiusUsers: 4218
     };
 
+    function readableCheckStatus(status) {
+      return {
+        Pass: "Requirement met",
+        Fail: "Requirement not met",
+        Warning: "Needs review",
+        Unknown: "Not enough usable information",
+        Expired: "Information is too old",
+        NotApplicable: "Does not apply to this pilot"
+      }[status] || status;
+    }
+
+    function readableStage(name) {
+      return {
+        Activation: "Prepare the first pilot",
+        "Safe pilot": "Review the pilot's access and data protection",
+        Scale: "Review requirements before expanding",
+        Assure: "Keep the assessment current"
+      }[name] || name;
+    }
+
     function scenarioCard(scenario, selected = false) {
       const badgeText = scenario.mode === "access"
         ? (scenario.badgeText || "Owner validation required")
-        : `${scenario.severity} scenario`;
+        : `${scenario.severity} review priority`;
       const article = document.createElement("article");
       article.className = `card scenario-card ${selected ? "selected" : ""}`;
       article.dataset.scenario = scenario.id;
       article.tabIndex = 0;
       article.setAttribute("role", "button");
       article.setAttribute("aria-pressed", String(selected));
-      article.setAttribute("aria-label", `Select scenario: ${scenario.title}`);
+      article.setAttribute("aria-label", `Select result to explain: ${scenario.title}`);
       const number = document.createElement("div");
       number.className = "scenario-number";
       number.textContent = String(scenario.sequence || 1).padStart(2, "0");
@@ -1965,47 +2019,47 @@
       const runButton = document.getElementById("run-simulation");
       const readinessMode = scenarios[0]?.mode === "readiness";
       pageMeta.simulator = readinessMode
-        ? ["Readiness blocker trace", "Understand what is blocking the rollout decision and the evidence required to clear it."]
-        : ["SharePoint access and sharing review", "Review evidence-backed public sites, broad sharing links, identity context, and scan coverage before enabling Microsoft 365 Copilot."];
+        ? ["Understand an unresolved readiness check", "Read the saved result, the requirement it relates to, and the information or action needed before the app can accept it."]
+        : ["Review SharePoint access and sharing", "Understand saved sharing records and the questions a site owner should answer. This review does not prove what Copilot can retrieve."];
       document.getElementById("scenario-section-title").textContent = readinessMode
-        ? "Priority readiness blockers"
-        : "SharePoint access and sharing evidence";
+        ? "Readiness checks to review first"
+        : "Sharing results that may need an owner review";
       document.getElementById("scenario-section-copy").textContent = readinessMode
-        ? "Trace how the strongest failed, warning, and unknown controls affect mission progression."
-        : "Preview up to 25 sampled access-review scenarios. Browse the grouped evidence on Assessment for the full collected review and ordinary permission inventory; neither view proves complete tenant coverage.";
-      document.getElementById("open-simulator").textContent = sharingReviewModel ? "Review grouped access" : readinessMode
-        ? "Trace blocker impact"
-        : "Review SharePoint evidence";
+        ? "Select a failed, warning, or unknown check to understand why the app cannot accept it yet. An unknown result means insufficient usable information, not a confirmed problem."
+        : "These cards preview up to 25 collected sharing results. Open the grouped review to see all collected records, including ordinary permissions. Ask the owner whether broad access is intended; neither view covers every item in the organization.";
+      document.getElementById("open-simulator").textContent = sharingReviewModel ? "Open the grouped sharing review" : readinessMode
+        ? "Explain an unresolved check"
+        : "Explain a sharing result";
       document.getElementById("open-simulator").dataset.go = sharingReviewModel ? "findings" : "simulator";
       document.getElementById("simulator-heading").textContent = readinessMode
-        ? "Choose a readiness blocker"
-        : "Choose an access or sharing finding";
+        ? "Choose a readiness check that needs attention"
+        : "Choose a sharing result to understand";
       document.getElementById("simulator-copy").textContent = readinessMode
-        ? "This deterministic trace uses collected control evidence. It does not pretend that an effective-access graph exists."
-        : "This bounded preview uses sealed sharing metadata, not proof of sensitive-content exposure. The grouped Assessment view retains the collected review and ordinary permission inventory.";
+        ? "The explanation connects an existing check result to the app's stage rules and suggested follow-up. It does not run another check or calculate all of a user's effective permissions."
+        : "The explanation uses saved sharing settings, not document contents. A broad permission is a reason to review access, not proof that sensitive information was disclosed. The grouped review includes the rest of the collected records.";
       document.getElementById("simulation-prompt-label").textContent = readinessMode
         ? "Decision question"
         : "Review question";
       document.getElementById("simulation-mode-title").textContent = readinessMode
-        ? "Control-impact trace"
-        : "Pre-deployment";
+        ? "Explain why this requirement is unresolved"
+        : "Explain the saved sharing setting";
       document.getElementById("simulation-mode-copy").textContent = readinessMode
-        ? "Flight Deck traces an actual control result into its affected mission and required correction."
-        : "No prompts are submitted to a production AI system. AI Flight Deck explains each observed sharing path and the administrator validation required before Copilot rollout.";
+        ? "Flight Deck shows which stage depends on this check and what information or review is still required. A stage is the app's own grouping of readiness requirements, not a Microsoft approval."
+        : "No prompts are sent to Copilot. Flight Deck explains the recorded sharing setting and suggests what an administrator or site owner should confirm before deciding whether to change it.";
       document.getElementById("result-path-title").textContent = readinessMode
-        ? "Evidence-to-decision path"
-        : "Evidence-backed review path";
+        ? "How this check affects the app's recommendation"
+        : "Recorded access and the review it needs";
       const stepLabels = readinessMode
-        ? ["Read the collected evidence", "Resolve the readiness control", "Evaluate affected mission gates", "Identify the required correction"]
-        : ["Identify the sharing configuration", "Determine the potential audience", "Separate observed facts from unverified exposure", "Apply the required validation or restriction"];
+        ? ["Read the saved information", "Find the readiness requirement", "Identify the stage that needs this check", "Show the information or action still needed"]
+        : ["Read the saved sharing setting", "Describe the possible audience", "Distinguish recorded access from unproven disclosure", "Show the review or restriction to consider"];
       document.querySelectorAll("#simulation-steps .step-copy").forEach((element, index) => {
         element.textContent = stepLabels[index];
       });
       if (!scenarios.length) {
-        const message = "No failed, warning, or unknown control is available to trace.";
+        const message = "There are no failed, warning, or unknown checks to explain in this view. This does not establish that the whole organization has been assessed.";
         overview.innerHTML = `<div class="empty-state">${message}</div>`;
         simulator.innerHTML = `<div class="empty-state">${message}</div>`;
-        document.getElementById("simulation-prompt").textContent = "No blocker is available for this scan.";
+        document.getElementById("simulation-prompt").textContent = "There is no unresolved result available to explain in this scan.";
         runButton.disabled = true;
         return;
       }
@@ -2013,7 +2067,7 @@
       simulator.replaceChildren(...scenarios.map(s => scenarioCard(s, s.id === selectedScenario.id)));
       document.getElementById("simulation-prompt").textContent = selectedScenario.prompt;
       runButton.disabled = false;
-      runButton.textContent = readinessMode ? "Trace readiness impact" : "Review selected evidence";
+      runButton.textContent = readinessMode ? "Explain why this check needs attention" : "Explain the selected sharing result";
     }
 
     function buildReadinessScenarios(scan) {
@@ -2029,30 +2083,30 @@
           const domain = readinessCatalog?.domains.find(item => item.id === result.domainId);
           const control = domain?.controls.find(item => item.id === result.controlId);
           const missionNames = (control?.missions || []).map(missionId =>
-            readinessCatalog?.missions.find(mission => mission.id === missionId)?.name || missionId);
+            readableStage(readinessCatalog?.missions.find(mission => mission.id === missionId)?.name) || missionId);
           const source = result.provenance?.source || control?.evidenceSources?.join(", ") ||
             "Required evidence source";
           const limitation = result.limitations?.map(item => item.description).join(" ") ||
             result.summary || "The required evidence is incomplete.";
           const decision = result.status === "Fail"
-            ? "Mission blocked until the control is corrected and re-scanned"
+            ? "This stage needs the requirement reviewed and a later accepted result"
             : result.status === "Warning"
-              ? "Owner review is required before mission approval"
-              : "Mission blocked until the missing evidence is connected or attested";
+              ? "The responsible owner needs to review this result before the stage can be accepted"
+              : "The app needs usable information through a supported validation method; a new connection or statement cannot bypass an unsupported check";
           return {
             id: `control-${result.controlId}`,
             sequence: index + 1,
             mode: "readiness",
             title: control?.title || result.controlId,
-            description: `${result.status}: ${limitation}`,
-            prompt: `Why does ${result.controlId} affect the next rollout mission, and what evidence is needed to clear it?`,
+            description: `${readableCheckStatus(result.status)}: ${limitation}`,
+            prompt: `What does ${result.controlId} require, why is it unresolved, and what should I do next?`,
             severity: result.status === "Fail" ? "Critical" : "Medium",
-            exposure: `This is a readiness-impact trace, not an access simulation. ${result.controlId} is ${result.status}. ${decision}. Required action: ${result.remediation?.action || control?.remediation || "Collect authoritative evidence and assign an owner."}`,
+            exposure: `This explanation uses a saved readiness result; it does not run a new security test. ${result.controlId}: ${readableCheckStatus(result.status)}. ${decision}. Next step: ${result.remediation?.action || control?.remediation || "Agree a responsible owner and collect the supporting information this check requires."}`,
             path: [
-              ["Evidence source", source],
-              ["Control", `${result.controlId} / ${result.status}`],
-              ["Mission gate", missionNames.join(", ") || "Estate readiness"],
-              ["Decision impact", decision]
+              ["Source of the information", source],
+              ["Readiness check", `${result.controlId} / ${readableCheckStatus(result.status)}`],
+              ["Stage that needs this check", missionNames.join(", ") || "Overall readiness"],
+              ["Why follow-up is needed", decision]
             ]
           };
         });
@@ -2090,43 +2144,43 @@
           ? attributes.principalCount
           : match.principalIds.length;
         const audience = scenarioType === "guest-direct-grant"
-          ? `${attributes.guestPrincipalCount || observedPrincipalCount} directly granted guest principal(s)`
+          ? `${attributes.guestPrincipalCount || observedPrincipalCount} guest accounts with direct permission`
           : scenarioType === "broad-identity-grant"
-            ? `up to ${potentialTenantAudience} enabled tenant members through an Everyone-style principal`
+            ? `up to ${potentialTenantAudience} enabled organization members through a permission for an Everyone-style group`
           : scenarioType === "group-direct-grant"
-            ? `${observedPrincipalCount} directly granted group principal(s); group membership was not expanded`
+            ? `${observedPrincipalCount} groups with direct permission; the people in those groups were not counted`
             : scenarioType === "application-grant"
-              ? `${observedPrincipalCount || 1} application or agent principal(s)`
+              ? `${observedPrincipalCount || 1} application or agent identities`
               : scenarioType === "inherited-permission"
-                ? "an inherited permission audience; nested membership was not expanded"
+                ? "people receiving access from a parent folder or site; membership of nested groups was not checked"
                 : ["specific-people-link", "user-direct-grant"].includes(scenarioType)
-                  ? `${observedPrincipalCount} directly named principal(s)`
+                  ? `${observedPrincipalCount} directly named accounts or groups`
                   : match.principalIds.includes("principal:anyone-with-link")
           ? "an unbounded audience because anyone possessing the link can use it"
           : match.principalIds.includes("principal:tenant-users")
           ? `up to ${potentialTenantAudience} enabled tenant members`
           : match.principalIds.includes("principal:broad-sharing-audience")
             ? "a broad sharing audience"
-            : `${match.principalIds.length} observed principals`;
+            : `${match.principalIds.length} recorded accounts or groups`;
         const missing = simulation.missingEvidence.length
-          ? ` ${simulation.missingEvidence.length} evidence link(s) are missing, so the result is incomplete.`
+          ? ` ${simulation.missingEvidence.length} connections between the saved access records are missing, so the explanation is incomplete.`
           : "";
         const permissionScenario = {
           "specific-people-link": {
             label: "Specific-people link",
             description: "Specific-people link on a sampled SharePoint item — validate the named recipients, role, and expiry.",
             badgeText: "Named-link review",
-            relevance: "Potential grounding after a named recipient uses the link"
+            relevance: "A named recipient may gain access through the link; this scan does not prove what Copilot can retrieve"
           },
           "broad-identity-grant": {
-            label: "Broad identity permission",
+            label: "Permission for a broad group of people",
             description: "An Everyone-style SharePoint permission was observed on a sampled item.",
-            badgeText: "Broad identity review",
-            relevance: "Potential tenant-wide Copilot grounding through the existing SharePoint permission"
+            badgeText: "Review the intended audience",
+            relevance: "The existing SharePoint permission may give many people access; Copilot retrieval was not tested"
           },
           "guest-direct-grant": {
             label: "Guest direct access",
-            description: "A sampled SharePoint item has a direct grant to one or more guest principals.",
+            description: "An item in the SharePoint sample has permission granted directly to one or more guest accounts.",
             badgeText: "Guest access review",
             relevance: "External access must be governed separately from internal Copilot rollout"
           },
@@ -2144,15 +2198,15 @@
           },
           "application-grant": {
             label: "Application or agent access",
-            description: "A sampled SharePoint item has a permission granted to an application or agent principal.",
+            description: "An item in the SharePoint sample has permission granted to an application or agent account.",
             badgeText: "Agent access review",
-            relevance: "Application and agent permissions require workload-specific governance"
+            relevance: "Ask the administrator responsible for the application or agent to review whether this access is appropriate"
           },
           "inherited-permission": {
             label: "Inherited permission",
-            description: "A sampled SharePoint item inherits access from a parent resource; the complete downstream audience was not expanded.",
+            description: "An item in the sample receives its permissions from a parent folder or site. The scan did not count every person who receives that access.",
             badgeText: "Inheritance review",
-            relevance: "Copilot follows the effective access created by inherited permissions"
+            relevance: "Inherited permissions may affect what a person can access; this scan does not test Copilot retrieval"
           },
           "unclassified-permission": {
             label: "Unclassified permission",
@@ -2168,7 +2222,7 @@
               exposure: `${resourceName} is a SharePoint ${String(attributes.resourceType || "item").toLowerCase()} with an observed Anyone link. ${audience}. This is confirmed sharing configuration and is a data-exposure concern independently of Copilot. The scan did not retrieve the content, so it does not claim that the item contains sensitive information.`,
               severity: "Critical",
               badgeText: "Urgent link review",
-              relevance: "External sharing exposure; Copilot grounding is not asserted"
+              relevance: "Anyone with the link can use it without signing in; no claim is made about Copilot retrieval"
             }
           : scenarioType === "organization-link"
             ? {
@@ -2181,12 +2235,12 @@
               }
             : scenarioType === "public-group-unresolved"
               ? {
-                  description: "Public Microsoft 365 group — the connected SharePoint site was not resolved by this scan.",
-                  prompt: `Why must the public Microsoft 365 group "${resourceName}" be resolved and validated?`,
+                  description: "The scan found a public Microsoft 365 group but could not identify its connected SharePoint site.",
+                  prompt: `What should an owner confirm about the public Microsoft 365 group "${resourceName}" and its connected site?`,
                   exposure: `${resourceName} is a public Microsoft 365 group. ${audience} may be able to discover or join the collaboration space, but this artifact does not contain a resolved connected SharePoint site. Do not treat it as site-level access proof.`,
                   severity: "Medium",
-                  badgeText: "Site resolution required",
-                  relevance: "Copilot relevance cannot be determined until the connected SharePoint site is resolved"
+                  badgeText: "Identify the connected site",
+                  relevance: "The connected SharePoint site must be identified before its access can be reviewed"
                 }
               : permissionScenario
               ? {
@@ -2203,7 +2257,7 @@
                 exposure: `${resourceName} is a SharePoint site connected to a public Microsoft 365 group. ${audience} may be able to discover and access its content. Confirm that public visibility is intentional and review the site's owners, permissions, sharing links, and content. This is not proof that sensitive content is exposed because document content was not retrieved.`,
                 severity: "High",
                 badgeText: "Owner validation required",
-                relevance: "Potential Microsoft 365 Copilot grounding through existing access"
+                relevance: "Existing site access may affect what Copilot can retrieve for a user; retrieval was not tested"
               };
         return {
           id: `live-${index + 1}`,
@@ -2215,15 +2269,15 @@
           severity: scenarioCopy.severity,
           badgeText: scenarioCopy.badgeText,
           resultTitle: `${scenarioCopy.badgeText}: ${resourceName}`,
-          exposure: `${scenarioCopy.exposure} Required action: ${attributes.recommendedAction || "Validate the access path with the resource owner and restrict it if broad access is unnecessary."} Review confidence is ${simulation.confidenceLevel.toLowerCase()} (${Math.round(simulation.confidence * 100)}%) because content classification and complete effective access were not collected.${missing}`,
+          exposure: `${scenarioCopy.exposure} Next step: ${attributes.recommendedAction || "Ask the resource owner whether this access is intended; propose a restriction only if it is unnecessary."} The app reports ${simulation.confidenceLevel.toLowerCase()} confidence (${Math.round(simulation.confidence * 100)}%) in this limited explanation. This is not a probability of data disclosure or readiness: document sensitivity and the full set of people with access were not checked.${missing}`,
           path: [
             ["Potential audience", audience],
-            ["Access basis", (reachability?.membershipIds || []).map(displayName).join(", ") || "Missing"],
+            ["Permission or membership behind this result", (reachability?.membershipIds || []).map(displayName).join(", ") || "Not recorded"],
             [attributes.resourceType || "SharePoint resource", resourceName],
             ["SharePoint location", [attributes.siteDisplayName, attributes.driveDisplayName].filter(Boolean).join(" / ") || "Site-level evidence"],
             ["Content inspection", `Not performed; no sensitivity classification was collected for this ${String(attributes.resourceType || "SharePoint resource").toLowerCase()}`],
             ["Copilot relevance", scenarioCopy.relevance],
-            ["Required validation", attributes.recommendedAction || match.blockedByPolicyIds.map(displayName).join(", ") || "Validate or restrict access"]
+            ["What the owner should review", attributes.recommendedAction || match.blockedByPolicyIds.map(displayName).join(", ") || "Confirm whether access is intended before proposing a restriction"]
           ]
         };
       });
@@ -2232,7 +2286,7 @@
           id: "guest-identity-review",
           sequence: accessScenarios.length + 1,
           mode: "access",
-          title: `${scan.summary.guests.toLocaleString()} guest identities require access review`,
+          title: `${scan.summary.guests.toLocaleString()} guest accounts are recorded; review their access separately`,
           description: "Guest accounts exist in the tenant. Their presence is not itself an exposure, but this bounded scan does not map each guest to SharePoint resources.",
           prompt: "What must be reviewed for guest identities before Microsoft 365 Copilot rollout?",
           severity: "Medium",
@@ -2254,9 +2308,9 @@
           id: "nested-content-coverage",
           sequence: accessScenarios.length + 1,
           mode: "access",
-          title: "Nested SharePoint content is outside this scan boundary",
-          description: "The bounded scan samples root-level items and does not recursively enumerate every folder, file, permission, or sharing link.",
-          prompt: "What does the bounded SharePoint scan leave unverified?",
+          title: "Files and folders below the top level were not all checked",
+          description: "This scan samples items at the top level of libraries. It does not open every subfolder or list every file permission and sharing link.",
+          prompt: "Which SharePoint items and permissions were left outside the scan?",
           severity: "Medium",
           badgeText: "Coverage boundary",
           resultTitle: "Deeper SharePoint access remains unverified",
@@ -2264,8 +2318,8 @@
           path: [
             ["Collected", `${scan.summary.sitesScanned.toLocaleString()} SharePoint sites and ${Number(scan.summary.sampledItems || 0).toLocaleString()} root-level items`],
             ["Not collected", "Recursive item permissions and every sharing link"],
-            ["Decision impact", "Do not interpret zero sampled findings as zero estate risk"],
-            ["Required validation", "Complete deeper governance evidence for priority sites"]
+            ["What this means for your decision", "No findings in a sample does not mean there are no risks elsewhere"],
+            ["What to do next", "Ask administrators and owners to review permissions in priority sites in more detail"]
           ]
         });
       }
@@ -2357,17 +2411,17 @@
       const assessment = window.FlightDeckEvidenceAdmissibility.projectAssessment(scan?.estateAssessment, readinessCatalog);
       const card = document.getElementById("dimension-card");
       if (!readinessCatalog) {
-        card.innerHTML = '<div class="empty-state">The readiness control catalogue is unavailable.</div>';
+        card.innerHTML = '<div class="empty-state">The list of readiness checks could not be loaded. Restart the app using the complete application folder.</div>';
         return;
       }
       if (!assessment || !Array.isArray(assessment.domains)) {
-        card.innerHTML = '<div class="empty-state" style="grid-column:1/-1">Estate-wide readiness coverage is unavailable for this artifact.</div>';
+        card.innerHTML = '<div class="empty-state" style="grid-column:1/-1">This saved file does not contain a supported assessment of the required service areas. Collect or import a current scan.</div>';
         return;
       }
       const statusLabels = {
-        Collected: "Online",
-        Partial: "Degraded",
-        NotCollected: "Unscanned"
+        Collected: "All checks assessed",
+        Partial: "Some checks assessed",
+        NotCollected: "No checks assessed"
       };
       const positions = [
         [50, 7], [67, 12], [80, 22], [86, 39], [85, 59], [76, 76], [61, 88],
@@ -2381,18 +2435,18 @@
       const hudCopy = document.createElement("div");
       const kicker = document.createElement("div");
       kicker.className = "console-kicker";
-      kicker.textContent = "Estate mission telemetry";
+      kicker.textContent = "Readiness checks by service area";
       const hudTitle = document.createElement("h3");
-      hudTitle.textContent = "Microsoft 365 Copilot control plane";
+      hudTitle.textContent = "Choose a service area or a decision stage";
       const hudText = document.createElement("p");
-      hudText.textContent = "Select a system to inspect its admitted evidence, reported findings, and remaining validation requirements.";
+      hudText.textContent = "A service area groups related checks. A stage groups the requirements the app uses for a pilot decision; this is sometimes called a mission gate. Select either to read the checks and their next steps. Assessed means the app can evaluate the information, not that every requirement is met. Stage completion is not Microsoft certification or rollout approval.";
       hudCopy.append(kicker, hudTitle, hudText);
       const telemetry = document.createElement("div");
       telemetry.className = "mission-telemetry";
       [
-        [assessment.collectedDomains, "Online"],
-        [assessment.partialDomains, "Degraded"],
-        [assessment.requiredDomains - assessment.collectedDomains - assessment.partialDomains, "Unscanned"]
+        [assessment.collectedDomains, "Areas fully assessed"],
+        [assessment.partialDomains, "Areas partly assessed"],
+        [assessment.requiredDomains - assessment.collectedDomains - assessment.partialDomains, "Areas not assessed"]
       ].forEach(([value, label]) => {
         const chip = document.createElement("div");
         chip.className = "telemetry-chip";
@@ -2413,9 +2467,14 @@
       }
       const missionDefinitions = readinessCatalog.missions.map(mission => ({
         id: mission.id,
-        code: `Mission ${String(mission.order).padStart(2, "0")}`,
-        title: mission.name,
-        detail: mission.purpose,
+        code: `Stage ${String(mission.order).padStart(2, "0")}`,
+        title: readableStage(mission.name),
+        detail: {
+          Activation: "Review licences, accounts, and the settings needed to begin a pilot.",
+          "Safe pilot": "Review who can access the pilot's information and how that information is protected.",
+          Scale: "Review additional people, connected services, agents, and support before expanding.",
+          Assure: "Review later scans, expired information, and whether the pilot is meeting its goals."
+        }[mission.name] || mission.purpose,
         requiredControlIds: mission.requiredControlIds,
         systems: [...new Set(mission.requiredControlIds.map(controlId => controlDomains.get(controlId)).filter(Boolean))],
         briefing: mission.purpose,
@@ -2464,7 +2523,7 @@
       mapWrap.className = "mission-map-wrap";
       const map = document.createElement("div");
       map.className = "mission-map";
-      map.setAttribute("aria-label", "Interactive three-dimensional Microsoft 365 estate map");
+      map.setAttribute("aria-label", "Select a Microsoft 365 service area to review its readiness checks");
       const outerRing = document.createElement("div");
       outerRing.className = "orbit-ring outer";
       const innerRing = document.createElement("div");
@@ -2474,9 +2533,9 @@
       const coreCount = document.createElement("strong");
       coreCount.textContent = `${assessment.collectedDomains}/${assessment.requiredDomains}`;
       const coreLabel = document.createElement("span");
-      coreLabel.textContent = "systems fully evidenced";
+      coreLabel.textContent = "service areas fully assessed";
       const coreState = document.createElement("small");
-      coreState.textContent = `${assessment.partialDomains} partial / ${assessment.requiredDomains - assessment.collectedDomains - assessment.partialDomains} collectors missing`;
+      coreState.textContent = `${assessment.partialDomains} partly assessed / ${assessment.requiredDomains - assessment.collectedDomains - assessment.partialDomains} not assessed`;
       core.append(coreCount, coreLabel, coreState);
       map.append(outerRing, innerRing, core);
 
@@ -2490,7 +2549,7 @@
       const consoleNext = document.createElement("div");
       consoleNext.className = "console-next";
       const consoleNextLabel = document.createElement("strong");
-      consoleNextLabel.textContent = "Next mission";
+      consoleNextLabel.textContent = "What to do next";
       const consoleNextText = document.createElement("p");
       const consoleDocumentation = document.createElement("a");
       consoleDocumentation.className = "doc-link";
@@ -2501,7 +2560,7 @@
       consoleNext.append(consoleNextLabel, consoleNextText, consoleDocumentation);
       const consoleControls = document.createElement("div");
       consoleControls.className = "console-controls";
-      consoleControls.setAttribute("aria-label", "Readiness control evidence");
+      consoleControls.setAttribute("aria-label", "Readiness checks and the information behind each result");
       console.append(consoleKicker, consoleTitle, consoleStatus, consoleSummary, consoleControls, consoleNext);
 
       const renderControlList = controlIds => {
@@ -2522,13 +2581,13 @@
           const heading = document.createElement("span");
           heading.className = "control-heading";
           const id = document.createElement("small");
-          id.textContent = `${controlId} / ${catalogControl.requirement}`;
+          id.textContent = `${controlId} / ${catalogControl.requirement === "Gate" ? "Required by the app for this stage" : "Advisory check for owner review"}`;
           const title = document.createElement("strong");
           title.textContent = catalogControl.title;
           heading.append(id, title);
           const badge = document.createElement("span");
           badge.className = "control-badge";
-          badge.textContent = effectiveStatus;
+          badge.textContent = readableCheckStatus(effectiveStatus);
           summary.append(heading, badge);
           const body = document.createElement("div");
           body.className = "control-body";
@@ -2537,32 +2596,36 @@
           const requirement = document.createElement("p");
           requirement.textContent = `Why this matters: ${catalogControl.applicability}`;
           const passCondition = document.createElement("p");
-          passCondition.textContent = `Ready when: ${catalogControl.passCondition}`;
+          passCondition.textContent = `What this check requires: ${catalogControl.passCondition}`;
           const evidence = document.createElement("p");
           evidence.textContent = result
-            ? `Evidence: ${result.provenance?.source || "Source not recorded"}. Coverage ${result.coverage?.evaluated ?? 0}/${result.coverage?.population ?? 0}.`
-            : `Evidence required: ${catalogControl.evidenceSources.join(", ")}.`;
+            ? `Information used: ${result.provenance?.source || "Source not recorded"}. The check evaluated ${result.coverage?.evaluated ?? 0} of ${result.coverage?.population ?? 0} people or resources in its reported scope; this is not a count of unique files.`
+            : `Information this check needs: ${catalogControl.evidenceSources.join(", ")}.`;
           const authority = document.createElement("p");
           authority.textContent = window.FlightDeckEvidenceAdmissibility.describeEvidence(result);
           const evidenceSources = document.createElement("p");
           evidenceSources.textContent =
-            `Collection method: ${catalogControl.automation}. Expected sources: ${catalogControl.evidenceSources.join(", ")}.`;
+            `Planned collection method: ${catalogControl.automation === "Attested" ? "statement from the responsible person" : catalogControl.automation === "Partial" ? "collected information plus further review" : "automatic collection"}. Expected sources: ${catalogControl.evidenceSources.join(", ")}. The planned method does not mean this version can validate the check; read the result and limitations below.`;
           const freshness = document.createElement("p");
           freshness.className = "control-meta";
           freshness.textContent = result
-            ? `Observed ${new Date(result.observedAt).toLocaleString()}; fresh until ${new Date(result.freshUntil).toLocaleString()}.`
-            : `No collector result is available. Freshness window: ${catalogControl.freshnessHours} hours.`;
+            ? `Information recorded on ${new Date(result.observedAt).toLocaleString()}; it must be refreshed after ${new Date(result.freshUntil).toLocaleString()}.`
+            : `No collected result is available. This check requires information no older than ${catalogControl.freshnessHours} hours.`;
           const next = document.createElement("p");
-          next.textContent = `Next: ${result?.remediation?.action || catalogControl.remediation}`;
+          next.textContent = `What to do next: ${result?.remediation?.action || catalogControl.remediation}`;
           const limitations = document.createElement("p");
           limitations.textContent = result?.limitations?.length
-            ? `Current blockers: ${result.limitations.map(item => `${item.code}: ${item.description}`).join(" ")}`
-            : "Current blockers: none recorded.";
+            ? `What limits this result: ${result.limitations.map(item => `${item.code}: ${item.description}`).join(" ")}`
+            : "No limitations are recorded for this check. This does not extend its scope beyond the collected information.";
           const observation = document.createElement("pre");
           observation.className = "control-observation";
           observation.textContent = result?.observedValue == null
             ? "No observation was returned."
             : JSON.stringify(result.observedValue, null, 2).slice(0, 4000);
+          const technical = document.createElement("details");
+          const technicalHeading = document.createElement("summary");
+          technicalHeading.textContent = "Technical details: how the app assessed this source and the recorded JSON";
+          technical.append(technicalHeading, authority, observation);
           const documentation = domainDocumentation[catalogDomain.id];
           const documentationLink = document.createElement("a");
           documentationLink.className = "doc-link";
@@ -2576,10 +2639,9 @@
             passCondition,
             evidenceSources,
             evidence,
-            authority,
             freshness,
             limitations,
-            observation,
+            technical,
             next,
             documentationLink
           );
@@ -2600,7 +2662,7 @@
           item.setAttribute("aria-pressed", String(selected));
         });
         const systemState = stateClass(domain.status);
-        consoleKicker.textContent = `System ${String(index + 1).padStart(2, "0")} of ${assessment.requiredDomains}`;
+        consoleKicker.textContent = `Service area ${String(index + 1).padStart(2, "0")} of ${assessment.requiredDomains}`;
         consoleTitle.textContent = domain.name;
         consoleStatus.className = `console-status ${systemState}`;
         consoleStatus.textContent = statusLabels[domain.status] || domain.status;
@@ -2636,21 +2698,21 @@
           !blocker.admissible && blocker.reason !== "Expired"
         ).length || 0;
         const expired = missionResult?.blockers.filter(blocker => blocker.reason === "Expired").length || 0;
-        consoleKicker.textContent = `${mission.code} / ${passed} of ${mission.requiredControlIds.length} gate controls satisfied`;
+        consoleKicker.textContent = `${mission.code} / ${passed} of ${mission.requiredControlIds.length} required checks accepted`;
         consoleTitle.textContent = mission.title;
         consoleStatus.className = `console-status ${locked ? "unscanned" : "online"}`;
         consoleStatus.textContent = locked
-          ? `Locked / ${failed} failed / ${warnings} warning / ${unknown} unknown / ${expired} expired`
-          : "Gate satisfied";
+          ? `Not complete: ${failed} requirements not met, ${warnings} need review, ${unknown} lack usable information, ${expired} have old information`
+          : "This stage meets the app's rules";
         const quality = missionResult?.evidenceQuality;
         const qualitySummary = quality
-          ? ` Evidence quality: ${quality.missingControls} missing controls; ${quality.completeCoverage}/${mission.requiredControlIds.length} controls have complete coverage; ${quality.acceptedPasses} Pass results meet a supported evidence contract; ${quality.minimumConfidence === null ? "confidence not reported for every required control" : `minimum reported confidence ${Math.round(quality.minimumConfidence * 100)}%`}; earliest evidence expiry ${quality.earliestFreshUntil ? new Date(quality.earliestFreshUntil).toLocaleString() : "not available"}.`
+          ? ` Information available: ${quality.missingControls} checks have no result; ${quality.completeCoverage} of ${mission.requiredControlIds.length} checks cover their full reported scope; ${quality.acceptedPasses} successful results use a validation method supported by this app. ${quality.minimumConfidence === null ? "Not every required check reports a confidence value" : `The lowest reported confidence value is ${Math.round(quality.minimumConfidence * 100)}%; this describes the supplied result, not the probability that rollout is safe`}. The earliest refresh deadline is ${quality.earliestFreshUntil ? new Date(quality.earliestFreshUntil).toLocaleString() : "not available"}.`
           : "";
         const assumptionSummary = quality?.unresolvedAssumptions?.length
           ? ` Unresolved assumptions: ${quality.unresolvedAssumptions.join(" ")}`
           : "";
-        consoleSummary.textContent = `${mission.briefing} ${mission.unlock}${qualitySummary}${assumptionSummary}`;
-        consoleNextLabel.textContent = "Mission gate";
+        consoleSummary.textContent = `${mission.detail} Required checks need current information accepted by the app. Completing this stage does not enable Copilot or approve rollout.${qualitySummary}${assumptionSummary}`;
+        consoleNextLabel.textContent = "What is needed for this stage?";
         renderControlList(mission.requiredControlIds);
         const blockingTitles = (missionResult?.blockers || []).slice(0, 5).map(blocker => {
           const control = readinessCatalog.domains
@@ -2660,8 +2722,8 @@
         });
         const decisionChanges = (missionResult?.whatWouldChangeDecision || []).slice(0, 5);
         consoleNextText.textContent = locked
-          ? `Cannot advance this cohort. Resolve: ${blockingTitles.join("; ")}${(missionResult?.blockers.length || 0) > 5 ? "; and additional blockers" : ""}. What would change this decision: ${decisionChanges.join(" ")}`
-          : mission.unlock;
+          ? `The app cannot mark this stage complete for the selected pilot people. Review: ${blockingTitles.join("; ")}${(missionResult?.blockers.length || 0) > 5 ? "; and the additional checks below" : ""}. Information or actions still needed: ${decisionChanges.join(" ")}`
+          : "The app accepts the required checks for this stage. Review the next stage and keep this information current; your organization still makes the pilot decision.";
         consoleDocumentation.hidden = true;
       };
 
@@ -2679,7 +2741,7 @@
         number.className = "domain-index";
         const catalogDomain = readinessCatalog.domains.find(item => item.id === domain.id);
         const catalogControls = domain.catalogControls ?? catalogDomain?.controls.length ?? 0;
-        number.textContent = `SYS-${String(index + 1).padStart(2, "0")} / ${catalogControls} controls`;
+        number.textContent = `Area ${String(index + 1).padStart(2, "0")} / ${catalogControls} checks`;
         const name = document.createElement("strong");
         name.textContent = domain.name;
         const status = document.createElement("span");
@@ -2720,7 +2782,7 @@
 
     function renderRemediations() {
       if (!remediations.length) {
-        document.getElementById("remediation-list").innerHTML = '<div class="empty-state">No failed, warning, or evidence-blocked controls require action.</div>';
+        document.getElementById("remediation-list").innerHTML = '<div class="empty-state">No proposed corrections are available for this scan. Review Assessment for collection gaps and unsupported checks; an empty action list does not prove readiness.</div>';
         document.getElementById("generate-package").disabled = true;
         applied.clear();
         updateForecast();
@@ -2728,16 +2790,16 @@
       }
       document.getElementById("remediation-list").innerHTML = remediations.map(r => `
         <article class="remediation ${applied.has(r.id) ? "applied" : ""}" data-remediation="${r.id}">
-          <button class="check" aria-pressed="${applied.has(r.id)}" aria-label="${applied.has(r.id) ? "Remove from" : "Include in"} forecast: ${r.title}"></button>
+          <button class="check" aria-pressed="${applied.has(r.id)}" aria-label="${applied.has(r.id) ? "Remove from" : "Include in"} administrator review plan: ${r.title}"></button>
           <div>
             <h3>${r.title}</h3>
             <p>${r.copy}</p>
             ${domainDocumentation[r.domainId]
               ? `<p><a class="doc-link" href="${domainDocumentation[r.domainId].url}" target="_blank" rel="noopener noreferrer">Microsoft documentation: ${domainDocumentation[r.domainId].title}</a></p>`
               : ""}
-            <span class="badge">${r.currentStatus ? `${r.currentStatus} / ` : ""}${r.effort}</span>
+            <span class="badge">${r.currentStatus ? `${readableCheckStatus(r.currentStatus)} / ` : ""}${r.effort}</span>
           </div>
-          <div class="impact"><strong>${Number.isFinite(r.gain) ? `+${r.gain} pts` : "Re-scan"}</strong><small>${Number.isFinite(r.gain) ? "demonstration forecast" : "required for impact"}</small></div>
+          <div class="impact"><strong>${Number.isFinite(r.gain) ? `+${r.gain} score points` : "Later scan needed"}</strong><small>${Number.isFinite(r.gain) ? "fictional estimate, not a measured improvement" : "to measure whether this action helped"}</small></div>
         </article>`).join("");
       document.getElementById("generate-package").disabled = false;
       updateForecast();
@@ -2750,19 +2812,19 @@
       const score = hasNumericForecast ? Math.min(100, activeTenant.baselineScore + gain) : null;
       const criticalClosed = selected.reduce((sum, r) => sum + r.critical, 0);
       const usersReduced = selected.reduce((sum, r) => sum + r.users, 0);
-      document.getElementById("forecast-score").textContent = hasNumericForecast ? score : "Re-scan";
+      document.getElementById("forecast-score").textContent = hasNumericForecast ? score : "Not yet measured";
       document.getElementById("forecast-progress").style.width = hasNumericForecast ? `${score}%` : "0";
       document.getElementById("applied-count").textContent = `${selected.length} of ${remediations.length} selected for the administrator plan`;
       document.getElementById("forecast-copy").textContent = selected.length
         ? hasNumericForecast
-          ? `${criticalClosed} critical path${criticalClosed === 1 ? "" : "s"} could close. This is a demonstration forecast and does not change the tenant.`
-          : `${selected.length} control${selected.length === 1 ? "" : "s"} selected. Run a new scan after administrator action to measure the result.`
-        : "Select controls to prepare a remediation package. A new scan is required to prove the result.";
+          ? `${criticalClosed} critical sharing issue${criticalClosed === 1 ? "" : "s"} could be addressed in this fictional example. This is an estimate, not a change made in Microsoft 365 or a measured improvement.`
+          : `${selected.length} action${selected.length === 1 ? "" : "s"} selected. After administrator review and approved changes, run a later comparable scan to measure the result.`
+        : "Select proposed actions to prepare the administrator review file. No changes are made here; a later comparable scan is needed to measure any improvement.";
       document.getElementById("package-copy").textContent = selected.length
         ? hasNumericForecast
           ? `${selected.length} correction${selected.length === 1 ? "" : "s"} selected for a demonstration forecast of ${gain} points.`
           : `${selected.length} evidence-linked correction${selected.length === 1 ? "" : "s"} selected. Impact will be measured by a new scan.`
-        : "Select one or more corrections to create a traceable remediation package for tenant administrators.";
+        : "Select one or more corrections to download a JSON review file containing the proposals and their supporting scan references. Give it to administrators for review; it is not an executable change or an approval.";
       document.getElementById("remediation-live").textContent = selected.length
         ? `${selected.length} correction${selected.length === 1 ? "" : "s"} selected. ${document.getElementById("forecast-copy").textContent}`
         : "No corrections selected.";
@@ -2800,7 +2862,7 @@
 
     async function runSimulation() {
       if (!selectedScenario) {
-        showError("No evidence-backed scenario is available for this scan.");
+        showError("This scan has no saved result available for explanation. Review the assessment and its collection limits.");
         return;
       }
       const button = document.getElementById("run-simulation");
@@ -2809,10 +2871,10 @@
       const live = document.getElementById("simulation-live");
       button.setAttribute("aria-busy", "true");
       button.disabled = true;
-      button.textContent = selectedScenario.mode === "readiness" ? "Tracing impact" : "Review running";
+      button.textContent = "Preparing the explanation";
       live.textContent = selectedScenario.mode === "readiness"
-        ? "Tracing readiness impact."
-        : "Reviewing the selected evidence.";
+        ? "Preparing an explanation of the saved readiness check."
+        : "Preparing an explanation of the saved sharing result.";
       result.classList.remove("visible");
       steps.forEach(step => {
         step.className = "step";
@@ -2829,7 +2891,7 @@
       }
       document.getElementById("result-copy").textContent = selectedScenario.exposure;
       document.getElementById("result-title").textContent = selectedScenario.mode === "readiness"
-        ? `${selectedScenario.title} requires evidence`
+        ? `${selectedScenario.title}: follow-up is needed`
         : (selectedScenario.resultTitle || `${selectedScenario.severity} access review`);
       const path = document.getElementById("result-path");
       path.replaceChildren();
@@ -2853,11 +2915,11 @@
       result.classList.add("visible");
       button.disabled = false;
       button.removeAttribute("aria-busy");
-      button.textContent = selectedScenario.mode === "readiness" ? "Trace again" : "Review again";
+      button.textContent = "Show the explanation again";
       button.focus();
       live.textContent = selectedScenario.mode === "readiness"
-        ? `${selectedScenario.severity} readiness impact traced. Review the evidence-to-decision path.`
-        : "Evidence review complete. Observed sharing configuration, potential audience, limitations, and required action are shown without claiming unverified sensitive-content exposure.";
+        ? "The explanation is ready. Read the requirement, the affected stage, and the suggested next step."
+        : "The explanation is ready. Read the recorded sharing setting, possible audience, limitations, and suggested owner review. No new scan or configuration change was performed.";
     }
 
     function downloadFile(name, payload, type) {
@@ -2960,7 +3022,7 @@
       link.download = `ai-flight-deck-${safeTenant}-controls.csv`;
       link.click();
       URL.revokeObjectURL(url);
-      showToast("Detailed controls CSV downloaded");
+      showToast("Readiness checks and their recorded results downloaded as CSV.");
     }
 
     function sharingReviewCsv() {
@@ -3501,10 +3563,10 @@
       document.getElementById("attestation-owner").value = attester;
       summary.replaceChildren();
       [
-        [plan.currentMission?.name || "All missions complete", "Current mission"],
-        [plan.summary.complete, "Validated checks"],
-        [plan.summary.total - plan.summary.complete, "Not yet verified"],
-        [plan.summary.actionRequired, "Configuration actions"]
+        [readableStage(plan.currentMission?.name) || "All stages meet the app's rules", "Stage being reviewed"],
+        [plan.summary.complete, "Checks accepted by the app"],
+        [plan.summary.total - plan.summary.complete, "Checks not yet accepted"],
+        [plan.summary.actionRequired, "Checks needing a setting or action reviewed"]
       ].forEach(([value, label]) => {
         const metric = document.createElement("div");
         metric.className = "assurance-metric";
@@ -3564,11 +3626,11 @@
       expiry.value = date.toISOString().slice(0, 16);
       expiry.max = expiry.value;
       document.getElementById("attestation-expiry-hint").textContent =
-        `Maximum expiry for this control: ${hours} hours from now.`;
+        `This statement can remain valid for at most ${hours} hours from now. Review or replace it before it expires.`;
       const guidance = document.getElementById("attestation-guidance");
       guidance.textContent = control
-        ? `${control.title}: ${control.passCondition} Evidence source: ${control.evidenceSources.join(", ")}. Supply non-empty evidence references and the data fields shown below. A local signature proves integrity of your statement, not independent inspection of these settings. For a supported Not applicable scope use applicablePopulation: 0 and scopeEvidenceRef, plus the reason and approver.`
-        : "Select a control to see the evidence required to clear it.";
+        ? `${control.title}: ${control.passCondition} Supporting records expected: ${control.evidenceSources.join(", ")}. Supply references to actual reviewed records and replace the example JSON values with confirmed facts. The local seal detects alteration of your statement; it does not independently inspect the settings. For a supported “Does not apply” case, the JSON must include applicablePopulation: 0 and scopeEvidenceRef, together with the reason and approver below.`
+        : "Select a requirement to see what supporting information is needed.";
       const data = document.getElementById("attestation-data");
       data.placeholder = JSON.stringify(attestationDataExamples[controlId] || {}, null, 2);
       if (!data.value.trim() || data.value.trim() === "{}" || data.value === data.dataset.lastExample) {
@@ -3582,15 +3644,15 @@
       try {
         const status = await apiJson("/api/evidence-sources");
         document.getElementById("admin-evidence-status").textContent = status.adminEvidence
-          ? "A locally sealed administrator evidence package is ready for the next scan."
-          : "No locally sealed administrator evidence package is available.";
+          ? "Administrator-collected settings are saved locally with an integrity seal. Run a new scan to evaluate supported checks."
+          : "No offline administrator settings package is saved. This is optional for the normal connected scan.";
         document.getElementById("power-platform-evidence-status").textContent =
           status.powerPlatformEvidence
-            ? "A locally sealed Power Platform evidence package is ready for the next scan."
-            : "No locally sealed Power Platform evidence package is available.";
+            ? "Power Platform information is saved locally with an integrity seal. A saved package is not a passed readiness check."
+            : "No offline Power Platform package is saved. The normal connected scan can attempt collection without this import.";
         document.getElementById("attestation-status").textContent = status.attestations
-          ? `${status.attestations} locally sealed attestation${status.attestations === 1 ? "" : "s"} available. Run a new scan to evaluate them.`
-          : "No locally sealed attestations are available.";
+          ? `${status.attestations} owner statement${status.attestations === 1 ? " is" : "s are"} saved locally with protection against alteration. Run a new scan to evaluate the statements against the supported requirements.`
+          : "No owner statements are saved. Use this form only for requirements that need a responsible person's confirmation.";
       } catch {
         document.getElementById("admin-evidence-status").textContent =
           "Evidence package status requires the current local service.";
@@ -3616,12 +3678,12 @@
         body: JSON.stringify({ kind, content: await file.text() })
       });
       await refreshEvidenceSourceStatus();
-      showToast(`${result.evidenceItems} ${kind === "admin" ? "administrator" : "Power Platform"} evidence sections imported and sealed`);
+      showToast(`${result.evidenceItems} ${kind === "admin" ? "administrator" : "Power Platform"} information sections saved locally. Importing is not a passed readiness check.`);
     }
 
     async function prepareEvidenceChallenge(kind) {
       if (!localServiceAvailable) {
-        throw new Error("Start the local AI Flight Deck service before creating a collection challenge.");
+        throw new Error("Start the local AI Flight Deck service before creating a time-limited collection request.");
       }
       const result = await apiJson("/api/evidence-challenges", {
         method: "POST",
@@ -3636,17 +3698,17 @@
         : "power-platform-evidence-challenge");
       output.hidden = false;
       output.textContent = kind === "admin"
-        ? `Collection challenge (valid for 30 minutes):\n${result.challenge}\n\nAdd to the collector command:\n-CollectionChallenge "${result.challenge}"`
-        : `Collection challenge (valid for 30 minutes):\n${result.challenge}\n\nPaste this value into collectionChallenge in the downloaded template.`;
-      showToast(`${kind === "admin" ? "Administrator" : "Power Platform"} collection challenge created`);
+        ? `Time-limited collection request (valid for 30 minutes):\n${result.challenge}\n\nAdd this technical parameter to the collection script command:\n-CollectionChallenge "${result.challenge}"`
+        : `Time-limited collection request (valid for 30 minutes):\n${result.challenge}\n\nPaste this value into the collectionChallenge field in the downloaded template.`;
+      showToast(`${kind === "admin" ? "Administrator" : "Power Platform"} collection request created; use it within 30 minutes.`);
     }
 
     async function createAttestation() {
-      if (!localServiceAvailable) throw new Error("Start the local AI Flight Deck service before creating an attestation.");
+      if (!localServiceAvailable) throw new Error("Start the local AI Flight Deck service before saving an owner statement.");
       const cohort = activeCohort();
       const tenantId = baselineScan?.tenant?.tenantId || baselineScan?.tenant?.id;
       if (!tenantId || !cohort || cohort.approved !== true) {
-        throw new Error("Run a live scan for an explicitly approved cohort before creating an attestation.");
+        throw new Error("Run an authenticated scan with an explicitly approved pilot group before saving an owner statement.");
       }
       let data;
       try {
@@ -3659,7 +3721,7 @@
       }
       const decision = document.getElementById("attestation-decision").value;
       const expiryValue = document.getElementById("attestation-expiry").value;
-      if (!expiryValue) throw new Error("Choose an attestation expiry.");
+      if (!expiryValue) throw new Error("Choose when this statement must be reviewed again.");
       const input = {
         tenantId,
         cohortId: cohort.id,
@@ -3691,7 +3753,7 @@
         body: JSON.stringify(input)
       });
       await refreshEvidenceSourceStatus();
-      showToast(`Sealed attestation created for ${input.controlId}; run a new scan to evaluate it`);
+      showToast(`Owner statement saved locally for ${input.controlId}. Run a new scan to evaluate it; saving does not independently confirm its contents.`);
       document.getElementById("attestation-statement").value = "";
       document.getElementById("attestation-data").value = "{}";
       document.getElementById("attestation-references").value = "";
@@ -3747,15 +3809,15 @@
       container.replaceChildren();
       downloadButton.disabled = !plan;
       if (!plan) {
-        reason.textContent = "Load the readiness catalogue to build the tenant enablement plan.";
+        reason.textContent = "The list of readiness checks must load before the app can build the administrator review plan.";
         return;
       }
 
       [
-        [plan.summary.complete, "Complete"],
-        [plan.summary.actionRequired, "Action required"],
-        [plan.summary.evidenceRequired, "Evidence required"],
-        [plan.summary.ownerReview, "Owner review"]
+        [plan.summary.complete, "Checks accepted by the app"],
+        [plan.summary.actionRequired, "Checks needing an action reviewed"],
+        [plan.summary.evidenceRequired, "Checks needing usable information"],
+        [plan.summary.ownerReview, "Checks needing an owner decision"]
       ].forEach(([value, label]) => {
         const metric = document.createElement("div");
         metric.className = "assurance-metric";
@@ -3766,7 +3828,7 @@
         metric.append(caption, strong);
         summary.appendChild(metric);
       });
-      reason.textContent = `${plan.recommendation}: ${plan.reason} Evidence snapshot: ${plan.evidence.generatedAt ? new Date(plan.evidence.generatedAt).toLocaleString() : "none loaded"}. The downloaded plan includes every control, including completed requirements.`;
+      reason.textContent = `${plan.recommendation}: ${plan.reason} Information saved on: ${plan.evidence.generatedAt ? new Date(plan.evidence.generatedAt).toLocaleString() : "no scan loaded"}. The counts above are readiness checks, not numbers of files, users, or confirmed problems. The download includes every check, including completed requirements.`;
 
       const include = control => {
         if (filter === "all") return true;
@@ -3798,7 +3860,7 @@
       if (!controls.length) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = "No controls match this filter.";
+        empty.textContent = "No readiness checks match this filter. Choose All readiness checks to see the full list.";
         container.appendChild(empty);
         return;
       }
@@ -3819,7 +3881,7 @@
           const headingWrap = document.createElement("span");
           headingWrap.className = "control-heading";
           const id = document.createElement("small");
-          id.textContent = `${control.controlId} / ${control.requirement}`;
+          id.textContent = `${control.controlId} / ${control.requirement === "Gate" ? "Required by the app" : "Advisory check"}`;
           const title = document.createElement("strong");
           title.textContent = control.title;
           headingWrap.append(id, title);
@@ -3834,24 +3896,24 @@
           const body = document.createElement("div");
           body.className = "control-body";
           const owner = document.createElement("p");
-          owner.textContent = `Responsible: ${control.responsibleRoles.join(", ") || "Accountable owner required"}.`;
+          owner.textContent = `Suggested roles to involve: ${control.responsibleRoles.join(", ") || "Agree a responsible owner"}. No person has been assigned by this app.`;
           const location = document.createElement("p");
-          location.textContent = `Where to implement: ${control.portal} > ${control.adminPath}.`;
+          location.textContent = `Where an administrator can investigate or make an approved change: ${control.portal} > ${control.adminPath}.`;
           const outcome = document.createElement("p");
           outcome.textContent = `Required outcome: ${control.requiredOutcome}`;
           const policy = document.createElement("p");
           policy.textContent = control.requirementOrigin;
           const prerequisites = document.createElement("p");
-          prerequisites.textContent = `Read permissions: ${control.prerequisites.permissions.join(", ") || "None listed"}. Entitlement prerequisites: ${control.prerequisites.licenses.join(", ") || "None listed"}. This view has no complete entitlement inventory; these are prerequisites to confirm, not evidence of missing licences.`;
+          prerequisites.textContent = `Permission hints from the checklist for an administrator to review: ${control.prerequisites.permissions.join(", ") || "None listed"}. These are not the permissions requested by the current sign-in, and are not an instruction to grant them all. Use the connection guide to identify the actual read method. Licences to confirm if your pilot needs the relevant feature: ${control.prerequisites.licenses.join(", ") || "None listed"}. This view does not contain a complete licence inventory and is not proof that your organization lacks these licences.`;
           const scope = document.createElement("p");
-          scope.textContent = `Affected resources: ${control.affectedScope.resources.join(", ") || "No identifiers recorded; establish scope before making changes"}. Affected principals: ${control.affectedScope.principals.join(", ") || "No identifiers recorded"}.`;
+          scope.textContent = `Resources to review: ${control.affectedScope.resources.join(", ") || "No identifiers recorded; agree the scope before changing anything"}. Accounts or groups to review: ${control.affectedScope.principals.join(", ") || "No identifiers recorded"}.`;
           const evidence = document.createElement("p");
           evidence.textContent = evidenceCompletion
-            ? `Next evidence step: ${evidenceCompletion.nextAction}`
-            : "Next evidence step: collect fresh evidence after implementation.";
+            ? `What to do next: ${evidenceCompletion.nextAction}`
+            : "What to do next: after an approved change, run another collection to check the result.";
           const stepsHeading = document.createElement("p");
           const stepsStrong = document.createElement("strong");
-          stepsStrong.textContent = "Implementation steps";
+          stepsStrong.textContent = "Instructions to review with the administrator";
           stepsHeading.appendChild(stepsStrong);
           const steps = document.createElement("ol");
           control.steps.forEach(step => {
@@ -3860,7 +3922,7 @@
             steps.appendChild(item);
           });
           const collectionHeading = document.createElement("p");
-          collectionHeading.textContent = "Evidence collection and completion";
+          collectionHeading.textContent = "How to collect the information this check needs";
           const collectionSteps = document.createElement("ol");
           control.collection.steps.forEach(step => {
             const item = document.createElement("li");
@@ -3868,7 +3930,7 @@
             collectionSteps.appendChild(item);
           });
           const boundary = document.createElement("p");
-          boundary.textContent = `Collection boundary: ${control.collection.limitation}`;
+          boundary.textContent = `What this collection method cannot establish: ${control.collection.limitation}`;
           const source = document.createElement("a");
           source.className = "doc-link";
           source.href = control.sources[0].url;
@@ -3917,53 +3979,53 @@
         title.textContent = "Explore the workflow before scanning a tenant";
         reason.textContent = "This page contains synthetic data. It cannot support a Copilot deployment decision until a live baseline scan is imported.";
       } else if (!scanIsComplete(baselineScan)) {
-        label.textContent = "Estate decision: Insufficient evidence";
-        title.textContent = "The sharing collector is incomplete";
-        reason.textContent = "Required sharing evidence is missing or truncated. The estate-wide assessment also requires the remaining readiness domains.";
+        label.textContent = "More information is needed";
+        title.textContent = "The sharing scan did not collect everything it needs";
+        reason.textContent = "Some required sharing records are missing or the scan stopped before finishing its configured scope. Review the collection errors and repeat the scan. Other Microsoft 365 service areas also need their own checks; this result does not prove a configuration problem.";
         actionText = "Review scan instructions";
         state = "hold";
       } else if (verificationOutcome?.cleared) {
-        label.textContent = "Sharing verification complete";
-        title.textContent = "Sharing controls improved; estate readiness is still undetermined";
-        reason.textContent = "A newer comparable scan verified the sharing changes. This is not a Copilot rollout approval: all remaining estate-readiness domains still require sufficient evidence.";
-        actionText = "Review estate evidence gaps";
+        label.textContent = "Sharing comparison complete";
+        title.textContent = "Sharing improved in the compared scope; overall readiness is not established";
+        reason.textContent = "A later comparable scan met the app's sharing-improvement rules. This only covers the sharing records compared. Review the other service areas and unresolved requirements before making a Copilot pilot decision.";
+        actionText = "Review the remaining readiness requirements";
         nextPage = "clearance";
         phase = 4;
       } else if (verificationOutcome?.status === "DriftDetected") {
-        label.textContent = "Sharing verification: Regression";
-        title.textContent = "New or worse sharing exposure was detected";
-        reason.textContent = "The verification scan found regression or newly opened sharing evidence. Investigate it while completing the other estate-readiness domains.";
-        actionText = "Investigate drift";
+        label.textContent = "Sharing comparison needs review";
+        title.textContent = "The later scan found new sharing records or a worse sharing result";
+        reason.textContent = "Compare the added records with the first scan and ask the responsible owners whether the access is intended. A newly observed record needs review; it does not by itself prove that sensitive information was disclosed.";
+        actionText = "Review what changed between scans";
         nextPage = "clearance";
         phase = 4;
         state = "hold";
       } else if (verificationOutcome?.status === "IncompleteEvidence") {
-        label.textContent = "Sharing verification incomplete";
+        label.textContent = "Sharing comparison incomplete";
         title.textContent = "The sharing changes have not been proven";
-        reason.textContent = "Repeat the sharing verification with the locked baseline configuration. The estate-wide assessment remains incomplete regardless.";
-        actionText = "Review verification";
+        reason.textContent = "Repeat the later scan using the same scope and collection settings as the first saved scan. Without comparable information the app cannot measure improvement. Other readiness checks still need separate review.";
+        actionText = "Review the scan comparison";
         nextPage = "clearance";
         phase = 4;
         state = "hold";
       } else if (verificationOutcome) {
-        label.textContent = "Sharing verification";
+        label.textContent = "Sharing comparison";
         title.textContent = "The expected sharing improvement has not been proven";
-        reason.textContent = "Review the remaining sharing findings and evidence changes. This comparison does not produce an estate-wide Copilot decision.";
-        actionText = "Review verification";
+        reason.textContent = "Review the remaining sharing records and what changed between scans. This comparison does not establish overall Copilot readiness.";
+        actionText = "Review the scan comparison";
         nextPage = "clearance";
         phase = 4;
       } else {
-        label.textContent = "Estate decision: Insufficient evidence";
+        label.textContent = "Overall readiness is not yet established";
         if (applied.size) {
-          title.textContent = "Sharing corrections are selected; estate assessment remains incomplete";
-          reason.textContent = `${applied.size} sharing correction${applied.size === 1 ? " is" : "s are"} selected. Complete and verify them, but do not treat this as an estate-wide Copilot decision.`;
-          actionText = "Review sharing action package";
+          title.textContent = "Proposed actions are selected, but no changes have been made here";
+          reason.textContent = `${applied.size} proposed action${applied.size === 1 ? " is" : "s are"} selected for administrator review. Obtain approval outside the app, complete any agreed work, and collect a later scan to measure changes. The other readiness requirements still need review.`;
+          actionText = "Review the proposed action file";
           nextPage = "remediation";
           phase = 3;
         } else {
           const estate = window.FlightDeckEvidenceAdmissibility.projectAssessment(baselineScan?.estateAssessment, readinessCatalog);
-          title.textContent = "Microsoft 365 Copilot estate readiness cannot be determined yet";
-          reason.textContent = `The current connector collected partial evidence for ${estate?.partialDomains ?? 0} of ${estate?.requiredDomains ?? 13} required systems. Its sharing signal is ${activeTenant.baselineScore}; ${baselineScan?.summary?.broadAccessSites ?? 0} public SharePoint sites require owner validation. Complete the missing missions before making a rollout decision.`;
+          title.textContent = "There is not enough assessed information for an overall readiness decision";
+          reason.textContent = `${estate?.partialDomains ?? 0} of ${estate?.requiredDomains ?? 13} service areas have only partly assessed information. The sharing review score is ${activeTenant.baselineScore ?? "not calculated"}; ${baselineScan?.summary?.broadAccessSites ?? 0} public groups or sites need an owner to confirm whether broad access is intended. Review the missing checks and this version's limitations before deciding on a pilot.`;
           actionText = "Review readiness coverage";
           nextPage = "overview";
           phase = 2;
@@ -4003,23 +4065,24 @@
       const ready = plan?.recommendation === "READY";
       const decisionTitle = plan
         ? plan.recommendation === "READY"
-          ? "READY — tenant-wide Copilot controls verified"
+          ? "The required checks meet Flight Deck's readiness rules"
           : plan.recommendation === "GO WITH CONDITIONS"
-            ? "GO WITH CONDITIONS — advisory treatment required"
-            : "NO-GO — tenant enablement requirements remain"
-        : "NO-GO — readiness catalogue is unavailable";
+            ? "The app recommends proceeding only after reviewing the listed conditions"
+            : "The app cannot recommend proceeding: requirements remain unresolved"
+        : "A recommendation is unavailable because the readiness checklist did not load";
       const decisionCopy = plan
-        ? `${plan.reason} ${plan.summary.complete} of ${plan.summary.total} controls are complete; ${plan.summary.actionRequired} require configuration changes, ${plan.summary.evidenceRequired} require evidence, and ${plan.summary.ownerReview} require owner review.`
-        : "The tenant-wide enablement plan could not be calculated.";
+        ? `${plan.reason} ${plan.summary.complete} of ${plan.summary.total} checks are accepted by the app; ${plan.summary.actionRequired} need a setting or action reviewed, ${plan.summary.evidenceRequired} need usable information, and ${plan.summary.ownerReview} need an owner decision. Unknown results are not proof of incorrect configuration.`
+        : "The app could not calculate the readiness review plan. Reload the complete application and try again.";
 
       if (!verificationOutcome) {
         card.classList.toggle("cleared", ready);
         icon.textContent = ready ? "✓" : "!";
         status.textContent = decisionTitle;
         const evaluated = estate?.evaluatedControls ?? 0;
-        copy.textContent = `${decisionCopy} ${evaluated} controls currently have conclusive collected evidence.`;
+        copy.textContent = `${decisionCopy} ${evaluated} checks currently have information the app can assess conclusively. This is a recommendation under the app's rules, not Microsoft approval.`;
         score.textContent = activeTenant.baselineScore == null ? "Not calculated" : activeTenant.baselineScore;
         open.textContent = baselineScan?.summary?.broadAccessSites ?? activeTenant.criticalExposures;
+        document.getElementById("clearance-open-label").textContent = baselineScan ? "Public groups or sites for owner review" : "Fictional critical sharing items";
         users.textContent = `${estate?.collectedDomains ?? 0}/${estate?.requiredDomains ?? 13}`;
         renderDecisionBlockers();
         renderTenantEnablementPlan();
@@ -4030,9 +4093,10 @@
       card.classList.toggle("cleared", ready);
       icon.textContent = ready ? "✓" : "!";
       status.textContent = decisionTitle;
-      copy.textContent = `${decisionCopy} Sharing verification status: ${verificationOutcome.reason}`;
+      copy.textContent = `${decisionCopy} Sharing comparison: ${verificationOutcome.reason}`;
       score.textContent = verificationReport.verification.readinessScore;
       open.textContent = verificationReport.verification.criticalExposures;
+      document.getElementById("clearance-open-label").textContent = "Critical sharing records in the later scan";
       users.textContent = `${estate?.collectedDomains ?? 0}/${estate?.requiredDomains ?? 13}`;
       renderDecisionBlockers();
       renderTenantEnablementPlan();
@@ -4045,7 +4109,7 @@
       if (!baselineScan?.estateAssessment?.controlResults) {
         const empty = document.createElement("div");
         empty.className = "empty-state";
-        empty.textContent = "Run or import a tenant assessment to calculate decision blockers.";
+        empty.textContent = "Collect or import a first scan to list the readiness checks that still need attention.";
         container.appendChild(empty);
         return;
       }
@@ -4067,13 +4131,13 @@
         const heading = document.createElement("span");
         heading.className = "control-heading";
         const id = document.createElement("small");
-        id.textContent = `${domain.name} / ${control.requirement}`;
+        id.textContent = `${domain.name} / ${control.requirement === "Gate" ? "Required by the app" : "Advisory check"}`;
         const title = document.createElement("strong");
         title.textContent = `${control.id}: ${control.title}`;
         heading.append(id, title);
         const badge = document.createElement("span");
         badge.className = "control-badge";
-        badge.textContent = evaluation.status;
+        badge.textContent = readableCheckStatus(evaluation.status);
         summary.append(heading, badge);
         const body = document.createElement("div");
         body.className = "control-body";
@@ -4081,15 +4145,15 @@
         impact.textContent = control.description;
         const blocker = document.createElement("p");
         blocker.textContent = !evaluation.admissible
-          ? `Evidence decision: ${evaluation.explanation} Reported status: ${evaluation.reportedStatus}.`
+          ? `Why the app cannot use this result: ${evaluation.explanation} The source reported: ${readableCheckStatus(evaluation.reportedStatus)}. A reported status alone does not satisfy this check.`
           : result.limitations?.length
-          ? `Blocking evidence: ${result.limitations.map(item => item.description).join(" ")}`
-          : "This control did not meet its required condition.";
+          ? `What limits this result: ${result.limitations.map(item => item.description).join(" ")}`
+          : "This check did not meet its required condition.";
         const playbook = window.FlightDeckEnablement.controlPlaybook(domain, control, result);
         const action = document.createElement("p");
         action.textContent = `Required action: ${result.remediation?.action || control.remediation}`;
         const location = document.createElement("p");
-        location.textContent = `Implementation path: ${playbook.portal} > ${playbook.adminPath}. Responsible: ${playbook.responsibleRoles.join(", ")}.`;
+        location.textContent = `Where to investigate: ${playbook.portal} > ${playbook.adminPath}. Suggested roles to involve: ${playbook.responsibleRoles.join(", ")}. The app has not assigned a person or authorized a change.`;
         const link = document.createElement("a");
         link.className = "doc-link";
         link.href = playbook.sources[0].url;
@@ -4109,7 +4173,7 @@
       if (blocked.length > 12) {
         const note = document.createElement("p");
         note.className = "enablement-note";
-        note.textContent = `${blocked.length - 12} additional blockers are listed with complete implementation steps in the tenant-wide enablement plan below.`;
+        note.textContent = `${blocked.length - 12} additional unresolved checks are listed in the full readiness checklist below. Open them for administrator instructions and collection limitations.`;
         container.appendChild(note);
       }
     }
@@ -4190,12 +4254,12 @@
       applied.clear();
       selectedScenario = scenarios[0] || null;
       document.querySelector(".tenant strong").textContent = activeTenant.name;
-      document.getElementById("tenant-status").textContent = "Imported point-in-time scan";
+      document.getElementById("tenant-status").textContent = "Saved scan, not a live view of current settings";
       const estate = window.FlightDeckEvidenceAdmissibility.projectAssessment(scan.estateAssessment, readinessCatalog);
       const missingDomains = estate.requiredDomains - estate.collectedDomains - estate.partialDomains;
       document.getElementById("source-ribbon").textContent = scanIsComplete(scan)
-        ? `Partial evidence is available for ${estate.partialDomains} of ${estate.requiredDomains} readiness domains for ${activeTenant.name}; ${missingDomains} domain collectors remain unavailable.`
-        : `The connected collectors were incomplete for ${activeTenant.name}. Findings are diagnostic only and no readiness score or rollout recommendation can be produced.`;
+        ? `${activeTenant.name}: ${estate.collectedDomains} of ${estate.requiredDomains} service areas are fully assessed, ${estate.partialDomains} are partly assessed, and ${missingDomains} have no accepted assessment results. These are readiness-check counts, not service uptime.`
+        : `The scan for ${activeTenant.name} did not finish collecting the information it needs. Review the collection errors before using the results; a reliable sharing score or rollout recommendation is unavailable.`;
       document.getElementById("scan-timestamp").textContent = scan.generatedAt
         ? `Scan generated ${new Date(scan.generatedAt).toLocaleString()}`
         : "Scan timestamp unavailable";
@@ -4205,29 +4269,29 @@
         .reduce((sum, key) => sum + (Number.isInteger(penalties[key]) ? penalties[key] : 0), 0);
       document.getElementById("score-note").textContent = activeTenant.baselineScore == null
         ? "Score unavailable because required evidence is incomplete"
-        : `100 minus ${totalPenalty} sharing-risk penalty points; this is not an estate-readiness score`;
+        : `100 minus ${totalPenalty} points for the app's sharing rules. Select to inspect the calculation; this does not measure overall Copilot readiness.`;
       document.getElementById("critical-count").textContent = activeTenant.criticalExposures;
-      document.getElementById("critical-label").textContent = "Critical sharing evidence";
+      document.getElementById("critical-label").textContent = "Sharing records marked critical";
       const publicGroupDetails = scan.evidenceDetails?.broadAccessSites || [];
       const resolvedPublicSites = publicGroupDetails.filter(detail => detail.siteResolved === true).length;
       const unresolvedPublicGroups = Math.max(0, summary.broadAccessSites - resolvedPublicSites);
       document.getElementById("critical-note").textContent = unresolvedPublicGroups
-        ? `${resolvedPublicSites} public SharePoint sites resolved; ${unresolvedPublicGroups} public groups require site resolution`
-        : `${resolvedPublicSites} public SharePoint sites require owner validation`;
-      document.getElementById("exposure-label").textContent = "Sampled exposed items";
+        ? `Related context: ${resolvedPublicSites} public SharePoint sites identified; the connected site for ${unresolvedPublicGroups} public groups could not be identified.`
+        : `Related context: ${resolvedPublicSites} public SharePoint sites need an owner to confirm whether broad access is intended.`;
+      document.getElementById("exposure-label").textContent = "Shared items in the collected sample";
       document.getElementById("exposed-files").textContent = activeTenant.exposedFiles.toLocaleString();
-      document.getElementById("exposure-note").textContent = `Across ${summary.sitesScanned} scanned sites`;
+      document.getElementById("exposure-note").textContent = `Across ${summary.sitesScanned} scanned sites. Shared does not mean sensitive or improperly exposed.`;
       const blastRadiusLabel = document.getElementById("blast-radius-label");
       const blastRadiusValue = document.getElementById("blast-radius-users");
       const blastRadiusNote = document.getElementById("blast-radius-note");
       if (activeTenant.blastRadiusUsers != null) {
         blastRadiusLabel.textContent = "Affected users";
         blastRadiusValue.textContent = activeTenant.blastRadiusUsers.toLocaleString();
-        blastRadiusNote.textContent = `${summary.guests.toLocaleString()} guest accounts detected`;
+        blastRadiusNote.textContent = `${summary.guests.toLocaleString()} guest accounts were also recorded; guest presence alone is not a sharing problem.`;
       } else if (summary.anonymousLinks > 0) {
         blastRadiusLabel.textContent = "Potential audience";
-        blastRadiusValue.textContent = "Unbounded";
-        blastRadiusNote.textContent = `${summary.anonymousLinks.toLocaleString()} anonymous sharing links cannot be mapped to named users`;
+        blastRadiusValue.textContent = "Anyone with a link";
+        blastRadiusNote.textContent = `${summary.anonymousLinks.toLocaleString()} anonymous links allow access without signing in. The app cannot count everyone who may receive them.`;
       } else if (summary.broadAccessSites > 0 || summary.organizationLinks > 0 || hasBroadIdentityPermission) {
         blastRadiusLabel.textContent = "Potential tenant audience";
         blastRadiusValue.textContent = `Up to ${potentialTenantAudience.toLocaleString()} users`;
@@ -4237,13 +4301,13 @@
             ? "An Everyone-style SharePoint permission was observed; effective access is not verified"
             : `${resolvedPublicSites} public SharePoint sites may be tenant-accessible; effective access is not verified`;
       } else if (observedDirectPrincipalCount > 0) {
-        blastRadiusLabel.textContent = "Observed direct principals";
+        blastRadiusLabel.textContent = "Accounts or groups named directly in permissions";
         blastRadiusValue.textContent = observedDirectPrincipalCount.toLocaleString();
-        blastRadiusNote.textContent = `${activePermissionPaths.length.toLocaleString()} sampled permission paths; group membership and effective access are not expanded`;
+        blastRadiusNote.textContent = `${activePermissionPaths.length.toLocaleString()} sampled permission records. Group memberships are not expanded, so this is not a count of all people who can actually access the items.`;
       } else {
         blastRadiusLabel.textContent = "Potential audience";
-        blastRadiusValue.textContent = "No broad path";
-        blastRadiusNote.textContent = "No tenant-wide or anonymous sharing path was observed in the bounded scan";
+        blastRadiusValue.textContent = "No broad access observed";
+        blastRadiusNote.textContent = "The collected sample contained no organization-wide or anonymous sharing record. This is not proof that none exists elsewhere.";
       }
       renderAppliedUpstreamSources(scan);
       renderEstateDomains(scan);
@@ -4253,9 +4317,9 @@
       document.getElementById("verification-change-details").hidden = true;
       document.getElementById("download-clearance").disabled = true;
       document.getElementById("verification-evidence").className = "evidence-entry";
-      document.getElementById("verification-evidence").querySelector("small").textContent = "Awaiting an authoritative comparison report.";
+      document.getElementById("verification-evidence").querySelector("small").textContent = "No accepted comparison is loaded. Collect a later scan after approved administrator work.";
       document.getElementById("clearance-evidence").className = "evidence-entry";
-      document.getElementById("clearance-evidence").querySelector("small").textContent = "Available after a post-change scan proves the required improvement.";
+      document.getElementById("clearance-evidence").querySelector("small").textContent = "A sharing comparison can support this review but cannot replace unresolved readiness checks in other service areas.";
       document.getElementById("simulation-result").classList.remove("visible");
       renderScenarios();
       renderFindings(document.getElementById("severity-filter").value);
@@ -4451,9 +4515,9 @@
       verificationReport = report;
       const evidenceChanges = report.change.evidenceSets;
       const statusLabels = {
-        ImprovementVerified: "Improvement verified",
-        DriftDetected: "Drift detected",
-        NoMaterialChange: "No material change"
+        ImprovementVerified: "Sharing improvement measured",
+        DriftDetected: "New or worse sharing results",
+        NoMaterialChange: "No meaningful change measured"
       };
       const cleared = decision === "SharingControlsVerified";
       const regressed = report.status === "DriftDetected";
@@ -4468,9 +4532,9 @@
         exposureDelta: report.change.exposedItems,
         evidenceChanges,
         reason: cleared
-          ? "The authoritative comparison proved the required sharing-control improvement. This does not complete the estate-wide Copilot readiness assessment."
+          ? "The accepted comparison met the app's sharing-improvement rules within the scanned scope. It does not establish overall Copilot readiness."
           : regressed
-            ? "The authoritative comparison found sharing regression or newly opened evidence."
+            ? "The accepted comparison found worse sharing counts or newly observed sharing records. Review whether the changed access is intended."
             : decision === "Remediate"
               ? "Sharing findings remain. Complete the required corrections and compare again."
               : "The comparison does not yet prove enough sharing improvement. Run another post-change scan after confirming the approved corrections were completed."
@@ -4490,7 +4554,7 @@
       }
       document.getElementById("critical-count").textContent = activeTenant.criticalExposures;
       document.getElementById("exposed-files").textContent = activeTenant.exposedFiles.toLocaleString();
-      document.getElementById("exposure-note").textContent = `Across ${report.verification.sitesScanned} verified sites`;
+      document.getElementById("exposure-note").textContent = `Across ${report.verification.sitesScanned} sites in the later scan. This does not certify those sites or their contents.`;
 
       const scoreElement = document.getElementById("verified-score-delta");
       const criticalElement = document.getElementById("verified-critical-delta");
@@ -4503,12 +4567,12 @@
       exposureElement.className = report.change.exposedItems <= 0 ? "delta-positive" : "delta-negative";
       document.getElementById("verified-status").textContent = status;
       document.getElementById("verified-status").className = regressed ? "delta-negative" : cleared ? "delta-positive" : "";
-      document.getElementById("verified-copy").textContent = `${report.verification.sitesScanned} sites were compared. The sharing posture signal is ${report.verification.readinessScore}; ${report.verification.criticalExposures} critical sharing items and ${report.verification.exposedItems} exposed sampled items remain. Estate-wide readiness is not determined by this comparison.`;
+      document.getElementById("verified-copy").textContent = `${report.verification.sitesScanned} sites were compared. The later scan's sharing review score is ${report.verification.readinessScore}; ${report.verification.criticalExposures} critical sharing records and ${report.verification.exposedItems} shared items remain in the sample. Positive score changes mean a higher score; negative record counts mean fewer records. These counts do not prove sensitive content was disclosed or establish overall readiness.`;
       const identifierPreview = ids => ids.length
         ? ids.slice(0, 3).join(", ") + (ids.length > 3 ? ` and ${ids.length - 3} more` : "")
         : "none";
       const changeDetails = document.getElementById("verification-change-details");
-      changeDetails.textContent = `Critical evidence opened: ${identifierPreview(evidenceChanges.criticalEvidenceIds.opened)}. Critical evidence closed: ${identifierPreview(evidenceChanges.criticalEvidenceIds.closed)}. Exposed items opened: ${identifierPreview(evidenceChanges.sharedItemIds.opened)}. Exposed items closed: ${identifierPreview(evidenceChanges.sharedItemIds.closed)}.`;
+      changeDetails.textContent = `Critical sharing record identifiers newly observed: ${identifierPreview(evidenceChanges.criticalEvidenceIds.opened)}. Critical sharing record identifiers no longer observed: ${identifierPreview(evidenceChanges.criticalEvidenceIds.closed)}. Shared item identifiers newly observed: ${identifierPreview(evidenceChanges.sharedItemIds.opened)}. Shared item identifiers no longer observed: ${identifierPreview(evidenceChanges.sharedItemIds.closed)}. “No longer observed” refers to this comparison, not proof that a file was deleted or all access removed.`;
       changeDetails.hidden = false;
       document.getElementById("verification-empty").hidden = true;
       document.getElementById("verification-result").hidden = false;
@@ -4603,15 +4667,24 @@
         item.dataset.status = workload.status;
         const content = document.createElement("span");
         const title = document.createElement("strong");
-        title.textContent = `${workload.name}: ${workload.status.replaceAll("-", " ")}`;
+        const collectionStatus = {
+          queued: "waiting to connect",
+          running: "reading service information",
+          collected: "information collected; check results still need review",
+          "collected-with-gaps": "some information collected; limitations remain",
+          failed: "collection failed; review the connection error",
+          skipped: "not collected in this run",
+          cancelled: "collection cancelled"
+        }[workload.status] || workload.status.replaceAll("-", " ");
+        title.textContent = `${workload.name}: ${collectionStatus}`;
         const message = document.createElement("p");
         message.className = "subtitle";
-        message.textContent = workload.message || "Waiting for the previous workload.";
+        message.textContent = workload.message || "Waiting for the preceding service collection to finish.";
         content.append(title, message);
         if (workload.resourceCounts?.length) {
           const counts = document.createElement("details");
           const summary = document.createElement("summary");
-          summary.textContent = "Observed rows by query (not proof of complete coverage)";
+          summary.textContent = "How many records each query returned (not passed readiness checks)";
           counts.append(summary);
           for (const resource of workload.resourceCounts) {
             const row = document.createElement("p");
@@ -4621,7 +4694,7 @@
             }[resource.acquisitionStatus] || "read outcome not recorded";
             row.textContent = `${resource.resource}: ${resource.rows} rows; ${status}` +
               (Number.isInteger(resource.acceptedRows) && Number.isInteger(resource.observationRows)
-                ? `. ${resource.acceptedRows} accepted source rows; ${resource.observationRows} retained observations. Neither count validates a readiness control.`
+                ? `. ${resource.acceptedRows} records accepted from the source; ${resource.observationRows} observations retained for review. These are collection counts, not passed checks or necessarily unique files.`
                 : "");
             counts.append(row);
           }
@@ -4642,7 +4715,7 @@
         if (workload.evidenceGaps?.length) {
           const details = document.createElement("details");
           const summary = document.createElement("summary");
-          summary.textContent = `Coverage and review gaps (${workload.evidenceGaps.length} of ${workload.evidenceGapCount})`;
+          summary.textContent = `Information still missing or needing review (${workload.evidenceGaps.length} of ${workload.evidenceGapCount} reported gaps)`;
           details.append(summary);
           for (const gap of workload.evidenceGaps) {
             const description = document.createElement("p");
@@ -4660,8 +4733,12 @@
       const panel = document.getElementById("capability-panel");
       panel.replaceChildren();
       const heading = document.createElement("strong");
-      heading.textContent = "Collector connection requirements";
+      heading.textContent = "Connection planning information for administrators";
       panel.appendChild(heading);
+      const explanation = document.createElement("p");
+      explanation.className = "subtitle";
+      explanation.textContent = "These are planned requirements from Flight Deck's checklist, not a record of what the current sign-in requested or successfully read. Some listed connection methods are not implemented. Do not grant all listed permissions to make the page green. Use the service-by-service connection guide above for the actual sign-in, commands, limits and missing features. The number of related checks is not the number that this connection can confirm.";
+      panel.appendChild(explanation);
       for (const plan of payload.plans || []) {
         const detail = document.createElement("details");
         detail.className = `control-detail ${plan.available ? "pass" : "unknown"}`;
@@ -4669,25 +4746,29 @@
         const title = document.createElement("span");
         title.className = "control-heading";
         const service = document.createElement("strong");
-        service.textContent = plan.serviceId;
+        service.textContent = readinessCatalog?.domains.find(domain =>
+          domain.controls.some(control => plan.controlIds.includes(control.id)))?.name || plan.serviceId;
         const count = document.createElement("small");
-        count.textContent = `${plan.controlIds.length} controls / ${plan.authMode}`;
+        count.textContent = `${plan.controlIds.length} related checks. Planned sign-in: ${
+          plan.authMode === "local-delegated" ? "a signed-in user's account"
+            : plan.authMode === "production-application" ? "an application identity rather than a user"
+              : plan.authMode}. This does not confirm that the connection has been run.`;
         title.append(count, service);
         const badge = document.createElement("span");
         badge.className = "control-badge";
-        badge.textContent = plan.available ? "Available" : "Requirements";
+        badge.textContent = plan.available ? "Connection method available" : "Review connection requirements";
         summary.append(title, badge);
         const body = document.createElement("div");
         body.className = "control-body";
         const lines = [
-          ["Permissions", plan.permissions],
-          ["Admin roles", plan.adminRoles],
-          ["Licences", plan.licenses],
-          ["Endpoints", plan.endpoints]
+          ["Catalogue permission hints, not a request to grant them all", plan.permissions],
+          ["Suggested administrator roles to review", plan.adminRoles],
+          ["Licences to review if the corresponding features are needed", plan.licenses],
+          ["Service addresses in the connection plan, not a record of completed requests", plan.endpoints]
         ];
         for (const [label, values] of lines) {
           const row = document.createElement("p");
-          row.textContent = `${label}: ${values.length ? values.join(", ") : "None"}`;
+          row.textContent = `${label}: ${values.length ? values.join(", ") : "None listed for this method"}`;
           body.appendChild(row);
         }
         detail.append(summary, body);
@@ -4702,8 +4783,8 @@
         const job = await apiJson(`/api/jobs/${id}`);
         const actionLabel = ["directorySearch", "directory-search"].includes(job.action) ? "Searching the directory" :
           ["directoryCohort", "directory-cohort"].includes(job.action) ? "Saving the approved pilot" :
-          job.action === "workloads" ? "Collecting workload evidence" :
-          job.action === "baseline" ? "Scanning the tenant" : "Verifying corrections";
+          job.action === "workloads" ? "Reading information from connected services" :
+          job.action === "baseline" ? "Collecting the first scan" : "Collecting a later scan for comparison";
         renderWorkloadProgress(job.workloads || []);
         if (job.status === "queued" || job.status === "running" || job.status === "cancelling") {
           renderServiceState("running", `${actionLabel}. Complete Microsoft sign-in if prompted.`, job.log, job.auth);
@@ -4729,11 +4810,11 @@
         renderWorkloadProgress(job.workloads || []);
         const collectionSummary = job.collectionSummary;
         const collectionMessage = collectionSummary
-          ? ` Workload results: ${collectionSummary.collected || 0} collected; ${collectionSummary.withGaps || 0} collected with gaps; ${collectionSummary.failed || 0} failed. Review the outcomes below.`
-          : " Review the evidence and remaining validation requirements.";
+          ? ` Service collection results: ${collectionSummary.collected || 0} collected information; ${collectionSummary.withGaps || 0} collected some information with gaps; ${collectionSummary.failed || 0} failed. These are connection outcomes, not readiness-check approvals. Review the details below.`
+          : " Review the saved information and the checks that still need attention.";
         renderServiceState("ready", (job.action === "verify"
-          ? "Verification complete. The Decision page is ready."
-          : job.action === "baseline" ? "Baseline complete. The Assessment page is ready." : "Assessment updated.") + collectionMessage, job.log);
+          ? "The scan comparison has finished. Open Review pilot decision to read the result."
+          : job.action === "baseline" ? "The first scan is saved. Review Assessment, then return to Set up to choose your pilot people." : "The saved assessment has been updated.") + collectionMessage, job.log);
         await refreshEvidenceSourceStatus();
         if (setupDecisionUI && setupDecisionWorkflowsAvailable) {
           await setupDecisionUI.refresh();
@@ -4753,8 +4834,8 @@
       if (!signInWindow) {
         document.getElementById("service-help").textContent = "Pop-ups are blocked. Open https://microsoft.com/devicelogin in another tab, then enter the code shown below.";
       }
-      const label = action === "workloads" ? "Preparing workload collection..." :
-        action === "baseline" ? "Preparing tenant sign-in..." : "Preparing verification sign-in...";
+      const label = action === "workloads" ? "Preparing to read connected service information..." :
+        action === "baseline" ? "Preparing Microsoft 365 sign-in for the first scan..." : "Preparing sign-in for a later comparison scan...";
       renderServiceState("running", label);
       try {
         const job = await apiJson("/api/jobs", {
@@ -4811,21 +4892,21 @@
       const title = document.createElement("strong");
       title.textContent = `${readiness.summary.rows} activity-report users imported`;
       const detail = document.createElement("div");
-      detail.textContent = `${readiness.privacy.mode} identities. Report date: ${
-        readiness.reportedAt ? new Date(readiness.reportedAt).toLocaleDateString() : "missing - evidence is non-gating"
-      }.`;
+      detail.textContent = `${readiness.privacy.mode === "Identified" ? "The report identifies individual users" : "Some user identities are hidden or cannot be matched"}. Report date: ${
+        readiness.reportedAt ? new Date(readiness.reportedAt).toLocaleDateString() : "missing; this undated report cannot satisfy a required check"
+      }. These are report rows, not confirmed pilot approvals.`;
       const metrics = document.createElement("div");
       metrics.className = "source-metrics";
       metrics.append(
-        metricElement(readiness.summary.copilotLicensedUsers, "Licensed"),
-        metricElement(readiness.summary.licensedUsersOnEligibleChannel, "Eligible channel"),
-        metricElement(readiness.summary.suggestedCandidates, "Suggested")
+        metricElement(readiness.summary.copilotLicensedUsers, "Users with a Copilot licence in the report"),
+        metricElement(readiness.summary.licensedUsersOnEligibleChannel, "Licensed users on an eligible app update channel"),
+        metricElement(readiness.summary.suggestedCandidates, "Suggested pilot candidates, not approved participants")
       );
       status.append(title, detail, metrics);
       if (readiness.privacy.mode !== "Identified") {
         const warning = document.createElement("div");
         warning.style.marginTop = "10px";
-        warning.textContent = "A named cohort cannot be created because one or more identities are concealed.";
+        warning.textContent = "You cannot choose named pilot participants from this report because one or more user identities are hidden. Use a report with identified users or the directory selection above.";
         status.appendChild(warning);
         return;
       }
@@ -4850,8 +4931,8 @@
         const meta = document.createElement("small");
         meta.textContent = [
           row.suggestedCandidate ? "Microsoft suggested candidate" : "Not Microsoft-suggested",
-          row.hasCopilotLicense ? "Copilot licence assigned" : "No Copilot licence",
-          row.eligibleUpdateChannel ? "Eligible update channel" : "Update channel needs attention"
+          row.hasCopilotLicense ? "Report shows a Copilot licence" : "Report does not show a Copilot licence",
+          row.eligibleUpdateChannel ? "Report shows an eligible update channel" : "Confirm the app update channel"
         ].join(" · ");
         copy.append(name, meta);
         label.append(checkbox, copy);
@@ -4862,7 +4943,7 @@
         document.getElementById("cohort-owner").value = cohort.owner;
         const cohortStatus = document.getElementById("cohort-status");
         cohortStatus.hidden = false;
-        cohortStatus.textContent = `${cohort.population} users approved for ${cohort.name}. Rerun the live scan to apply this cohort.`;
+        cohortStatus.textContent = `${cohort.population} users saved as the approved participants for ${cohort.name}. This records your selection, not independent approval. Rerun the scan to assess these people; no licences or group memberships were changed.`;
       }
     }
 
@@ -4876,7 +4957,7 @@
       const title = document.createElement("strong");
       title.textContent = `${assessment.summary.rows} assessment rows imported`;
       const detail = document.createElement("div");
-      detail.textContent = `${assessment.summary.mappedRows} exact-crosswalk rows mapped; ${assessment.summary.stagedRows} retained for review. Source ${assessment.upstreamVersion}.`;
+      detail.textContent = `${assessment.summary.mappedRows} report rows matched known checks from a supported source version; ${assessment.summary.stagedRows} rows were saved for review without being accepted as check results. Source version: ${assessment.upstreamVersion}. Matching a row does not by itself make the check pass.`;
       status.append(title, detail);
       if (assessment.stagedRows?.length) {
         const list = document.createElement("ul");
@@ -4888,7 +4969,7 @@
         }
         if (assessment.stagedRows.length > 8) {
           const item = document.createElement("li");
-          item.textContent = `${assessment.stagedRows.length - 8} additional rows remain staged.`;
+          item.textContent = `${assessment.stagedRows.length - 8} additional report rows still need review and do not count as accepted results.`;
           list.appendChild(item);
         }
         status.appendChild(list);
@@ -4904,7 +4985,7 @@
         panel.hidden = sources.length === 0;
         if (!sources.length) continue;
         const heading = document.createElement("h3");
-        heading.textContent = "Evidence combined with this baseline";
+        heading.textContent = "Imported reports included with the first saved scan";
         const copy = document.createElement("p");
         copy.className = "subtitle";
         copy.textContent = sources.map(source => {
@@ -4972,8 +5053,8 @@
       await loadUpstreamEvidence();
       if (payload.artifactUpdated) await loadWorkflowArtifact("baseline");
       showToast(readiness
-        ? `Imported ${payload.summary.rows} readiness users`
-        : `Mapped ${payload.summary.mappedRows}; staged ${payload.summary.stagedRows}`);
+        ? `Imported report information for ${payload.summary.rows} users. Review it before selecting pilot participants.`
+        : `${payload.summary.mappedRows} report rows matched known checks; ${payload.summary.stagedRows} remain for review. Importing does not mean checks passed.`);
     }
 
     async function savePilotCohort() {
@@ -4994,7 +5075,7 @@
       });
       upstreamEvidence.cohort = cohort;
       renderReadinessSource(upstreamEvidence.readiness, cohort);
-      showToast(`Approved ${cohort.population}-user pilot cohort`);
+      showToast(`Saved your selection of ${cohort.population} pilot participants. No Microsoft 365 memberships or licences changed.`);
     }
 
     async function initializeLocalService() {
@@ -5031,10 +5112,10 @@
           }
         }
         renderServiceState("ready", status.artifacts.report
-          ? "Previous verified decision loaded. Run verification again after further changes."
+          ? "A saved scan comparison is loaded. Read its result on Review pilot decision; run another comparison after further changes."
           : status.artifacts.baseline
-            ? "Previous baseline loaded. Review the Assessment page or verify approved corrections."
-            : "Integrated scanner ready. Select Connect and scan tenant.");
+            ? "Your first saved scan is loaded. Choose pilot people on Set up, review Assessment, or compare a later scan after approved changes."
+            : "The local scanner is ready. Select Connect and scan tenant to collect your first scan.");
         await setupDecisionUI.setEnabled(setupDecisionWorkflowsAvailable);
         renderEvidenceCompletion();
       } catch (error) {
@@ -5147,7 +5228,7 @@
     });
     document.getElementById("create-attestation").addEventListener("click", () => {
       const button = document.getElementById("create-attestation");
-      runBusyAction(button, "Creating...", createAttestation)
+      runBusyAction(button, "Saving the reviewed statement...", createAttestation)
         .catch(error => showError(error.message));
     });
     document.getElementById("prepare-admin-evidence").addEventListener("click", () => {

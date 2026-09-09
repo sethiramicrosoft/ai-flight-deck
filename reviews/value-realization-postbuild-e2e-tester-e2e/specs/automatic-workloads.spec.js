@@ -13,8 +13,9 @@ test("setup makes automatic collection the default and keeps optional imports co
     await page.evaluate(() => navigate("guide"));
     const notice = page.locator("#automatic-workload-notice");
     await expect(notice).toBeVisible();
-    await expect(notice).toContainText("no scripts to run, exports to assemble, or JSON templates to fill");
-    await expect(notice).toContainText("Accountable owner decisions still require human approval");
+    await expect(notice).toContainText("You do not need to assemble report packages for the normal scan");
+    await expect(notice).toContainText("Complete Microsoft sign-in, multifactor authentication, and permission prompts");
+    await expect(page.locator("#setup-decision-forms")).toContainText("They do not assign licences, change Microsoft 365 settings");
     expect(await notice.evaluate(element =>
       Boolean(element.compareDocumentPosition(document.getElementById("connect-scan")) & Node.DOCUMENT_POSITION_FOLLOWING)
     )).toBe(true);
@@ -70,11 +71,11 @@ test("existing-baseline collection needs one button, shows workload failures and
   await expect(page.locator("#service-panel")).toHaveClass(/ready/);
   await page.evaluate(() => navigate("guide"));
   await page.locator("#connect-scan").click();
-  await expect(page.locator("#service-status")).toHaveText(/^Baseline complete\./, { timeout: 25000 });
+  await expect(page.locator("#service-status")).toHaveText(/^The first scan is saved\./, { timeout: 25000 });
   await page.evaluate(() => navigate("guide"));
   await expect(page.locator("#collect-workloads")).toBeEnabled();
   await page.locator("#collect-workloads").click();
-  await expect(page.locator("#service-status")).toContainText("2 collected; 1 collected with gaps; 1 failed", { timeout: 25000 });
+  await expect(page.locator("#service-status")).toContainText("2 collected information; 1 collected some information with gaps; 1 failed", { timeout: 25000 });
   for (const viewport of [{ width: 1440, height: 1080 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
     await page.evaluate(() => navigate("guide"));
@@ -91,12 +92,12 @@ test("existing-baseline collection needs one button, shows workload failures and
     await expect(errorDetails).toContainText("connections: Synthetic connection read denied. (PP_HTTP_403)");
     await expect(errorDetails).not.toContainText("COVERAGE_INCOMPLETE");
     await errorDetails.locator("summary").click();
-    const counts = page.locator("#workload-progress details").filter({ hasText: "Observed rows by query" });
+    const counts = page.locator("#workload-progress details").filter({ hasText: "How many records each query returned" });
     await counts.locator("summary").click();
     await expect(counts).toContainText("environments: 2");
     await expect(counts).toContainText("apps: 0 rows; read succeeded");
     await counts.locator("summary").click();
-    const coverage = page.locator("#workload-progress details").filter({ hasText: "Coverage and review gaps" });
+    const coverage = page.locator("#workload-progress details").filter({ hasText: "Information still missing or needing review" });
     await coverage.locator("summary").click();
     await expect(coverage).toContainText("agentSharing: Synthetic effective sharing cannot be established. (COVERAGE_INCOMPLETE)");
     await coverage.locator("summary").click();

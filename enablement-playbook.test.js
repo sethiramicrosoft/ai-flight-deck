@@ -140,10 +140,10 @@ test("evidence routes distinguish integration gaps, automatic workloads and acco
   }
   assert.equal(byId.get("AFD-IAM-007").collection.kind, "SignedAttestationRequired");
   assert.equal(byId.get("AFD-PPA-001").collection.kind, "PowerPlatformEvidenceRequired");
-  assert.match(byId.get("AFD-PPA-001").collection.limitation, /unsupported observation-validation/);
+  assert.match(byId.get("AFD-PPA-001").collection.limitation, /without implemented checking rules remain unconfirmed/);
   assert.match(byId.get("AFD-PPA-001").collection.steps.join(" "), /Collect workload evidence/);
   assert.equal(byId.get("AFD-EXO-001").collection.kind, "AdminEvidenceRequired");
-  assert.match(byId.get("AFD-EXO-001").collection.steps.join(" "), /exchangeOnline automatically/);
+  assert.match(byId.get("AFD-EXO-001").collection.steps.join(" "), /read Exchange Online for the organization/);
   assert.doesNotMatch(byId.get("AFD-EXO-001").collection.steps.join(" "), /download|Install-Module|import the package/i);
   assert.equal(byId.get("AFD-SEC-004").collection.kind, "LiveCollectionRequired");
 });

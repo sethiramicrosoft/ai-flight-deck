@@ -36,7 +36,7 @@ test("README credits Microsoft sources and lists every live delegated scope", ()
 
   assert.match(readme, /Microsoft 365 Copilot Readiness report/);
   assert.match(readme, /m365-copilot-automated-readiness-assessment/);
-  assert.match(readme, /What AI Flight Deck adds/);
+  assert.match(readme, /What the prototype can already do/);
   assert.match(readme, /SETUP-AI-Flight-Deck\.cmd/);
   assert.match(acknowledgements, /independent hackathon prototype/i);
 
@@ -46,5 +46,21 @@ test("README credits Microsoft sources and lists every live delegated scope", ()
       readme.includes(`\`${displayName}\``),
       `README must document delegated scope ${displayName}`
     );
+  }
+});
+
+test("the user and connection guides are discoverable and their local file links resolve", () => {
+  const readme = read("README.md");
+  assert.match(readme, /docs\/COLLECTOR-GUIDE\.md/);
+  assert.match(readme, /docs\/VISUAL-TOUR\.md/);
+  for (const name of ["docs/COLLECTOR-GUIDE.md", "docs/VISUAL-TOUR.md"]) {
+    const content = read(name);
+    for (const match of content.matchAll(/\]\(([^)\s]+)\)/g)) {
+      const target = match[1];
+      if (/^(?:https?:|mailto:|#)/.test(target)) continue;
+      const relative = decodeURIComponent(target.split("#")[0]);
+      assert.ok(fs.existsSync(path.resolve(root, path.dirname(name), relative)),
+        `${name} has a broken relative link: ${target}`);
+    }
   }
 });

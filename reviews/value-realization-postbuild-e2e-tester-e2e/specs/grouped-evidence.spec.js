@@ -46,7 +46,7 @@ test("4094 permission observations render bounded groups and 50-record drilldown
     await page.getByRole("button", { name: "Next groups", exact: true }).click();
     await expect(page.locator(".sharing-review-card")).toHaveCount(3);
     await page.getByRole("button", { name: "Previous groups", exact: true }).click();
-    const first = page.getByRole("button", { name: "View grouped evidence", exact: true }).first();
+    const first = page.getByRole("button", { name: "See the files and permission records", exact: true }).first();
     await first.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.locator(".evidence-detail")).toHaveCount(50);

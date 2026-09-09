@@ -11,10 +11,10 @@
     const lanes = plan.lanes;
     if (!lanes) throw new Error("The completion plan does not expose actionable categories. Reload the updated application.");
     const descriptions = [
-      ["userDecisions", "Your decisions", "Choose the assessment scope and record accountable decisions. Saving a decision does not prove that a Microsoft setting has been applied."],
-      ["administratorActions", "Administrator actions", "Only act on a confirmed access, licence or collection requirement. An unavailable command is not automatically a missing permission."],
-      ["configurationActions", "Configuration actions", "These are reported configuration findings that need review and new evidence after an approved change."],
-      ["appLimitations", "App limitations", "These checks cannot currently be verified by the app. Repeated scans, permission grants or manual imports do not implement missing validation."]
+      ["userDecisions", "Decisions for you", "These items need information from the person responsible for the pilot: who will take part, which policies should apply, or a written answer that software cannot establish. Open an item, record the answer and explain who confirmed it. Saving an answer does not change a Microsoft 365 setting."],
+      ["administratorActions", "Help needed from an administrator", "Flight Deck could not obtain some information needed for these checks. Read the reason on each item before contacting the administrator for that service. They may need to sign in, review a denied read permission, confirm a licence, or run collection again. Do not grant broader permissions just because a command failed."],
+      ["configurationActions", "Settings to review", "The collected information points to a setting that needs review. Ask the administrator to compare the finding with your organization's requirements before changing anything. If a change is approved, make it in the normal Microsoft administration tool and run another scan to check the result. Flight Deck does not make the change."],
+      ["appLimitations", "Checks this version cannot perform", "The software is missing the connection or checking logic needed for these items. These are not tasks you can finish by changing a Microsoft 365 setting. Repeated scans or extra permissions will not add the missing software feature. Review the requirement outside Flight Deck; an app update is needed before Flight Deck can confirm the result."]
     ];
     let found = false;
     for (const [key, title, description] of descriptions) {
@@ -28,7 +28,7 @@
       container.append(lane);
       if (!items.length) {
         list.append(node("li", key === "userDecisions"
-          ? "No outstanding setup decision for this scope."
+          ? "No unanswered setup choices are listed for this pilot."
           : "No items in this category.", "source-status"));
         continue;
       }
@@ -42,8 +42,9 @@
           const item = items[visible];
           const row = node("li", undefined, "completion-blocker");
           const content = node("div");
-          content.append(node("strong", item.controlId ? `${item.controlId}: ${item.title}` : item.title));
-          if (item.owner) content.append(node("small", `Owner: ${item.owner}`, "completion-blocker-meta"));
+          content.append(node("strong", item.title));
+          if (item.controlId) content.append(node("small", `Flight Deck check reference: ${item.controlId}. This is an app identifier, not a Microsoft certification.`, "completion-blocker-meta"));
+          if (item.owner) content.append(node("small", `Suggested person or team to contact: ${item.owner}. No task has been assigned or message sent.`, "completion-blocker-meta"));
           content.append(node("small", item.description || item.nextAction || item.reason || ""));
           if (item.description && item.nextAction && item.nextAction !== item.description) {
             content.append(node("small", item.nextAction));
@@ -52,7 +53,7 @@
           if (item.warning) content.append(node("small", item.warning));
           if (item.limitations?.length) {
             const detail = node("details");
-            detail.append(node("summary", "Why this is unresolved"),
+            detail.append(node("summary", "Technical details for the administrator or app maintainer"),
               node("small", item.limitations.map(reason => `${reason.code}: ${reason.description}`).join("; ")));
             content.append(detail);
           }
@@ -60,25 +61,25 @@
           action.type = "button";
           const decisionId = item.id || item.decisionId;
           if (["pilotCohort", "hybridExchange", "webGrounding"].includes(decisionId)) {
-            action.textContent = "Record this decision";
+            action.textContent = "Open the form to answer this";
             action.addEventListener("click", () => onDecision(decisionId));
           } else if (key === "appLimitations") {
-            action.textContent = "View control definition";
+            action.textContent = "Read what this check requires";
             action.addEventListener("click", () => onControl(item.controlId));
           } else if (item.state === "SignedAttestationRequired") {
-            action.textContent = "Record owner statement";
+            action.textContent = "Write the responsible person's answer";
             action.addEventListener("click", () => onAttest(item.controlId));
           } else if (["AdminEvidenceRequired", "PowerPlatformEvidenceRequired", "RecollectionRequired", "LiveCollectionRequired"].includes(item.state)) {
-            action.textContent = "Go to collection";
+            action.textContent = "Open the collection controls";
             action.addEventListener("click", onCollect);
           } else {
-            action.textContent = "View required action";
+            action.textContent = "Read the recommended next step";
             action.addEventListener("click", () => onControl(item.controlId));
           }
           action.setAttribute("aria-label", `${action.textContent}: ${item.controlId || item.title}`);
           if (item.controlId) action.dataset.controlId = item.controlId;
           content.append(action);
-          row.append(content, node("span", key === "appLimitations" ? "App capability missing" : item.stateLabel || "Decision needed", "completion-state"));
+          row.append(content, node("span", key === "appLimitations" ? "Not supported by this version" : item.stateLabel || "An answer is needed", "completion-state"));
           list.append(row);
         }
         more.hidden = visible >= items.length;
@@ -87,7 +88,7 @@
       lane.append(more);
       addPage();
     }
-    container.append(node("li", `${plan.summary.complete} checks validated; ${plan.summary.total - plan.summary.complete} not yet verified. Unverified does not mean failed or misconfigured.${found ? " Items above separate actions from app limitations." : ""}`, "source-status"));
+    container.append(node("li", `${plan.summary.complete} of ${plan.summary.total} checks have enough current information to meet Flight Deck's rules. The other ${plan.summary.total - plan.summary.complete} checks do not. This may be because information is missing, a setting needs review, or the app cannot perform the check; it does not mean all of those Microsoft 365 settings are wrong.${found ? " Use the categories above to see who can take the next step." : ""}`, "source-status"));
   }
   root.FlightDeckCompletionUI = { render };
 })(typeof globalThis !== "undefined" ? globalThis : this);

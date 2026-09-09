@@ -22,52 +22,52 @@
   });
   const STATE_DETAILS = Object.freeze({
     ObservationValidationRequired: {
-      label: "App capability missing",
-      action: "The app maintainer must implement and validate this control's source-observation contract. No tenant permission change is prescribed."
+      label: "The app cannot confirm this check",
+      action: "The app maintainer needs to add and test the rules that check the collected information for this requirement. Review the requirement outside Flight Deck for now. Changing tenant permissions will not add those rules."
     },
     IntegrationRequired: {
-      label: "App capability missing",
-      action: "The app maintainer must connect the missing evidence source and its validation contract. No tenant permission change is prescribed."
+      label: "A software connection or checking rule is missing",
+      action: "The app maintainer needs to add a working connection to the relevant Microsoft service and rules for checking its results. Review this requirement with the service administrator outside Flight Deck; a permission change alone is not a solution."
     },
     MissingPermission: {
-      label: "Permission required",
-      action: "Ask the workload administrator to review the confirmed access denial and the source's least-privilege access requirements."
+      label: "Read access needs review",
+      action: "The service refused a read request. Ask its administrator to inspect the access error and approve only the read permissions required for that request. Run collection again after access is available."
     },
     MissingLicense: {
-      label: "Licence evidence required",
-      action: "Confirm the listed product entitlement for the approved cohort, then rescan."
+      label: "Licence information needs confirmation",
+      action: "Ask the licensing administrator whether the listed subscription or feature is available to the selected pilot users. Do not buy an add-on just to remove this message. Confirm that the feature is required, then scan again when the information is available."
     },
     SignedAttestationRequired: {
-      label: "Signed attestation required",
-      action: "Create an accountable statement with an owner, evidence data, and expiry."
+      label: "A written answer from the responsible person is needed",
+      action: "Open the owner-statement form, write what the responsible person has confirmed, add the requested supporting details and references, and choose when the answer must be reviewed again. This is a human statement, not an automatic inspection of Microsoft 365."
     },
     AdminEvidenceRequired: {
-      label: "Administrator evidence required",
+      label: "A service administrator needs to collect information",
       action: "In Set up, select Collect workload evidence and complete the Microsoft workload sign-in prompts. The app collects and processes the results."
     },
     PowerPlatformEvidenceRequired: {
-      label: "Power Platform evidence required",
+      label: "Power Platform information needs to be collected",
       action: "In Set up, select Collect workload evidence and complete Power Platform sign-in. The app collects supported resources and records any gaps."
     },
     RecollectionRequired: {
-      label: "Recollect evidence",
-      action: "Re-run the relevant collector to replace expired, legacy or unverified evidence."
+      label: "A fresh collection is needed",
+      action: "The saved information is too old or cannot be used by the current checks. Run the relevant collection again to read current information from Microsoft 365."
     },
     LiveCollectionRequired: {
-      label: "Not yet collected",
-      action: "Connect the tenant with the required read-only access and run the live scan."
+      label: "This information has not been collected",
+      action: "Use Connect and scan tenant in Set up. Sign in to the intended Microsoft 365 organization and complete the requested read-access approvals."
     },
     ConfigurationAction: {
-      label: "Configuration action required",
-      action: "Implement the control playbook, then collect new evidence."
+      label: "A setting needs review",
+      action: "Read the check's instructions with the relevant administrator. If your organization approves a change, make it through the normal administration tools, then scan again to check what changed. Flight Deck does not change the setting."
     },
     OwnerReview: {
-      label: "Owner review required",
-      action: "Have the accountable owner review the evidence and record the decision."
+      label: "The responsible person needs to review the result",
+      action: "Ask the person responsible for this requirement to review the collected information, explain whether it is acceptable for the pilot, and record their answer."
     },
     Complete: {
-      label: "Complete",
-      action: "No current action is required while the evidence remains fresh."
+      label: "Enough current information",
+      action: "This check currently meets Flight Deck's rules. Review it again when its information expires or the relevant users or settings change."
     }
   });
   // Presentation-only capability inventory, matching the implemented source contracts.
@@ -117,10 +117,10 @@
     const codes = limitationCodes(result);
     const sourceGaps = [...codes].filter(code => CAPABILITY_CODES.has(code));
     const reasons = [];
-    if (sourceGaps.length) reasons.push(`Source capability unavailable or unusable: ${sourceGaps.join(", ")}.`);
+    if (sourceGaps.length) reasons.push("The connection or command did not provide information that this check can use. The technical details below list the reported errors.");
     if (control.collection.kind === "IntegrationRequired") reasons.push(control.collection.limitation);
     if (control.automation !== "Attested" && !VALIDATED_GRAPH_SCOPES[control.id]) {
-      reasons.push(`No source-observation validation contract is implemented for ${control.id}.`);
+      reasons.push(`Flight Deck does not yet have the rules needed to confirm ${control.id} from the information collected.`);
     }
     return reasons.join(" ") || null;
   }
@@ -170,19 +170,19 @@
   function pendingDecisions(cohort, decisions) {
     const tasks = [];
     if (!cohort?.id || cohort.approved !== true) tasks.push({
-      id: "pilotCohort", title: "Approve the pilot group",
-      description: "The app needs explicitly approved directory users or groups to bound the pilot population.",
-      nextAction: "Select the pilot directory users or groups and approve their scope. Approval does not validate any control."
+      id: "pilotCohort", title: "Choose who will take part in the Copilot pilot",
+      description: "Flight Deck needs a list of pilot participants before it can check their licence assignments. It does not assume that every licensed person is in the pilot.",
+      nextAction: "Search for users or groups in the pilot form, name the person responsible and approve the selected people. This saves the participant list; it does not assign licences or grant access."
     });
     if (!["yes", "no"].includes(decisions?.hybridExchange?.value)) tasks.push({
-      id: "hybridExchange", title: "Record whether hybrid Exchange is in scope",
-      description: "This local scope decision is not proof of hybrid configuration or signed applicability evidence.",
-      nextAction: "Record yes or no with the accountable owner and rationale. This does not change Microsoft settings or clear Unknown."
+      id: "hybridExchange", title: "Confirm whether pilot users use an on-premises Exchange server",
+      description: "An organization may use its own Exchange email server alongside Exchange Online. A cloud scan cannot inspect that server, so Flight Deck asks whether it is relevant to the pilot.",
+      nextAction: "Ask the email administrator, then record Yes or No and explain who confirmed it. Saving the answer does not change Exchange settings or complete the technical checks."
     });
     if (!["allow", "restrict"].includes(decisions?.webGrounding?.value)) tasks.push({
-      id: "webGrounding", title: "Record the web-grounding policy choice",
-      description: "The intended policy and the effective Microsoft setting are separate. The app cannot yet validate the effective setting.",
-      nextAction: "Record allow or restrict with the accountable owner and rationale. This does not change Microsoft settings or clear Unknown."
+      id: "webGrounding", title: "Decide whether Copilot may use public-web information",
+      description: "Record whether your organization intends to allow Copilot to use information from the public web for these users. Flight Deck cannot yet confirm the actual Microsoft setting.",
+      nextAction: "Confirm the choice with the person responsible for the policy, then save Allow or Restrict with their name and the reason. An administrator must check or change the Microsoft setting separately."
     });
     return tasks;
   }
@@ -240,14 +240,14 @@
             "AUTHORITY_VALIDATION_REQUIRED", "EVIDENCE_NOT_ADMISSIBLE", "APPROVED_COHORT_REQUIRED",
             "INCOMPLETE_EVIDENCE", "COLLECTION_BOUND_REACHED"].includes(code));
       const warning = unclassified
-        ? "The source failure cause is unclassified; missing administrator roles or permissions have not been established."
+        ? "The service request failed, but Flight Deck could not identify the cause. This is not enough information to say an administrator role or permission is missing."
         : null;
       let nextAction = STATE_DETAILS[state].action;
       if (state === "MissingPermission" && !confirmedDenial) {
-        nextAction = `Ask the administrator to review the required read-only Graph scopes for the implemented licensing collector: ${missingPermissions.join(", ")}. Collect fresh evidence after access is available.`;
+        nextAction = `Ask the administrator to review the Microsoft Graph read permissions needed for the licensing checks: ${missingPermissions.join(", ")}. Run collection again after read access is available.`;
       }
       if (state === "MissingPermission" && blockedReason) {
-        nextAction += " Access recovery alone cannot complete this control: the app capability is also missing.";
+        nextAction += " Restoring read access will not finish this check: the app also needs additional software support.";
       }
       return {
         controlId: control.id,
@@ -265,8 +265,8 @@
         actionLane: actionLane(state),
         nextAction,
         why: blockedReason || warning || (state === "MissingPermission"
-          ? confirmedDenial ? "The source reported an explicit access or consent denial."
-            : "Required Graph scopes for an implemented collector are missing."
+          ? confirmedDenial ? "Microsoft reported that the requested read access or consent was denied."
+            : "The signed-in connection does not have all the Microsoft Graph read permissions needed for this check."
           : STATE_DETAILS[state].label),
         appBlockedReason: blockedReason,
         warning,
@@ -329,7 +329,7 @@
         actionRequired: counts.ConfigurationAction,
         ownerReview: counts.OwnerReview,
         unknown: controls.filter(control => control.status === "Unknown").length,
-        explanation: "Unknown means evidence is not yet authoritative, not a confirmed tenant misconfiguration."
+        explanation: "Not confirmed means Flight Deck does not have enough usable information to decide this check. It does not mean the Microsoft 365 setting is wrong."
       }
     };
   }

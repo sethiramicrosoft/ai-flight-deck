@@ -657,54 +657,55 @@
     if (UNCONNECTED_INPUTS[control.id]) {
       return {
         kind: "IntegrationRequired",
-        limitation: `The live pipeline does not yet supply ${UNCONNECTED_INPUTS[control.id]}. This can prevent automated completion; permissions or a rescan alone will not supply it.`,
+        limitation: `Flight Deck does not yet collect or accept ${UNCONNECTED_INPUTS[control.id]}. This check cannot be completed automatically with the information currently available. Extra permissions or a rescan alone will not add this missing support.`,
         steps: [
-          `Ask the ${domain.ownerRoles[0]} to retain ${UNCONNECTED_INPUTS[control.id]} with tenant, scope and observation date.`,
-          `Have the product integrator connect this evidence to ${control.id}. Do not edit the scan JSON or use an unrelated attestation to force a Pass.`
+          `Ask the ${domain.ownerRoles[0]} to keep a record of ${UNCONNECTED_INPUTS[control.id]}, including which organization, people or resources it covers and when it was checked.`,
+          `The app maintainer must add support for using this information in ${control.id}. Until then, assess the requirement outside Flight Deck. Do not edit the scan file or submit a statement for a different check to force a passing result.`
         ]
       };
     }
     if (control.automation === "Attested" || domain.id === "adoptionMeasurementGovernance") {
       return {
         kind: "SignedAttestationRequired",
-        limitation: "An attestation records an accountable human statement; it does not turn a policy decision into machine-observed proof.",
+        limitation: "A written owner statement records what a person has confirmed and which documents support it. Flight Deck checks the required fields and dates, but does not independently verify the statement or the linked documents.",
         steps: [
-          `In Set up, select ${control.id} under Create a locally sealed attestation after loading an approved cohort.`,
-          "Provide the statement, structured supporting JSON, reference links and expiry; create the attestation and run a new tenant scan."
+          `In Set up, open Record a written answer from the responsible person and select ${control.id}. First load an assessment with approved pilot participants.`,
+          "Write the answer, fill in the supporting-data example, add document links and choose the review date. Save the statement, then run a new tenant scan to evaluate it."
         ]
       };
     }
     if (domain.id === "powerPlatformAgents") {
       return {
         kind: "PowerPlatformEvidenceRequired",
-        limitation: "Authenticated collection preserves unavailable resources, partial coverage, and unsupported observation-validation paths as gaps. Collection does not prove effective enforcement or owner approval.",
+        limitation: "The scan lists what it could read and what was unavailable. Reading an app, flow or policy does not prove that every user is covered by that policy or that the owner approved it. Checks without implemented checking rules remain unconfirmed.",
         steps: [
           "In Set up, select Connect and scan tenant, or Collect workload evidence to update the existing baseline.",
-          "Complete the Microsoft Power Platform sign-in prompt with the listed administrative access. The app runs the connector and saves and processes its evidence automatically.",
-          "Review the workload outcome and this control's source errors. Resolve the specific access or unsupported-evidence issue; no JSON template, export, or file upload is required."
+          "Sign in to Microsoft Power Platform with an account allowed to read the required administration information. Flight Deck runs the collection and saves the results automatically.",
+          "Read the Power Platform collection result and any error for this check. Address the stated problem before trying again. You do not need to prepare a JSON file, export data manually or upload a template."
         ]
       };
     }
     const workloads = { exchangeOnline: "exchangeOnline", sharePointOneDrive: "sharePointOnline", purviewCompliance: "purview", securityPosture: "exchangeOnline" };
+    const serviceNames = { exchangeOnline: "Exchange Online", sharePointOnline: "SharePoint Online", purview: "Microsoft Purview" };
     if (workloads[domain.id] && (domain.id !== "securityPosture" || control.id === "AFD-SEC-002")) {
       return {
         kind: "AdminEvidenceRequired",
-        limitation: "Automatic workload collection supplements Graph evidence. Command output must match the evaluator and validation contract; successful collection alone does not close the control.",
+        limitation: "These service-specific reads add information that the Microsoft Graph scan cannot provide. A command can run successfully even when Flight Deck does not yet have the checking rules needed to confirm this requirement.",
         steps: [
-          `In Set up, select Collect workload evidence to run ${workloads[domain.id]} automatically against the baseline tenant. A new tenant scan also runs the workload collectors.`,
-          "Complete the workload's Microsoft sign-in and consent prompts. The app prepares missing connectors, discovers the SharePoint administration URL, runs read-only commands, and processes the results.",
-          "Review command errors and remaining evidence limitations. No shell commands, copied challenges, or uploaded evidence files are required."
+          `In Set up, select Collect workload evidence to read ${serviceNames[workloads[domain.id]]} for the organization in the saved scan. Connect and scan tenant also runs this collection automatically.`,
+          "Complete the Microsoft sign-in and read-access approval prompts. The app prepares the required Microsoft modules, finds the SharePoint administration address where needed, runs read-only commands and saves the results.",
+          "Read any command errors and the explanation of what could not be checked. You do not need to run shell commands, copy collection codes or upload files."
         ]
       };
     }
     return {
       kind: "LiveCollectionRequired",
       limitation: domain.id === "networkConnectivity"
-        ? "Built-in probes represent the scanner host. Proxy, WebSocket, media and other pilot locations are not fully collected by these probes."
-        : "Successful authentication or an inventory count alone does not prove effective policy coverage.",
+        ? "The built-in network tests run from this computer only. They do not fully test proxy behavior, persistent WebSocket connections, Teams audio/video traffic or the networks used by other pilot participants."
+        : "Signing in successfully or counting available items does not prove that the relevant policy is configured correctly for every pilot user.",
       steps: [
-        "In Set up, connect and scan the intended tenant with the listed read permissions and an approved pilot cohort.",
-        `Inspect ${control.id} after collection. Retain scope, timestamps and errors; resolve the specific limitation rather than repeatedly rescanning unchanged inputs.`
+        "In Set up, use Connect and scan tenant for the intended Microsoft 365 organization. Approve the required read access and select the pilot participants.",
+        `Open ${control.id} after collection. Read what was checked, when it was checked and any errors. Resolve the stated missing information before repeating the same scan.`
       ]
     };
   }

@@ -18,13 +18,13 @@ async function goToGuidePage(page) {
   await page.waitForTimeout(500);
   await page.click('[data-page="guide"]:visible');
   await expect(page.locator("#guide")).toHaveClass(/active/);
-  await expect(page.locator("#page-title")).toHaveText("Set up your estate assessment");
+  await expect(page.locator("#page-title")).toHaveText("Connect Microsoft 365 and choose your pilot");
 }
 
 test.describe("value-realization responsive behavior", () => {
   test("evidence completion center is usable and free of horizontal overflow on mobile", async ({ page }) => {
     await goToGuidePage(page);
-    await expect(page.locator("h2:has-text('Evidence completion center')").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What still needs to be checked" })).toBeVisible();
 
     // No horizontal scroll/overflow on the primary evidence-completion card region.
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -55,7 +55,7 @@ test.describe("value-realization responsive behavior", () => {
 
   test("attestation creation form fields are all reachable and tappable on mobile", async ({ page }) => {
     await goToGuidePage(page);
-    const attestationCard = page.locator("h3:has-text('Create a locally sealed attestation')").first();
+    const attestationCard = page.getByRole("heading", { name: "Record a written answer from the responsible person" });
     await attestationCard.scrollIntoViewIfNeeded();
     await expect(attestationCard).toBeVisible();
 

@@ -31,11 +31,11 @@ async function goToPage(page, id, title) {
 }
 
 async function goToGuidePage(page) {
-  await goToPage(page, "guide", "Set up your estate assessment");
+  await goToPage(page, "guide", "Connect Microsoft 365 and choose your pilot");
 }
 
 async function goToDecisionPage(page) {
-  await goToPage(page, "clearance", "Estate readiness decision");
+  await goToPage(page, "clearance", "Review the recommendation for your Copilot pilot");
 }
 
 // `#import-error` is a generic, always-hidden-by-default error banner cleared at the
@@ -55,10 +55,9 @@ async function goToDecisionPage(page) {
 // to applyTenantScan()'s navigate("overview") because the real completion, and its
 // navigate() call, actually landed a moment later). The fix is to match only the
 // specific terminal strings monitorWorkflow() renders once loadWorkflowArtifact() (and
-// therefore applyTenantScan()) has fully resolved: "Baseline complete." / "Verification
-// complete.".
+// therefore applyTenantScan()) has fully resolved.
 async function waitForScanComplete(page) {
-  await expect(page.locator("#service-status")).toHaveText(/^(Baseline|Verification) complete\./, { timeout: 20000 });
+  await expect(page.locator("#service-status")).toHaveText(/^The (first scan is saved|scan comparison has finished)\./, { timeout: 20000 });
   await expect(page.locator("#connect-scan")).toBeEnabled();
   await expect(page.locator("#import-error")).toBeHidden();
 }
@@ -83,7 +82,7 @@ test.describe("value-realization customer journey", () => {
     // A successful scan auto-navigates to Assessment; return to Decision to read the
     // evidence completion center's post-scan state.
     await goToGuidePage(page);
-    await expect(page.locator("h2:has-text('Evidence completion center')")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What still needs to be checked" })).toBeVisible();
     const completeValue = page.locator("#completion-summary .assurance-metric").nth(1).locator("strong");
     await expect(completeValue).toBeVisible();
     const initialComplete = Number(await completeValue.textContent());

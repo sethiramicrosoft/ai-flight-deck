@@ -1,59 +1,109 @@
 # AI Flight Deck visual tour
 
-AI Flight Deck turns Microsoft 365 Copilot readiness evidence into a four-stage
-workflow: set up the evidence, assess the estate, prepare corrections, and make
-a cohort-specific rollout decision. This tour follows the complete customer
-journey and uses only an isolated synthetic offline fixture. Every screenshot
-is labelled accordingly; none is a production tenant assessment.
+This guide explains what each part of Flight Deck shows, what to do there, and
+what the result means. Flight Deck helps organize a Copilot pilot assessment;
+it does not enable Copilot, change Microsoft settings or approve a production
+rollout on your behalf.
 
-The current validator admits three automated licensing observation contracts
-and eleven accountable attestation contracts. Other controls remain visible
-with their findings and instructions, but cannot approve a rollout until their
-source-observation validation is implemented. A collected inventory, local
-signature, or high confidence value is not automatically a passed control.
+The application can use collected information to confirm three licensing checks
+and can accept written answers for eleven checks that require a person to
+confirm the result. The other 63 checks do not yet have the software rules needed
+to confirm their results. They can still show useful information and instructions.
+Their presence on a page does not mean they have been completed.
+
+The screenshots use synthetic examples, not a real tenant. Screenshots from
+earlier versions may have shorter labels than the current interface; the
+instructions below describe the current behavior.
 
 [Return to the README](../README.md)
 
+## Start here: what the terms mean
+
+| Term you may see in a saved report or technical detail | Meaning |
+|---|---|
+| Tenant | Your organization's Microsoft 365 environment |
+| Pilot or cohort | The people explicitly selected to try Copilot |
+| Baseline | The first saved scan used as the starting point for comparison |
+| Verification scan | A later collection used to compare with that starting point |
+| Domain | A subject area such as licensing, email or SharePoint |
+| Control | One Flight Deck readiness check, with an identifier such as `AFD-LIC-004` |
+| Evidence | The setting, report, recorded observation or written answer used by a check |
+| Attestation | A written answer from a responsible person, with supporting details and a review date |
+| Mission or gate | A rollout stage and the checks Flight Deck requires before that stage can proceed |
+| Unknown | The app cannot confirm a result; this is not the same as a failed Microsoft setting |
+
+Flight Deck defines its own check identifiers and decision rules. They are not
+Microsoft certification numbers. See the [connection guide](COLLECTOR-GUIDE.md)
+for the Microsoft service, sign-in method and information read for each subject.
+
 ## 1. Set up the assessment
 
-### Choose the evidence path
+### Connect Microsoft 365 or load an existing assessment
 
-Start a read-only tenant scan with automatic workload collection, import an existing AI Flight Deck artifact, or
-bring in evidence from the Microsoft 365 Copilot Readiness report and
-Microsoft's automated readiness assessment.
+For a first assessment, start the local service and choose **Connect and scan
+tenant**. Sign in to the intended Microsoft 365 organization and complete the
+requested approvals for read access. The app first reads Microsoft Graph
+information, then attempts the Exchange, SharePoint, Purview and Power Platform
+collections. These services may each ask you to sign in.
 
-The opening view identifies who uses the tool and keeps the collection boundary
-visible. AI Flight Deck reads the evidence required by enabled collectors; it
-does not enable Copilot or silently change tenant configuration.
+If you already have a saved Flight Deck assessment, load it instead. Microsoft
+readiness CSV imports are optional additions, not a prerequisite for the normal
+scan. Importing a report does not make its conclusions independently verified.
+
+Read the scan limits before starting. A scan reads only the information the
+signed-in account can access and stops at documented collection limits.
+One failed service does not mean every service failed. Check each service's result.
 
 [![Choose the assessment evidence path](screenshots/01-setup-overview.png)](screenshots/01-setup-overview.png)
 
-### Prioritize incomplete evidence
+### Choose the people and settings for your pilot
 
-The Evidence completion center separates **Your decisions**, **Administrator
-actions**, **Configuration actions**, and **App limitations**. Each category
-initially shows at most five items, with more available on demand.
+After running or loading an assessment, use the pilot forms before working
+through the list of unfinished checks. They record three things:
 
-Decisions open the appropriate setup form. Administrator actions require an
-actual collection/access requirement; unsupported commands and unknown errors
-are not automatically permission problems. Missing validation contracts are
-explicit app limitations. Repeated scans or permission grants cannot implement
-those contracts. Select **View control definition** to inspect the boundary.
+1. **Who will participate:** Search Microsoft Entra for users or groups, select
+   the intended people, name the person or team responsible, tick the approval
+   box and save. Everyone with a Copilot licence is not automatically your pilot.
+2. **Whether an on-premises Exchange server is involved:** Ask the email
+   administrator whether pilot users depend on an Exchange server operated by
+   your organization as well as Exchange Online. Record the answer and how it
+   was confirmed. Leave it unconfirmed if you do not know.
+3. **Whether Copilot may use public-web information:** Confirm your intended
+   policy with the responsible business or security owner, then record Allow
+   or Restrict and the reason.
 
-The setup forms search live directory users or groups and save an approved
-pilot membership snapshot without a CSV. Hybrid Exchange applicability intent
-and the web-grounding policy choice are recorded locally with an owner and
-rationale. These decisions do not change Microsoft settings, act as signed
-attestations, or clear an Unknown control.
+The saved participant list is a snapshot. Group membership does not update
+automatically and recent directory changes may not appear immediately.
+Saving these forms changes only the local Flight Deck records. It does not
+assign licences, grant access, change the public-web setting, inspect an
+on-premises server or send an approval request to the named owner.
 
 [![Record scoped pilot and policy decisions](screenshots/14-setup-decisions.png)](screenshots/14-setup-decisions.png)
+
+### Work through what still needs to be checked
+
+This section explains why the assessment is incomplete and who can take the
+next step. It is not a list of 77 problems with your tenant.
+
+| Category | What it means | What to do |
+|---|---|---|
+| Decisions for you | A participant list, policy answer or written confirmation is missing | Open the form, confirm the answer with the responsible person and save it |
+| Help needed from an administrator | Required information could not be read, is too old, or needs licence/access confirmation | Read the specific reason and contact the administrator for that service; do not grant broad permissions blindly |
+| Settings to review | The available information points to a setting that needs attention | Review it against your organization's requirements, obtain approval for any change, then collect new information |
+| Checks this version cannot perform | Flight Deck is missing a connection or checking rule | Assess the requirement outside the tool; repeated scans and extra permissions do not add missing software |
+
+Five items initially appear in each category. Use **Show more in this category**
+to continue. Each item identifies the check, explains the next step and links to
+the relevant form or instructions. A suggested contact is not an assigned task.
+Technical errors are available separately for administrators and app maintainers.
 
 [![Prioritize missing evidence](screenshots/02-setup-evidence-center.png)](screenshots/02-setup-evidence-center.png)
 
 ### Collect workload evidence
 
-Some controls cross administration boundaries that Microsoft Graph cannot
-cover by itself.
+Microsoft Graph does not expose every setting that the assessment needs.
+Service-specific collection uses the relevant Microsoft administration tools
+to read additional information.
 
 Select **Connect and scan tenant**, or **Collect workload evidence** for an
 existing baseline. The app prepares connectors, opens workload authentication,
@@ -61,69 +111,73 @@ runs Exchange Online, SharePoint Online, Purview and Power Platform / Copilot
 Studio collection, and processes the results. No operator-run scripts or
 hand-filled export packages are required.
 
-Workload progress and specific collection failures appear in Set up and are
-saved with the assessment. Sign-in, MFA, consent and genuine owner approvals
-remain human actions. Successful collection does not override missing
-observation-validation contracts or prove complete effective access.
+Progress and errors appear separately for each service and are saved with the
+assessment. Complete sign-in and multi-factor authentication when asked.
+If a service reports a gap, read its explanation before retrying. For example,
+an on-premises-only Exchange command cannot be made available simply by granting
+an Exchange Online administrator role. A successful collection means data was
+read, not that every readiness check passed.
 
-Power Platform apps, flows and connections are collected even when Dataverse
-bot discovery is unavailable. Dataset row counts distinguish successful empty
-reads from failures or unavailable sources. Collection errors and coverage/review
-gaps have separate disclosures. If an environment list omits its Dataverse
-endpoint, the app attempts an exact-environment detail read automatically;
-it does not interpret the provisioning-state label as proof of a database.
+For Power Platform, the app may collect apps and flows even when it cannot read
+Copilot Studio agents from an environment's Dataverse database. Read the result
+for each type of information, rather than assuming all collection succeeded or
+all of it failed.
 
-Failed administrator workloads also show individual command errors when the
-producer supplied them, even if every read failed and no evidence package was
-accepted. Older saved runs cannot recover diagnostics their collector discarded.
-Warning-bearing administrator rows are retained as observations, separate from
-accepted source rows. Their presence is useful for investigation, not a passed
-configuration check.
+A row count of zero may mean the request succeeded and found no items, or that
+the request failed. The status and error explain which happened. Rows returned
+with warnings can remain available for investigation without being accepted as
+reliable information for a readiness check.
 
-The local service rejects stale, malformed, cross-tenant, replayed, or
-unsupported packages before they can affect a control result.
+Saved imports are checked for their organization, format, collection date and
+whether they belong to the current collection. Rejected files cannot change a
+readiness result simply by containing a "Pass" label.
 
 [![Collect administrator and Power Platform evidence](screenshots/03-setup-workload-evidence.png)](screenshots/03-setup-workload-evidence.png)
 
-### Create accountable human evidence
+### Record a written answer from the responsible person
 
-Controls explicitly classified as `Attested` can use a locally sealed
-attestation. The record includes the statement, supporting JSON, evidence
-references, and bounded expiry.
+Some requirements concern work that software cannot establish on its own:
+for example, whether training has been delivered or a use case has received
+the required review. For supported checks, select the check in the written-answer
+form, read its instructions, state what was confirmed, and fill in the example
+supporting data. Add references to the documents that support the answer and
+choose a date when the answer must be reviewed again.
 
-The attester is derived from the verified scan actor. The record is bound to
-the tenant, approved cohort, control, signer, and freshness window.
-`NotApplicable` is accepted only for supported conditional controls with a
-named approver, reason, zero applicable population and a scope-evidence reference.
-The control-specific data example explains the required fields. The local
-signature protects an accountable statement; it does not independently verify
-the referenced documents or tenant settings.
+This record is called an attestation. The app associates it with the signed-in
+scan account, organization, pilot and check. Its local signature detects changes
+to the saved record; it does not independently establish the truth of the answer
+or the signer's approval authority. Save it and run another scan to evaluate it.
+Only supported conditional checks can accept a justified "not applicable" answer;
+this is not a way to skip any inconvenient check.
 
 [![Create accountable attestations](screenshots/04-setup-attestation.png)](screenshots/04-setup-attestation.png)
 
-### Follow the complete operating workflow
+### Understand what happens after collection
 
-The lower part of Set up documents the operating sequence: connect, capture a
-baseline, assess, prepare approved corrections, implement changes through
-normal administration, rescan, and compare the result.
+Use Assessment to read what was found. Use Corrections to prepare proposed
+changes for an administrator. The administrator must obtain normal approval
+and make changes outside Flight Deck. Then collect a later scan and compare it
+with the first saved scan.
 
-A forecast is never treated as proof. Only admitted, current evidence meeting
-a supported control contract can close a control and advance a rollout mission.
+A predicted improvement is not a measured result. The tool can confirm a check
+only when it has current information and the implemented rules for that check.
+The complete real-tenant pilot-to-rollout process has not yet been demonstrated.
 
 [![Follow the operating workflow](screenshots/05-setup-operating-workflow.png)](screenshots/05-setup-operating-workflow.png)
 
-## 2. Assess the estate
+## 2. Read the assessment
 
-### Review the control plane
+### Review the readiness checks by subject
 
-Assessment maps 13 readiness domains and 77 controls across Activation, Safe
-pilot, Scale, and Assure. Online, degraded, and unscanned domains remain
-visible rather than being hidden behind a single score.
+Start with a subject such as Licensing, Identity or SharePoint, then open a
+specific check to read what it tests and why the result is incomplete or needs
+review. There are 13 subject areas and 77 Flight Deck-defined checks. These
+counts describe the checklist, not the number of automatically verified results.
 
-Domain totals are recomputed from admitted evidence, not imported status counters.
-Select a domain to inspect its controls, evidence state, collection coverage,
-limitations, recommended next action, and Microsoft guidance. Evidence added
-on Set up is evaluated during the next scan and then appears here.
+For each check, read the result together with the collection date, the people
+or resources covered and the explanation of missing information. Follow its
+next-step instructions, rather than interpreting a grey or unknown result as a
+misconfigured setting. New written answers are evaluated during the next scan.
 
 [![Review the readiness control plane](screenshots/06-assessment-control-plane.png)](screenshots/06-assessment-control-plane.png)
 
@@ -140,47 +194,53 @@ generic “access-path scenarios.” It can identify:
 - inherited permissions on sampled shared items;
 - guest-identity context that still requires a separate resource-access
   review; and
-- the bounded collector coverage that remains unverified.
+- which sites and items were sampled, and what was not inspected.
 
 For each item, AI Flight Deck explains what was observed, why the sharing
 configuration matters, the potential audience, what the scan did not prove,
 and the administrator action required. Public sites are shown as SharePoint
 sites. Files, folders, and sharing links retain their actual resource type.
 
-The audience is deliberately bounded. A public site or organization-wide link
-shows up to the inventoried tenant-user population; an Anyone link shows an
-unbounded audience. The product does not label that estimate as “affected
-users” because exact effective access requires per-resource permission
-evaluation, nested-group expansion, guest mapping, inherited permissions, and
-link-use context.
+The potential audience is an estimate, not a list of people who actually opened
+the content. A public site or organization-wide link may reach people in the
+organization; an Anyone link can be used by someone outside it who obtains the
+link. Determining precisely who can access a particular resource needs additional
+permission and group-membership checks.
 
-The offline fixture can show a readiness-blocker trace instead when there is
-no supported sealed sharing path. That is not a simulated effective-access proof.
+If there is no usable sharing information, the app can instead explain how a
+missing readiness check prevents a rollout-stage decision. This explanation is
+not a test of someone's actual file access.
 
 [![Review the fixture's available evidence scenarios](screenshots/07-assessment-sharing-review.png)](screenshots/07-assessment-sharing-review.png)
 
-### Inspect the evidence-backed action
+### Open a finding to understand the recommended review
 
-Selecting an item traces the potential audience, access mechanism, exact
-SharePoint resource, location, content-inspection boundary, Copilot relevance,
-and required validation. The result distinguishes confirmed sharing
-configuration from unproven sensitive-content exposure.
+Open an item to see which site, file or folder was observed, how access was
+recorded, why it matters for Copilot and what the owner should review.
+For example, an organization-wide sharing link may be appropriate for an
+employee handbook but inappropriate for a confidential personnel file.
+The scan does not inspect the file's contents or establish that sensitive
+information was disclosed.
 
-If no public site or broad sharing link is found, the review reports that no
-broad path was observed in the sampled scope and continues to show the
-remaining collection boundary. When no sealed access graph is available, the
-product falls back to a deterministic readiness-impact trace connecting
-missing evidence to its control, mission, decision, and correction.
+If the sample contains no public site or broad sharing link, the page says so
+and still explains which files and sites were not inspected. It does not declare
+the entire organization safe. If sharing details are unavailable, an explanation
+of missing readiness information may appear instead; do not read that as an
+actual file-permission test.
 
 [![Inspect the fixture's evidence-to-decision trace](screenshots/08-assessment-sharing-result.png)](screenshots/08-assessment-sharing-result.png)
 
 ### Review grouped access evidence
 
-The default view shows access-pattern groups, not thousands of permission rows.
-**Needs access review** is separate from ordinary **Permission inventory**.
-Inheritance is labelled explicitly; an unknown parent remains unresolved.
-Each group shows its sampled item count, permission count, owner status, reason
-and next action.
+The default view groups related permission records. Start with **Access that
+needs a review** for broad, external or unclear access. **Other recorded
+permissions** contains ordinary user and group access; it is not automatically
+a list of changes to make.
+
+One file can produce many permission records. A count of 4,000 permission
+records therefore does not mean 4,000 files or 4,000 separate problems.
+Inherited access means the file gets access from a parent folder, library or
+site. The app says when the scan could not identify that parent.
 
 Browse 25 groups per page and open a group for at most 50 records at a time.
 The primary CSV is a grouped summary; the separate collected-evidence CSV
@@ -193,64 +253,77 @@ million-file backend.
 
 ## 3. Prepare corrections
 
-Corrections presents evidence-linked technical changes for administrator
-review. Selecting a correction updates only the demonstration forecast and can
-produce an approval package; it does not modify the tenant.
+Corrections helps prepare proposed changes for administrator review. Select a
+proposal and read what it would change, who needs to review it and how the result
+should be checked. Selection updates only the app's forecast. Downloading a
+review package creates a document; it does not send an approval request or
+modify Microsoft 365.
 
-Administrators implement approved changes through normal Microsoft 365
-administration and change-control processes. A new scan is required to prove
-the resulting state. Evidence-collection tasks remain prioritized in the
-Evidence completion center, while this page focuses on technical remediation.
+Administrators obtain approval and implement changes through normal Microsoft
+365 tools. Run another scan afterwards to see what changed in the information
+the tool can collect. Missing information belongs in **What still needs to be
+checked** on Set up; this page concerns proposed changes, not software features
+missing from Flight Deck.
 
 [![Prepare technical corrections](screenshots/10-corrections.png)](screenshots/10-corrections.png)
 
 ## 4. Make the rollout decision
 
-### Review the cohort-specific outcome
+### Read the result for the selected pilot participants
 
-Decision shows whether the explicitly approved cohort can proceed to its next
-mission. Missing permissions, incomplete coverage, stale evidence, invalid
-exemptions, or unsupported packages keep the relevant mission blocked.
+Decision summarizes whether the selected pilot meets Flight Deck's rules for
+the next rollout stage. Read the named pilot and scan date first so you know
+which people and information the result covers. Then inspect the checks that
+prevent a decision. A stage can remain blocked because the tool cannot check
+something, even if the organization's actual configuration is acceptable.
 
-The summary separates a bounded sharing signal from the complete estate
-decision and lists the mandatory gates that still prevent progression.
+A sharing sample with no broad links does not establish overall readiness.
+The result is not Microsoft certification or permission to start a production
+rollout. The program owner must make the actual decision using appropriate
+organizational reviews and information beyond this prototype.
 
 [![Review the rollout decision](screenshots/11-decision-summary.png)](screenshots/11-decision-summary.png)
 
-### Follow the tenant enablement plan
+### Read the detailed instructions for each check
 
-The enablement plan covers all 77 controls and orders unresolved work using the
-same evidence priorities as the Evidence completion center.
+The detailed plan lists all 77 checks. Filter it to the items you need to review,
+then expand a check. Its instructions identify suggested contacts, the relevant
+administration page, what to examine, the desired result and supporting Microsoft
+documentation. A suggested role is not a named assignee, and the tool has not
+created a task for that person.
 
-Each control provides the responsible roles, administration path,
-prerequisites, required outcome, implementation steps, acceptance criteria,
-next evidence action, and supporting Microsoft references. The catalogue's
-gates and thresholds are AI Flight Deck rollout policy, not a universal
-Microsoft prerequisite list. The complete
-customer handoff can be downloaded as Markdown.
+Read the requirement before asking someone to change a setting. Flight Deck's
+thresholds and required checks are its own proposed rollout policy, not a
+universal list of Microsoft prerequisites. Download the plan as Markdown to
+share through your usual review process. Downloading it does not send it to
+anyone or establish that a reviewer approved it.
 
 [![Follow the tenant enablement plan](screenshots/12-decision-enablement-plan.png)](screenshots/12-decision-enablement-plan.png)
 
-### Verify and preserve the decision trail
+### Compare the earlier and later scans
 
-After administrators complete approved work, run a new scan and return to
-Decision. The evidence trail distinguishes the baseline, imported sources,
-forecast actions, verification evidence, and final cohort decision.
+After approved work is completed, run a later scan and return to Decision.
+Read the dates and the collected coverage of both scans. The history separates
+the first saved scan, imported reports, proposed changes and later observations.
+Use it to explain which information supported the review, rather than treating
+a selected proposal as a completed change.
 
-Evidence expiry, drift, or newly opened risk can reopen a previously satisfied
-gate. The product therefore supports a repeatable evidence cycle rather than a
-one-time readiness score.
+Information that has passed its allowed age no longer satisfies a supported
+check when the app reevaluates it. Later scans can also show changed results.
+Flight Deck does not continuously watch Microsoft 365, automatically rescan,
+send reminders or prove that every requirement has been resolved.
 
 [![Verify the decision evidence trail](screenshots/13-decision-evidence-trail.png)](screenshots/13-decision-evidence-trail.png)
 
 ## How the stages connect
 
-1. **Set up:** Connect or import evidence, identify the current mission, and
-   complete missing evidence.
-2. **Assessment:** Inspect domain, control, trace, and finding results.
-3. **Corrections:** Review proposed technical changes without modifying the
-   tenant.
-4. **Decision:** Follow the enablement plan, rescan, and determine whether the
-   approved cohort can proceed.
+1. **Set up:** Connect the organization, collect information, select pilot users
+   and answer the setup questions.
+2. **Assessment:** Read the results and understand what the tool did and did not
+   check.
+3. **Corrections:** Prepare proposed changes for administrator review; nothing
+   is applied to Microsoft 365 here.
+4. **Decision:** Review what supports or prevents the pilot decision, compare
+   later scans and retain the supporting records.
 
 [Return to the README](../README.md)

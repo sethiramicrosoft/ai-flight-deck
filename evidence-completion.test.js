@@ -136,9 +136,9 @@ test("legacy generic permission codes with unavailable command descriptions rema
   for (const [id] of cases) {
     const item = plan.controls.find(control => control.controlId === id);
     assert.equal(item.actionLane, "appLimitations");
-    assert.equal(item.stateLabel, "App capability missing");
+    assert.match(item.stateLabel, /app cannot confirm|software connection or checking rule/);
     assert.deepEqual(item.missingPermissions, []);
-    assert.match(item.warning, /unclassified/);
+    assert.match(item.warning, /could not identify the cause/);
     assert.doesNotMatch(item.nextAction, /grant|rescan|import/i);
     assert.notEqual(item.effort, "<15 minutes");
   }
@@ -164,8 +164,8 @@ test("structured source codes alone determine denial and capability categories",
     assert.equal(item.actionLane, "administratorActions");
     assert.equal(item.state, "MissingPermission");
     assert.equal(item.status, "Unknown");
-    assert.match(item.appBlockedReason, /No source-observation validation contract/);
-    assert.match(item.nextAction, /Access recovery alone cannot complete/);
+    assert.match(item.appBlockedReason, /does not yet have the rules needed/);
+    assert.match(item.nextAction, /Restoring read access will not finish/);
     assert.deepEqual(item.missingPermissions, []);
   }
 });
@@ -186,10 +186,10 @@ test("missing validators and Copilot source paths are app work even with approve
     const item = after.controls.find(control => control.controlId === id);
     assert.equal(item.status, "Unknown");
     assert.equal(item.actionLane, "appLimitations");
-    assert.match(item.appBlockedReason, /No source-observation validation contract/);
+    assert.match(item.appBlockedReason, /does not yet have the rules needed/);
   }
   assert.equal(after.summary.complete, 0);
-  assert.match(after.summary.explanation, /not a confirmed tenant misconfiguration/);
+  assert.match(after.summary.explanation, /does not mean the Microsoft 365 setting is wrong/);
 });
 
 test("only explicit approved cohort and decisive choices remove independent decision tasks", () => {
@@ -239,7 +239,7 @@ test("unclassified causes warn rather than infer a role from prose", () => {
   });
   const item = plan.controls.find(control => control.controlId === "AFD-LIC-001");
   assert.notEqual(item.state, "MissingPermission");
-  assert.match(item.warning, /have not been established/);
+  assert.match(item.warning, /not enough information to say an administrator role or permission is missing/);
 });
 
 test("only admitted outcomes enter Complete and confirmed configuration lanes", async () => {

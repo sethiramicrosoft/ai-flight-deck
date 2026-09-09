@@ -3,6 +3,18 @@
 **A prototype for organizing Microsoft 365 Copilot pilot evidence, findings
 and decisions.**
 
+## Documentation
+
+- **[How to use each page](docs/VISUAL-TOUR.md)** — what each page is for,
+  what its results mean, and what to do next, with screenshots.
+- **[What connects and what gets checked](docs/COLLECTOR-GUIDE.md)** —
+  which Microsoft services each topic uses, how you sign in, what the app
+  reads, what it cannot check, and what you need to do.
+- [Windows installation](#install-ai-flight-deck-on-a-windows-computer) —
+  prerequisites, sign-in and troubleshooting.
+- [Which results can support a rollout decision](#evidence-authority-and-supported-boundaries) —
+  the three supported automated checks and eleven types of owner statement.
+
 ## Project vision
 
 **Help a rollout owner move from assessment findings to an accountable,
@@ -36,14 +48,14 @@ These capabilities are implemented, with the boundaries shown below.
 
 | Capability available now | What it does | Important boundary |
 |---|---|---|
-| Pilot selection | Searches Microsoft Entra users/groups and saves an explicitly approved membership snapshot with an owner | Bounded resolution; group results can lag recent changes. This is not continuous membership tracking |
-| App-managed collection | Launches authenticated Graph and workload reads, including Exchange, SharePoint, Purview and Power Platform | Sign-in, consent and service access are still required. A successful read is not a validated readiness result |
-| Grouped sharing review | Separates access-review observations from ordinary permission inventory, with 25 groups per page, 50-record drilldowns and separate CSV exports | Uses a bounded root-item sample. It is not a recursive, million-file inventory or complete effective-access assessment |
-| Evidence completion | Organizes unresolved checks into user decisions, administrator actions, configuration findings and app limitations | An unknown result is not automatically a tenant fault. Suggested accountable roles are not assigned operational tasks |
-| Local decisions and statements | Records pilot approval, hybrid Exchange and web-grounding choices; supports control-specific owner attestations | An owner name or local signature does not prove organizational approval authority or independently verify a tenant setting |
-| Limited evidence-based gating | Checks supported evidence for binding, freshness and required data; keeps unsupported claims unresolved | Three automated licensing contracts and eleven attested contracts are implemented—not all 77 controls |
-| Reassessment and comparison | Supports on-demand recollection and bounded baseline/verification comparison; expired evidence stops satisfying gates when reevaluated | Not continuous monitoring. Sharing comparison does not prove remediation across every workload |
-| Microsoft report imports | Accepts readiness reports and a narrowly mapped automated-assessment recommendation CSV | Nine exact upstream check names map to three Flight Deck controls at the supported revision; other rows/revisions remain staged |
+| Pilot selection | Searches Microsoft Entra for users/groups and saves the people you explicitly approve for the pilot, with a named owner | The saved list does not update automatically. Recent group changes may not appear immediately, and large or incomplete selections are rejected |
+| App-managed collection | Signs in to Microsoft Graph and the Exchange, SharePoint, Purview and Power Platform administration services to read information | You must complete sign-in and approve appropriate read access. Reading information successfully does not mean a readiness check passed |
+| Grouped sharing review | Groups related permission records, with 25 groups per page, up to 50 individual records when a group is opened, and separate CSV exports | Only a limited sample of top-level files and folders is read. It does not search every nested file or establish exactly who can access everything |
+| What still needs to be checked | Shows decisions for you, help needed from an administrator, settings to review and checks this version cannot perform | A missing result may mean the app cannot check it—not that your settings are wrong. Suggested owners are not automatically assigned tasks |
+| Local decisions and statements | Records pilot approval, whether on-premises Exchange applies, whether Copilot should use public web information, and supported owner statements | Recording a choice does not change a Microsoft setting. An owner name or local signature does not independently prove authority or confirm the setting |
+| Limited checks for rollout decisions | Checks that supported results describe the right organization and pilot users, are recent enough and contain the required facts | Implemented for three automated licensing checks and eleven types of owner statement—not all 77 checks |
+| Reassessment and comparison | Lets you run another collection and compare saved sharing results; information that has become too old no longer satisfies a check when reevaluated | It does not continuously monitor Microsoft 365. A comparison of sampled sharing records does not prove that every proposed change was completed |
+| Microsoft report imports | Accepts Microsoft readiness reports and recognizes a small set of recommendations from the automated assessment CSV | Nine exact check names from the supported Microsoft assessment version map to three Flight Deck checks. Other rows or versions are retained for review, not automatically interpreted |
 
 ### What has been demonstrated
 
@@ -59,8 +71,8 @@ Flight Deck has **77 application-defined controls across 13 organizing domains**
 This is a policy catalogue, not 77 fully validated automated checks or a claim
 of broader coverage than Microsoft's differently grouped service areas.
 
-**Not yet implemented:** source-observation validation for the remaining
-**63 controls**; an operational task-assignment, reminder and approval system;
+**Not yet implemented:** the rules needed to confirm the remaining
+**63 checks** from collected information; an operational task-assignment, reminder and approval system;
 continuous change monitoring and automatic follow-up; and a production-scale,
 complete effective-access collection service. Flight Deck also does not
 automatically launch Microsoft's assessment or correlate its entire output.
@@ -110,12 +122,12 @@ This compares documented workflows, not an exhaustive claim that an upstream
 feature is absent. The revision is an integration reference, not a claim about
 the latest upstream HEAD.
 
-### Example: a DLP concern
+### Example: a data-loss prevention concern
 
-**Today:** Flight Deck can retain a supported mapped concern, associate it with
-a control, show suggested accountable-role guidance and explain why it remains
-unresolved. The DLP source-validation contract is not implemented, so it cannot
-declare that gate closed.
+**Today:** Flight Deck can keep a recognized data-loss prevention (DLP) finding,
+link it to a check and suggest which administrator should review it. This version
+cannot independently verify the DLP setting, so it cannot mark that rollout
+requirement as satisfied.
 
 **In the envisioned workflow:** the concern would move through an assigned
 owner's investigation, an approved change, fresh source evidence and validated
@@ -124,6 +136,14 @@ remains work to build and demonstrate.
 
 ## Evidence authority and supported boundaries
 
+This section explains **which results the app can use to support a rollout
+decision**. It is the technical reference for administrators and developers:
+a *control* is a check; a *cohort* is the approved list of pilot users; an evidence
+*contract* specifies the facts required for a particular check; *admission* means
+accepting a result for decision-making. The app must first read the information,
+then interpret it, then verify whether the conclusion is supported. Those are
+three different steps.
+
 `collector-runtime.js` retains only source-derived proof facts and a digest before
 discarding raw collector observations. It does not persist raw Graph user records,
 tokens, invented request IDs, or credentials in the receipt. `evidence-authority.js`
@@ -131,7 +151,7 @@ checks those facts against the normalized decision and creates a locally
 HMAC-sealed, source-bound observation receipt. Each new `evidenceRefs` entry resolves
 to that receipt's record, rather than to a decorative string.
 
-The implemented automated contracts are:
+The three automated checks with implemented source verification are:
 
 | Control | Validated observation boundary |
 |---|---|
@@ -147,14 +167,15 @@ Source: Microsoft's [licensing identifier reference](https://learn.microsoft.com
 The boundary is Copilot in productivity apps; other features still require their
 own applicable controls and evidence.
 
-All eleven catalogue-designated attested controls have bounded data contracts.
-An accepted statement means that the accountable signer supplied the required
+Eleven checks accept a specific statement from an accountable owner, called an
+*attestation*. Each requires the information listed below.
+An accepted statement means that the signer supplied the required
 facts and references, not that Flight Deck fetched those documents or independently
 tested effective settings. The local HMAC protects integrity; it does not authenticate
 Microsoft's truth, prove the signer's service role, or constitute external evidence.
 The existing local service/adapter and host remain trust boundaries.
 
-| Attested control | Required data (non-empty text unless stated otherwise) |
+| Check supported by an owner statement | Required data (non-empty text unless stated otherwise) |
 |---|---|
 | AFD-IAM-007 | `accountRef`, `owner`, `exclusionEvidenceRef`, `monitoringAlertRef` |
 | AFD-DEV-005 | `owner`, `policyRef`, `conditionalAccessEvidenceRef`, `enrollmentRestrictionsEvidenceRef`, `settingsMatchPolicy: true` |
@@ -186,7 +207,8 @@ challenge do not establish source truth or effective enforcement. The administra
 package contract remains exactly version **1.0.0**. Network probes remain limited to
 the scanner host; inventory and sampled access are not effective-access proofs.
 
-### Admission, freshness and reader parity
+<a id="admission-freshness-and-reader-parity"></a>
+### How results are checked and kept consistent
 
 - Binding must match the trusted tenant, cohort, domain, control, instance, actor,
   catalogue version and collector run. Cross-run or cross-tenant replay is rejected.
@@ -252,11 +274,11 @@ Their presence does not establish a complete operational rollout workflow.
 
 | AI Flight Deck capability | What it offers |
 |---|---|
-| Cross-source evidence control tower | Combines Microsoft reports, a live Graph scan, workload evidence, and accountable attestations without hiding their source |
-| Named pilot cohort | Searches live Microsoft Entra users or groups and saves an explicitly approved, bounded membership snapshot with an accountable owner; no CSV is required |
-| 13 domains and 77 controls | Normalizes licensing, identity, devices, network, service health, Exchange, Teams, SharePoint/OneDrive, Purview, security, Copilot configuration, Power Platform/agents, and adoption/governance |
-| Actionable evidence gaps | Preserves the actual source error; an unsupported command, unknown failure, or missing validation contract is not automatically a missing permission |
-| Evidence completion center | Separates decisions, administrator actions, configuration findings and app limitations, with five items initially displayed per category and links to the appropriate form or control definition |
+| Results from multiple sources | Keeps Microsoft reports, Graph reads, administration-service reads and owner statements together, with their sources visible |
+| Approved pilot user list | Searches Microsoft Entra users or groups and saves an explicitly approved list with an accountable owner; no CSV is required |
+| 13 topics and 77 checks | Organizes results across licensing, identity, devices, network, service health, Exchange, Teams, SharePoint/OneDrive, Purview, security, Copilot settings, Power Platform/agents and adoption |
+| Reasons a check is unfinished | Preserves the actual error. The cause may be permissions, unsupported software or a missing feature in this app |
+| What still needs to be checked | Shows **Decisions for you**, **Help needed from an administrator**, **Settings to review** and **Checks this version cannot perform**, with five items initially shown per category and links to the relevant form or instructions |
 | Mission gates | Shows whether activation, safe pilot, scale, and assurance missions can advance and identifies the exact blocking controls |
 | Readiness-impact traces | Connects evidence source to control, affected mission, decision impact, and required correction when a full access graph is unavailable |
 | SharePoint access and sharing review | Converts public SharePoint sites and sampled Anyone or organization-wide sharing links into named, evidence-backed validation scenarios with bounded audience estimates, explicit limitations, and administrator actions |
@@ -270,6 +292,22 @@ In one sentence: **Flight Deck implements parts of a pilot evidence-and-decision
 workspace; the complete follow-through workflow is the vision still to prove.**
 
 ### Using the control instructions
+
+**What still needs to be checked** separates four different situations:
+
+- **Decisions for you:** choices the app cannot make for your organization, such
+  as who joins the pilot or whether Copilot may use public web information.
+- **Help needed from an administrator:** a Microsoft service could not be read,
+  for example because sign-in, a required role or a licence is missing. Review
+  the actual error with that service's administrator.
+- **Settings to review:** the scan returned information suggesting a setting
+  needs attention. An administrator should inspect it before deciding to change it.
+- **Checks this version cannot perform:** the app lacks the connection or
+  verification needed. Repeated sign-ins or changes to Microsoft settings will
+  not add that missing app feature.
+
+These are different next steps. “Not checked” by itself does not tell you that a
+setting is wrong.
 
 Select **View required action** or **View control definition** on a Set up item to open and
 focus that control in the Decision page's plan, including when the previous filter
@@ -383,11 +421,12 @@ relevant authoritative Microsoft documentation.
 
 ## See the product before installing
 
-[Open the complete AI Flight Deck visual tour](docs/VISUAL-TOUR.md) to see
-all four workflow stages, what each provides, and how evidence moves from
-collection to a cohort-specific decision.
+[Read how to use each page](docs/VISUAL-TOUR.md) for screenshots and practical
+instructions: what each page does, how to use its controls, what the results
+mean and what to do next. For service sign-ins, collected information, limits
+and error explanations, use the [connection guide](docs/COLLECTOR-GUIDE.md).
 
-[![AI Flight Deck evidence completion center](docs/screenshots/02-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
+[![AI Flight Deck: what still needs to be checked](docs/screenshots/02-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
 
 The screenshots use an isolated, explicitly labelled synthetic offline fixture
 data. They do not contain tenant data and are intended to show the product
@@ -592,17 +631,19 @@ acquisition outcome, accepted rows, retained observations, and coverage gaps.
 An observations-only run can be partial rather than discarding useful rows;
 a genuinely empty, unsuccessful acquisition still fails.
 
-`Get-SPOSite` no longer uses deprecated `-Detailed`. Each inventory scope is
+`Get-SPOSite` no longer uses deprecated `-Detailed`. Each site-list query is
 bounded to 1,000 rows, followed by identity-specific detail reads because list
 queries can omit or default configuration properties. The process-wide detail
 budget defaults to 200 sites, with caching across the three logical site queries.
-Unhydrated or warning-bearing rows stay observations, not configuration proof.
+Sites without successful detail reads, and rows returned with warnings, remain
+incomplete observations—not proof of their settings.
 These counts are per query and must not be summed as unique sites.
 
 The Purview audit-log query now uses a supplemental Exchange Online connection
-after IPPS policy collection. Its tenant and actor must match before the bounded
-audit read runs. An audit connection failure does not discard successfully
-collected Purview policy evidence. This fixes the session routing; it does not
+after the Purview compliance connection finishes reading policies. The audit
+connection must report the same organization and signed-in account before it
+reads records. An audit connection failure does not discard successfully
+read Purview policies. This fixes which service is used; it does not
 prove that every tenant exposes the command or that audit ingestion is healthy.
 
 SharePoint Data Access Governance reads use
@@ -673,20 +714,20 @@ scanner's preferred PowerShell host. Execution-policy bypass is process-local;
 the app does not change persisted policy or override organization-enforced
 restrictions.
 
-Successful collection is **not** automatic authority admission. The bounded
-validator still admits only the source contracts listed above. Missing
-observation-validation paths remain Unknown; authenticating or resealing data
-does not implement those contracts.
+Successful collection does **not** automatically satisfy a rollout requirement.
+The app can verify only the three automated checks and eleven types of owner
+statement listed above. Other checks remain unresolved. Signing in again or
+protecting a local file against edits does not add the missing verification.
 
 Existing offline import controls remain in a collapsed **Advanced: import an
 existing evidence package (optional)** section. They are not part of the normal
 collection flow; their one-time challenge and freshness rules remain enforced.
 
-#### Accountable governance attestations
+#### Statements from accountable owners
 
-For controls whose catalogue automation class is `Attested`, load a locally
-verified baseline for an explicitly approved cohort, then complete the
-attestation form in the Evidence completion center. Flight Deck:
+For checks that accept an owner statement (marked `Attested` in the code),
+load a verified scan for explicitly approved pilot users. Then complete the
+statement form under **What still needs to be checked**. Flight Deck:
 
 1. Restricts attestations to controls explicitly marked `Attested`.
 2. Derives the attester from the verified scan actor and binds the statement
@@ -776,27 +817,17 @@ No single role makes every one of the 77 controls technically available.
 Microsoft Graph, workload administration, licensing, and human governance
 evidence have different access boundaries.
 
-The capability plan identifies these roles for the relevant domain:
+The [connection table](docs/COLLECTOR-GUIDE.md#at-a-glance-all-13-domains)
+lists relevant Graph read permissions and suggested administrators beside each
+Microsoft service, with links to what it reads and cannot check.
 
-| Readiness area | Relevant reader or administrator role |
-|---|---|
-| Licensing and entitlement | License Administrator |
-| Identity and access | Global Reader |
-| Devices and Microsoft 365 Apps | Intune Administrator |
-| Network checks | Network Administrator or approved network operator |
-| Service health | Service Support Administrator |
-| Exchange Online | Exchange Administrator |
-| Microsoft Teams | Teams Administrator |
-| SharePoint and OneDrive | SharePoint Administrator |
-| Microsoft Purview | Compliance Administrator |
-| Microsoft Defender and security | Security Reader |
-| Copilot tenant configuration | Global Reader |
-| Power Platform and Copilot Studio | Power Platform Administrator |
-| Adoption and organizational governance | Named business owner or signed attester |
-
-These roles describe who can provide complete evidence; they are not permission
-to make changes through AI Flight Deck. The current application remains
-read-only.
+These are suggested roles, not a universal permission recipe. What the app can
+read depends on the signed-in account's permissions for that service, licences
+and software support. Flight Deck does not use those permissions to change
+Microsoft settings. The [connection guide](docs/COLLECTOR-GUIDE.md#authentication-and-permission-legend)
+separates permissions actually requested at Graph sign-in from plans such as
+`Sites.FullControl.All` and `Exchange.ManageAsApp`, neither of which is requested
+by the local Graph sign-in.
 
 If the signed-in account lacks a required role, permission, licence, connector,
 or attestation, the affected control remains technically `Unknown` in the
@@ -854,8 +885,8 @@ Do not copy the local evidence workspace into the repository.
 | PowerShell Gallery asks to install NuGet or trust PSGallery | Review and accept the prompt if allowed by organizational policy. |
 | Device sign-in requires approval | Ask a tenant administrator to grant the displayed delegated read permissions. |
 | The page says the integrated scanner is unavailable | Start the product with `Start-AI-Flight-Deck.cmd`; do not open `index.html` directly or use a generic static server. |
-| Many controls remain `Unknown` | The installation is working. Those controls require additional workload connectors, permissions, Microsoft reports, or accountable attestations. |
-| A named cohort cannot be created | The Microsoft readiness export contains concealed or mixed identities. Change the Microsoft 365 report privacy setting or use an identified export. |
+| Many checks remain `Unknown` | Open **What still needs to be checked** and the [connection guide](docs/COLLECTOR-GUIDE.md#a-gap-is-not-always-a-tenant-fault). This version cannot verify 63 checks from returned records; granting more permissions or rescanning will not add that feature. Other checks may need administrator access, licences or a specific owner statement. |
+| A pilot user list cannot be approved | Check the user/group lookup limits and use the same account that created the scan. Hidden or mixed identities in a readiness CSV cannot identify pilot users; select users from the directory or use an approved report with visible identities. Do not assume you must change your organization's privacy settings. |
 
 ## Quick start for returning users
 
@@ -996,10 +1027,13 @@ The collector suite is deliberately bounded:
   attestation adapter inputs without presenting absent inputs as completed
   checks.
 
-Before sign-in, the local service exposes a thirteen-service capability plan
-that lists the minimum permissions, administrator roles, licences, and
-endpoints required by each collector. Delegated local operation and production
-application identity are planned separately. Access tokens remain in memory,
+Before sign-in, the local service displays a plan for thirteen topics. Its
+suggested permissions, roles, licences and service addresses are **plans**, not
+the exact sign-in request or proof that every connection works. Several topics
+share one Microsoft connection. Labels proposing application-only sign-in do
+not mean that connection has been implemented. The
+[connection guide](docs/COLLECTOR-GUIDE.md) explains what actually runs and what is missing.
+Access tokens remain in memory,
 are bound to one tenant/job/collector tuple through opaque one-time handles,
 and are cleared on completion or cancellation.
 
@@ -1039,21 +1073,12 @@ mandatory domains have sufficient, current evidence.
 
 ### Estate-readiness domains
 
-| Domain | Current state |
-|---|---|
-| Licensing and tenant entitlement | Automated Graph inventory plus cohort and renewal evidence |
-| Identity and access | Automated Graph policy, sign-in, risk, role, and directory checks |
-| Devices and Microsoft 365 Apps | Automated Intune and application checks plus policy evidence |
-| Network and client connectivity | Automated local probes plus enterprise network evidence |
-| Service health and tenant operations | Automated Graph issues and messages plus ownership evidence |
-| Exchange Online readiness | Workload administration adapter required |
-| Teams readiness | Automated inventory plus Teams policy administration evidence |
-| SharePoint and OneDrive content governance | Graph scan plus SharePoint administration evidence |
-| Purview information protection and compliance | Graph label read plus Purview administration evidence |
-| Security posture | Graph security reads plus Defender service connections |
-| Copilot configuration and feature governance | Graph inventory plus tenant policy evidence |
-| Power Platform, Copilot Studio and agents | Power Platform administration evidence required |
-| Adoption, measurement and operational governance | Usage reports and signed attestations required |
+Use the **[13-topic connection table](docs/COLLECTOR-GUIDE.md#at-a-glance-all-13-domains)**
+as the single connection reference. Each topic explains the Microsoft service,
+how you sign in, what is read, what cannot be checked and what to do next.
+For example, listing Teams does not check every assigned Teams policy;
+the planned separate Defender connections do not work yet; and testing this
+computer's network does not test every employee's connection.
 
 ## Relationship to Microsoft's open-source readiness accelerator
 
@@ -1071,27 +1096,14 @@ field alone because some recommendation modules use `Success` for a completed
 collector even when the observation identifies a governance gap. Exact feature
 semantics and source provenance determine the proposed Flight Deck result.
 
-AI Flight Deck can include equivalent assessment domains without losing its
-product differentiation:
-
-| Assessment domain | AI Flight Deck treatment |
-|---|---|
-| Microsoft 365 licensing | Validate prerequisite licenses and service-plan state |
-| Entra | Model users, guests, groups, risky identities and Conditional Access |
-| Defender | Incorporate Secure Score, incidents, vulnerabilities and exposure signals |
-| Purview | Add labels, DLP, retention and oversharing evidence to attack paths |
-| Power Platform | Evaluate environments, connectors, DLP boundaries and AI Builder |
-| Copilot Studio | Inventory agents, authentication, tools and accessible resources |
-| Agent 365 | Evaluate agent catalog, ownership, deployment scope and access expansion |
-
-The additional AI Flight Deck layer remains:
-
-- Adversarial scenario simulation.
-- User and agent permission attack paths.
-- Business-impact and affected-user calculation.
-- Before-and-after remediation forecasting.
-- Evidence-backed estate-domain coverage and pilot recommendation only after
-  every mandatory domain is sufficiently assessed.
+At that revision, **nine exact check names map to only three controls**:
+`AFD-PPA-001`, `AFD-SEC-005` and `AFD-COPILOT-003`. Other names/revisions remain
+available for review without automatic interpretation. These mappings retain
+findings; the app cannot yet verify any of those three checks sufficiently to
+mark them Pass for a rollout decision. Flight Deck does not launch the upstream
+assessment. See [import boundaries](docs/COLLECTOR-GUIDE.md#microsoft-report-imports-are-another-source-not-a-connector-launch)
+and the [project vision](#project-vision) rather than treating comparable domain
+names as equivalent collection or proof.
 
 Capability ideas can be implemented independently from public documentation and
 supported APIs. If source code from the Microsoft repository is copied or
@@ -1121,10 +1133,11 @@ The prototype includes three synthetic scenarios:
 - Employee compensation data exposed through stale group membership.
 - A procurement agent receiving excessive Finance access.
 
-## Product differentiation
+## Questions the product aims to answer
 
-Existing readiness tools largely report whether controls are configured. AI
-Flight Deck demonstrates the outcome:
+The envisioned workflow aims to answer the following questions. Synthetic
+scenarios and bounded sharing review illustrate parts of them; the current
+collectors do not establish complete tenant-wide answers:
 
 - What could AI retrieve?
 - Which users or agents could retrieve it?
