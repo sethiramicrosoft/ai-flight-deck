@@ -10,6 +10,8 @@ and decisions.**
 - **[What connects and what gets checked](docs/COLLECTOR-GUIDE.md)** —
   which Microsoft services each topic uses, how you sign in, what the app
   reads, what it cannot check, and what you need to do.
+- **[Guided action workflow](docs/ACTION-WORKFLOW.md)** — save a correction,
+  record a manual hand-off, report completion and check fresh evidence.
 - [Windows installation](#install-ai-flight-deck-on-a-windows-computer) —
   prerequisites, sign-in and troubleshooting.
 - [Which results can support a rollout decision](#evidence-authority-and-supported-boundaries) —
@@ -53,6 +55,8 @@ These capabilities are implemented, with the boundaries shown below.
 | Grouped sharing review | Groups related permission records, with 25 groups per page, up to 50 individual records when a group is opened, and separate CSV exports | Only a limited sample of top-level files and folders is read. It does not search every nested file or establish exactly who can access everything |
 | What still needs to be checked | Shows decisions for you, help needed from an administrator, settings to review and checks this version cannot perform | A missing result may mean the app cannot check it—not that your settings are wrong. Suggested owners are not automatically assigned tasks |
 | Local decisions and statements | Records pilot approval, whether on-premises Exchange applies, whether Copilot should use public web information, and supported owner statements | Recording a choice does not change a Microsoft setting. An owner name or local signature does not independently prove authority or confirm the setting |
+| Persistent guided actions | Creates or resumes one saved action per control and exact tenant/cohort/catalogue context; preserves starting evidence, guidance, ownership records, dependencies, progress, hand-off drafts and history | Local records only: no authenticated approval, external assignment, notification or tenant write. Administrators act through their existing process |
+| Action-linked verification | Rechecks reported completion against admissible, freshly collected evidence; reopens previous satisfaction on expiry, later failure/unknown or context changes | Three licensing contracts can support technical verification; eleven contracts support separately labelled owner statements. The other 63 remain unverified. Completion, a link or an imported CSV is not proof |
 | Limited checks for rollout decisions | Checks that supported results describe the right organization and pilot users, are recent enough and contain the required facts | Implemented for three automated licensing checks and eleven types of owner statement—not all 77 checks |
 | Reassessment and comparison | Lets you run another collection and compare saved sharing results; information that has become too old no longer satisfies a check when reevaluated | It does not continuously monitor Microsoft 365. A comparison of sampled sharing records does not prove that every proposed change was completed |
 | Microsoft report imports | Accepts Microsoft readiness reports and recognizes a small set of recommendations from the automated assessment CSV | Nine exact check names from the supported Microsoft assessment version map to three Flight Deck checks. Other rows or versions are retained for review, not automatically interpreted |
@@ -61,6 +65,9 @@ These capabilities are implemented, with the boundaries shown below.
 
 Synthetic integration and browser exercises cover directory selection and
 approval, local decisions, cancellation, evidence handling and expiry behavior.
+The guided-action regression suite uses only isolated synthetic tenants and
+offline adapters, including restart persistence, conflict handling, manual
+hand-off and post-completion checks.
 The grouped review has also been exercised against a saved tenant assessment.
 These are useful checks of implementation, **not proof of a complete real-tenant
 pilot-to-rollout lifecycle**.
@@ -92,8 +99,9 @@ Flight Deck is not required for that job.**
 
 Microsoft already provides automated collection, prioritized recommendations,
 CSV/Excel reports and repeatable assessments with timestamped outputs.
-Flight Deck's potential additional value is the **pilot follow-through
-workflow** described in the vision—not superior collection or greater authority.
+Flight Deck adds a **local guided follow-through workflow**; operational
+assignment and authenticated approval remain vision, not implemented services.
+This is not superior collection or greater authority.
 
 | Area | Microsoft's documented workflow | Flight Deck's implemented addition |
 |---|---|---|
@@ -283,7 +291,7 @@ Their presence does not establish a complete operational rollout workflow.
 | Readiness-impact traces | Connects evidence source to control, affected mission, decision impact, and required correction when a full access graph is unavailable |
 | SharePoint access and sharing review | Converts public SharePoint sites and sampled Anyone or organization-wide sharing links into named, evidence-backed validation scenarios with bounded audience estimates, explicit limitations, and administrator actions |
 | Tenant-wide enablement plan | Computes a recommendation under custom policy and lists suggested accountable roles, administration paths, checklists, acceptance criteria and Microsoft references. Missing validation contracts prevent an estate-wide approval |
-| Evidence-bound corrections | Produces administrator action packages tied to the selected controls and signed baseline rather than claiming that changes were applied |
+| Evidence-bound corrections | Saves guided actions with frozen evidence/context, progress, local responsibility/approval records, manual hand-off and completion history; separately checks new supported evidence. Optional administrator review packages remain available |
 | Bounded before-and-after comparison | Compares collected sharing baselines and verification results. This does not prove remediation across all 77 controls |
 | Provenance and freshness | Retains source artifact hashes, report dates, collector identity, evidence limitations, and conflicts between imported and live evidence |
 | Detailed exports | Exports the complete control-level assessment and correction context for review outside the application |
@@ -428,8 +436,8 @@ and error explanations, use the [connection guide](docs/COLLECTOR-GUIDE.md).
 
 [![AI Flight Deck: what still needs to be checked](docs/screenshots/02-setup-evidence-center.png)](docs/VISUAL-TOUR.md)
 
-All 14 tour screenshots were refreshed on **9 September 2026** for the
-plain-language interface and revised Setup order. They use explicitly labelled
+All 16 tour screenshots were captured on **11 September 2026**, including
+the saved-action workflow, supported verification and manual hand-off. They use explicitly labelled
 synthetic examples, not real tenant data, so you can see the product before
 connecting your organization.
 
@@ -1136,8 +1144,9 @@ The product is organized around four customer tasks:
    import Microsoft evidence, and approve a named pilot cohort.
 2. **Assessment** - Review domain coverage, evidence gaps, the sharing posture
    signal, and evidence-backed findings.
-3. **Corrections** - Create an approval-ready correction package. Forecasts are
-   planning aids and never count as proof.
+3. **Corrections** - Save guided work and manual hand-off, report completion,
+   and check fresh supported evidence. Optional review packages and forecasts
+   remain planning aids; none authenticate approval or prove a tenant change.
 4. **Decision** - Re-scan and verify sharing corrections independently from
    the estate-wide decision. `SharingControlsVerified` never means Copilot
    rollout is approved.
@@ -1204,8 +1213,13 @@ Exposure risk = discoverability x sensitivity x audience x control weakness
 
 ## Act and prove
 
-The product does not stop at forecasting. Selected corrections can be
-exported as an administrator approval package containing:
+The guided local action workflow is described in
+[ACTION-WORKFLOW.md](docs/ACTION-WORKFLOW.md). It persists progress and preserves
+history; action-linked checks distinguish supported technical observations from
+owner statements and unverified work. It does not send anything or make changes.
+
+Selected corrections can also be exported as an administrator review package
+(not an authenticated approval) containing:
 
 - Baseline evidence and affected tenant.
 - Requested controls and business rationale.

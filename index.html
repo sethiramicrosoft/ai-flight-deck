@@ -1095,6 +1095,32 @@
       .remediation { grid-template-columns: auto 1fr; }
       .impact { grid-column: 2; text-align: left; }
     }
+    #guided-actions { margin-bottom: 16px; overflow-wrap: anywhere; min-width: 0; }
+    #guided-actions p { margin: 12px 0; color: var(--cp-text-muted); line-height: 1.5; }
+    #guided-actions h3, #guided-actions h4 { margin: 20px 0 12px; }
+    #guided-actions fieldset { min-width: 0; border: 1px solid var(--cp-border); border-radius: 10px; padding: 16px; margin: 16px 0; }
+    #guided-actions legend { color: var(--cp-text); font-weight: 600; max-width: 100%; }
+    #guided-actions label { display: block; margin: 8px 0; }
+    #guided-actions input:not([type="checkbox"]), #guided-actions select, #guided-actions textarea {
+      width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+      padding: 10px; border: 1px solid var(--cp-border-strong); border-radius: 10px;
+      background: var(--cp-surface); color: var(--cp-text); font: inherit;
+    }
+    #guided-actions textarea { min-height: 88px; resize: vertical; }
+    #guided-actions input[type="checkbox"] { margin-right: 8px; accent-color: var(--cp-accent); }
+    #guided-actions .action-card { padding: 12px; border-bottom: 1px solid var(--cp-border); }
+    #guided-actions .btn { white-space: normal; max-width: 100%; margin: 4px 4px 4px 0; overflow-wrap: anywhere; }
+    #guided-actions .actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+    #guided-actions pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 400px; overflow: auto; color: var(--cp-text); }
+    #guided-actions summary { cursor: pointer; padding: 12px 0; color: var(--cp-text); }
+    #guided-actions li { margin: 12px 0 12px 20px; }
+    #guided-actions .action-status { color: var(--cp-text); font-weight: 600; }
+    #guided-actions :focus-visible { outline: 2px solid var(--cp-accent); outline-offset: 3px; }
+    @media (max-width: 760px) {
+      #guided-actions fieldset { padding: 8px; }
+      #guided-actions .actions-row { flex-direction: column; }
+      #guided-actions .actions-row .btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -1272,9 +1298,10 @@
       </section>
 
       <section class="page" id="remediation">
+        <article class="card" id="guided-actions" aria-label="Guided correction actions"></article>
         <article class="card" data-page-help="remediation" style="margin-bottom:16px">
-          <h2>Prepare a proposal, not an automatic change</h2>
-          <p class="subtitle">Use this page to select follow-up actions and download a review file for your administrators. Read the reason for each item before selecting it: some items need a setting reviewed, while others need more information before a decision is possible. Ask the responsible administrator or site owner to confirm the scope, obtain approval, and make any necessary changes in Microsoft 365 outside this app.</p>
+          <h2>Optional review-file export</h2>
+          <p class="subtitle">Use the guided actions above to save scope, ownership records, steps and completion history. The older review-file selection below remains available for administrator hand-off. Neither workflow sends a task, authenticates an approval or changes Microsoft 365 settings.</p>
           <p class="subtitle">Selecting a checkbox only adds an action to your plan. It does not assign a person, approve the action, or fix a setting. After approved work is complete, use the Decision page to collect a later scan and compare it with the first saved scan. Predicted score changes are examples for planning, not proof of an improvement.</p>
         </article>
         <div class="grid two">
@@ -1763,6 +1790,7 @@
 
   <script src="evidence-admissibility.js"></script>
   <script src="enablement-playbook.js"></script>
+  <script src="action-workflow-ui.js"></script>
   <script src="evidence-completion.js"></script>
   <script src="completion-center-ui.js"></script>
   <script src="sharing-review.js"></script>
@@ -1885,7 +1913,7 @@
       overview: ["Review your Microsoft 365 readiness assessment", "See what the saved scan checked, where information is missing, and which results need a person to review them."],
       simulator: ["Understand a sharing or readiness result", "Choose a saved result to see the information behind it and the next review step. This does not test Copilot or change settings."],
       findings: ["Review SharePoint access and sharing", "Inspect collected permission records, understand the possible audience, and confirm with site owners whether access is intended."],
-      remediation: ["Plan corrections for administrator review", "Select proposed actions for a downloadable review file. Administrators approve and make changes outside this app; a later scan is needed to measure the result."],
+      remediation: ["Plan corrections and take action", "Save guided work, record manual hand-offs and check fresh evidence. Administrators still approve and make tenant changes outside this app."],
       clearance: ["Review the recommendation for your Copilot pilot", "Check unresolved requirements and compare sharing scans. Flight Deck's recommendation supports, but does not replace, your organization's decision."],
       guide: ["Connect Microsoft 365 and choose your pilot", "Collect the first read-only scan, choose the pilot participants, and record the decisions needed for the assessment. The app does not enable Copilot or change Microsoft 365 settings."]
     };
@@ -1948,6 +1976,7 @@
     let baselineScan = null;
     let sharingReviewModel = null;
     let setupDecisionUI = null;
+    let actionUI = null;
     let setupDecisionWorkflowsAvailable = false;
     let attestationDataExamples = {};
     let verificationReport = null;
@@ -2349,7 +2378,8 @@
     function renderFindings(filter = "all") {
       if (baselineScan && sharingReviewModel) {
         window.FlightDeckSharingReviewUI.render(document.getElementById("finding-list"),
-          sharingReviewModel, { severity: filter, onError: showError });
+          sharingReviewModel, { severity: filter, onError: showError,
+            onGuidedAction: () => actionUI?.pick("AFD-SPO-003") });
         return;
       }
       const visible = findings.filter(f => filter === "all" || f.severity === filter);
@@ -2633,6 +2663,12 @@
           documentationLink.target = "_blank";
           documentationLink.rel = "noopener noreferrer";
           documentationLink.textContent = `Microsoft documentation: ${documentation.title}`;
+          const guidedAction = document.createElement("button");
+          guidedAction.type = "button";
+          guidedAction.className = "btn";
+          guidedAction.dataset.startAction = controlId;
+          guidedAction.textContent = "Start guided action";
+          guidedAction.addEventListener("click", () => actionUI?.pick(controlId));
           body.append(
             description,
             requirement,
@@ -2643,7 +2679,8 @@
             limitations,
             technical,
             next,
-            documentationLink
+            documentationLink,
+            guidedAction
           );
           detail.append(summary, body);
           consoleControls.appendChild(detail);
@@ -2850,6 +2887,7 @@
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
       renderJourneyPhase();
+      if (page === "remediation") actionUI?.refresh();
     }
 
     function renderJourneyPhase() {
@@ -5364,6 +5402,18 @@
       context: () => baselineScan ? { tenantId: scanTenantId(baselineScan), cohortId: activeCohort()?.id } : null,
       onSaved: () => renderEvidenceCompletion(),
       onError: showError
+    });
+    actionUI = window.FlightDeckActions.mount({
+      container: document.getElementById("guided-actions"),
+      navigate,
+      collect: async () => {
+        navigate("guide");
+        const job = await apiJson("/api/jobs", { method: "POST",
+          headers: { "Content-Type": "application/json", "X-Flight-Deck": "local-ui" },
+          body: JSON.stringify({ action: "workloads" }) });
+        const outcome = await monitorWorkflow(job.id);
+        if (outcome?.status !== "completed") throw new Error("Collection did not complete. The previous evidence is not proof of this action.");
+      }
     });
     renderScenarios();
     renderFindings();

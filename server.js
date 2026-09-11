@@ -32,6 +32,7 @@ const { validateEvidencePackage, graphRequest } = require("./collector-adapters"
 const { selectedWorkloads, collectWorkloadEvidence, PRODUCER_VERSIONS, collectorErrorFromOutput } = require("./workload-collection");
 const { buildEvidenceCompletionPlan } = require("./evidence-completion");
 const { validateAssessmentAuthority } = require("./evidence-authority");
+const { createActionStore } = require("./action-workflow");
 const { sameTenant, safeDirectoryError, validateDirectorySearch, directorySearch, validateDirectorySelection,
   resolveDirectoryCohort, decisionsForContext, recordDecision } = require("./setup-decisions");
 
@@ -547,6 +548,7 @@ function createApp({
   });
   let activeJobId = null;
   const artifactPaths = {
+    actionAssessment: path.join(workspace, "action-assessment.json"),
     baseline: path.join(workspace, "baseline-scan.json"),
     report: path.join(workspace, "verification-report.json"),
     history: path.join(workspace, "control-history.json"),
@@ -555,14 +557,15 @@ function createApp({
     cohort: path.join(workspace, "cohort-config.json")
   };
   const envelopePaths = {
+    actionAssessment: path.join(workspace, "action-assessment.envelope.json"),
     baseline: path.join(workspace, "baseline-scan.envelope.json"),
     report: path.join(workspace, "verification-report.envelope.json")
   };
 
-  function sealArtifact(kind) {
+  function sealArtifact(kind, { publishActionAssessment = true } = {}) {
     const artifactPath = artifactPaths[kind];
     const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
-    if (kind === "baseline") {
+    if (kind === "baseline" || kind === "actionAssessment") {
       validateAssessmentAuthority(artifact, { key: integrityKey, keyId: integrityKeyId });
       if (artifact.evidenceGraph) {
         artifact.evidenceGraphEnvelope = createEvidenceEnvelope({
@@ -594,6 +597,10 @@ function createApp({
       key: integrityKey
     });
     writeJsonAtomic(envelopePaths[kind], envelope);
+    if (kind === "baseline" && publishActionAssessment) {
+      writeJsonAtomic(artifactPaths.actionAssessment, artifact);
+      writeJsonAtomic(envelopePaths.actionAssessment, envelope);
+    }
     return envelope;
   }
 
@@ -604,7 +611,7 @@ function createApp({
     if (sha256Digest(artifact) !== envelope.payloadDigest) {
       throw new Error("The stored artifact no longer matches its signed evidence envelope.");
     }
-    if (kind === "baseline") validateAssessmentAuthority(artifact, { key: integrityKey, keyId: integrityKeyId });
+    if (kind === "baseline" || kind === "actionAssessment") validateAssessmentAuthority(artifact, { key: integrityKey, keyId: integrityKeyId });
     return {
       ...artifact,
       integrity: {
@@ -658,6 +665,30 @@ function createApp({
     }
   }
 
+  const actionStore = createActionStore({
+    workspace, integrity: { key: integrityKey, keyId: integrityKeyId }, writeJsonAtomic,
+    readBaseline: () => verifiedBaselineContext().baseline,
+    contextIsCurrent: context => {
+      if (!fs.existsSync(artifactPaths.cohort)) return true;
+      if (fs.statSync(artifactPaths.cohort).size > 1024 * 1024) throw new Error("Invalid selected cohort.");
+      const selected = JSON.parse(fs.readFileSync(artifactPaths.cohort, "utf8"));
+      if (!selected || typeof selected !== "object" || !selected.id) throw new Error("Invalid selected cohort.");
+      if (selected.tenantId && !sameTenant(selected.tenantId, context.tenantId)) return false;
+      if (selected.id !== context.cohort.id || (selected.approved === true) !== (context.cohort.approved === true)) return false;
+      const memberField = Array.isArray(selected.principalIds) && selected.principalIds.length
+        ? "principalIds" : "userPrincipalNames";
+      if (!Array.isArray(selected[memberField]) || !Array.isArray(context.cohort[memberField])) return false;
+      const members = values => values.map(value => String(value).toLowerCase()).sort();
+      return sha256Digest(members(selected[memberField])) === sha256Digest(members(context.cohort[memberField]));
+    },
+    readAssessment: () => {
+      if (fs.existsSync(artifactPaths.actionAssessment) || fs.existsSync(envelopePaths.actionAssessment)) {
+        return readVerifiedArtifact("actionAssessment");
+      }
+      return verifiedBaselineContext().baseline;
+    }
+  });
+
   const decisionsPath = path.join(workspace, "setup-decisions.json");
   function readSetupDecisions() {
     const { baseline, tenantId } = verifiedBaselineContext();
@@ -704,7 +735,8 @@ function createApp({
     if (action === "directoryCohort") job.directorySelectionRequest = metadata.directorySelectionRequest;
     // Restore the complete previously sealed state if evaluation, cancellation or sealing fails.
     const backup = action === "directoryCohort" ? new Map([
-      artifactPaths.cohort, artifactPaths.baseline, envelopePaths.baseline, artifactPaths.history
+      artifactPaths.cohort, artifactPaths.baseline, envelopePaths.baseline, artifactPaths.history,
+      artifactPaths.actionAssessment, envelopePaths.actionAssessment
     ].map(file => [file, fs.existsSync(file) ? fs.readFileSync(file) : null])) : null;
     jobs.set(id, job);
     const controller = new AbortController();
@@ -718,6 +750,13 @@ function createApp({
           if (!job.directoryResult) throw new Error("Directory search did not return a result.");
         } else {
           sealArtifact(result);
+          if (result === "report") {
+            const verificationScan = path.join(workspace, "verification-scan.json");
+            if (fs.existsSync(verificationScan)) {
+              writeJsonAtomic(artifactPaths.actionAssessment, JSON.parse(fs.readFileSync(verificationScan, "utf8")));
+              sealArtifact("actionAssessment");
+            }
+          }
         }
         job.status = "completed";
         job.result = result;
@@ -771,6 +810,7 @@ function createApp({
             ready: true,
             automaticWorkloadCollection: true,
             setupDecisionWorkflows: true,
+            guidedActions: true,
             activeJobId,
             artifacts: {
               baseline: fs.existsSync(artifactPaths.baseline),
@@ -780,6 +820,23 @@ function createApp({
               attestations: fs.existsSync(attestationsPath)
             }
           });
+          return;
+        }
+        const guidedAction = pathname.match(/^\/api\/actions\/([0-9a-f-]{36})$/i);
+        if (pathname === "/api/actions" || guidedAction) {
+          if (req.method !== "GET" && !requireTrustedUiMutation(req, res)) return;
+          try {
+            if (req.method === "GET" && !guidedAction) {
+              json(res, 200, actionStore.list());
+            } else if (req.method === "POST") {
+              const input = await readJsonBody(req, 32768);
+              json(res, 200, guidedAction
+                ? actionStore.update(guidedAction[1], input) : actionStore.create(input));
+            } else json(res, 405, { error: "Unsupported action request." });
+          } catch (error) {
+            json(res, error.statusCode || 400, { error: error.statusCode ? error.message :
+              "Actions require an intact, locally sealed baseline and assessment. Collect a baseline or restore trusted evidence; no action state was reset." });
+          }
           return;
         }
         if (req.method === "GET" && pathname === "/api/setup-decisions") {
@@ -1042,28 +1099,35 @@ function createApp({
           writeJsonAtomic(importPath, imported);
           let artifactUpdated = false;
           if (fs.existsSync(artifactPaths.baseline) && fs.existsSync(envelopePaths.baseline)) {
-            const baseline = readVerifiedArtifact("baseline");
-            delete baseline.integrity;
-            mergeImportedControlResults(
-              baseline,
-              imported.sourceType === "m365-copilot-readiness"
-                ? readinessControlResults(baseline, imported)
-                : assessmentControlResults(baseline, imported),
-              {
-                sourceType: imported.sourceType,
-                importedAt: imported.importedAt,
-                reportedAt: imported.reportedAt,
-                fileName: imported.fileName,
-                rows: imported.summary.rows,
-                privacyMode: imported.privacy?.mode,
-                upstreamVersion: imported.upstreamVersion,
-                artifactSha256: imported.sourceArtifact.sha256,
-                mappedRows: imported.summary.mappedRows,
-                stagedRows: imported.summary.stagedRows
-              }
-            );
-            writeJsonAtomic(artifactPaths.baseline, baseline);
-            sealArtifact("baseline");
+            // Imports enrich each snapshot; they must not replace a newer comparison
+            // with the original baseline and resurrect an old passing observation.
+            const snapshots = [["baseline", readVerifiedArtifact("baseline")]];
+            if (fs.existsSync(artifactPaths.actionAssessment) || fs.existsSync(envelopePaths.actionAssessment)) {
+              snapshots.push(["actionAssessment", readVerifiedArtifact("actionAssessment")]);
+            }
+            for (const [kind, snapshot] of snapshots) {
+              delete snapshot.integrity;
+              mergeImportedControlResults(
+                snapshot,
+                imported.sourceType === "m365-copilot-readiness"
+                  ? readinessControlResults(snapshot, imported)
+                  : assessmentControlResults(snapshot, imported),
+                {
+                  sourceType: imported.sourceType,
+                  importedAt: imported.importedAt,
+                  reportedAt: imported.reportedAt,
+                  fileName: imported.fileName,
+                  rows: imported.summary.rows,
+                  privacyMode: imported.privacy?.mode,
+                  upstreamVersion: imported.upstreamVersion,
+                  artifactSha256: imported.sourceArtifact.sha256,
+                  mappedRows: imported.summary.mappedRows,
+                  stagedRows: imported.summary.stagedRows
+                }
+              );
+              writeJsonAtomic(artifactPaths[kind], snapshot);
+              sealArtifact(kind, { publishActionAssessment: snapshots.length === 1 });
+            }
             artifactUpdated = true;
           }
           json(res, 200, {
@@ -1166,7 +1230,7 @@ function createApp({
       }
 
       const relativePath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-      const publicFiles = new Set(["index.html", "enablement-playbook.js", "evidence-completion.js",
+      const publicFiles = new Set(["index.html", "enablement-playbook.js", "evidence-completion.js", "action-workflow-ui.js",
         "sharing-review.js", "sharing-review-ui.js", "setup-workflows.js", "completion-center-ui.js",
         "mission-engine.js", "evidence-admissibility.js", "evidence-graph.js",
         "schema/readiness-catalog.v1.json", "schema/control-result.schema.v1.json",

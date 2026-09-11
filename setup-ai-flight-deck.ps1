@@ -153,6 +153,8 @@ try {
         "server.js",
         "index.html",
         "enablement-playbook.js",
+        "action-workflow.js",
+        "action-workflow-ui.js",
         "evidence-completion.js",
         "attestation-evidence.js",
         "scanner\collect-admin-evidence.ps1",

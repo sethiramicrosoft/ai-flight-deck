@@ -1,5 +1,11 @@
 # AI Flight Deck visual tour
 
+> Guided action update: Corrections now saves action scope, local decisions,
+> manual hand-off and completion history, then checks fresh supported evidence.
+> See [Guided action workflow](ACTION-WORKFLOW.md) for the current steps.
+> The screenshots below include the saved-action workflow and the distinction
+> between a supported technical check and a reported but unverified hand-off.
+
 This guide explains what each part of Flight Deck shows, what to do there, and
 what the result means. Flight Deck helps organize a Copilot pilot assessment;
 it does not enable Copilot, change Microsoft settings or approve a production
@@ -11,8 +17,8 @@ confirm the result. The other 63 checks do not yet have the software rules neede
 to confirm their results. They can still show useful information and instructions.
 Their presence on a page does not mean they have been completed.
 
-All 14 screenshots were refreshed on **9 September 2026** to show the
-plain-language interface and the revised Setup order. Every image is labelled
+All 16 screenshots were captured on **11 September 2026** to show the
+current interface, revised Setup order and guided action workflow. Every image is labelled
 as a synthetic example, not a real Microsoft 365 assessment. The examples
 include incomplete collections and checks the app cannot yet confirm; they
 are not demonstrations of a fully approved rollout.
@@ -258,19 +264,49 @@ million-file backend.
 
 ## 3. Prepare corrections
 
-Corrections helps prepare proposed changes for administrator review. Select a
-proposal and read what it would change, who needs to review it and how the result
-should be checked. Selection updates only the app's forecast. Downloading a
-review package creates a document; it does not send an approval request or
-modify Microsoft 365.
+Corrections now saves guided actions for the exact tenant/cohort snapshot.
+Choose **Create or resume action**, record scope, owner/team, prerequisites and
+any required user-recorded approval, then start the guided steps. Save progress,
+preview a manual hand-off, and report completion before checking new evidence.
+See [Guided action workflow](ACTION-WORKFLOW.md) for the full sequence.
+
+The optional review-file export remains below these actions. Its selection
+updates only the forecast; downloading a package does not send an approval
+request or modify Microsoft 365.
 
 Administrators obtain approval and implement changes through normal Microsoft
 365 tools. Run another scan afterwards to see what changed in the information
-the tool can collect. Missing information belongs in **What still needs to be
-checked** on Set up; this page concerns proposed changes, not software features
-missing from Flight Deck.
+the tool can collect. Missing information still appears in **What still needs
+to be checked** on Set up. A guided action can record work for an unsupported
+control, but no task completion or manual hand-off can provide its missing
+technical verification contract.
 
-[![Select proposed actions for administrator review without changing Microsoft 365](screenshots/10-corrections.png)](screenshots/10-corrections.png)
+The saved-action list shows separate work and verification results. In this
+synthetic example, both actions have reported completion, but only the licensing
+action has passed a supported technical check. The sharing action remains
+unverified.
+
+[![Resume saved actions and distinguish reported completion from supported verification](screenshots/10-corrections.png)](screenshots/10-corrections.png)
+
+### Inspect what the technical check actually established
+
+Open the action to review its original requirement, scope, owner and recorded
+approval. A current, supported observation must be newer than reported
+completion and match the exact assessment context. This licensing example
+checks the cohort-wide assignment criterion; it does not prove who changed
+assignments or that the whole tenant is ready.
+
+[![Review a saved licensing action and its bounded technical verification](screenshots/15-guided-action-verification.png)](screenshots/15-guided-action-verification.png)
+
+### Record a central-team hand-off without claiming technical proof
+
+For work involving central IT, record the request, response and supporting
+reference. Review the entire draft before copying it, then deliver it through
+your approved process. The application does not send it or authenticate the
+named approver. This example's sharing requirement has no supported technical
+verification contract, so the recorded response does not mark it verified.
+
+[![Review a manual central-team hand-off and copy the draft without sending it](screenshots/16-guided-action-handoff.png)](screenshots/16-guided-action-handoff.png)
 
 ## 4. Make the rollout decision
 

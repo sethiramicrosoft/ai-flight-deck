@@ -13,7 +13,7 @@
     node.addEventListener("click", action);
     return node;
   }
-  function render(container, model, { severity = "all", onError = () => {} } = {}) {
+  function render(container, model, { severity = "all", onError = () => {}, onGuidedAction = null } = {}) {
     const api = root.FlightDeckSharingReview;
     let state = states.get(container);
     if (!state || state.model !== model) {
@@ -25,7 +25,7 @@
       try { operation(); } catch (error) { onError(error.message); }
     };
     const repaint = (selector = "[data-sharing-page]") => {
-      render(container, model, { severity, onError });
+      render(container, model, { severity, onError, onGuidedAction });
       container.querySelector(selector)?.focus({ preventScroll: true });
     };
     container.replaceChildren();
@@ -98,6 +98,7 @@
       );
       const open = button("See the files and permission records", () => run(() => showDetails(container, model, group, open, onError)));
       card.append(open);
+      if (onGuidedAction) card.append(button("Plan guided sharing review (not technical verification)", onGuidedAction));
       container.append(card);
     }
     const navigation = element("nav", undefined, "actions sharing-pagination");

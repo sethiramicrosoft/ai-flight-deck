@@ -60,11 +60,12 @@ test("setup and recovery guidance never sends modules back to redirected Documen
   assert.match(read("index.html"), /class="command-block">\.\\SETUP-AI-Flight-Deck\.cmd</);
 });
 
-test("the user and connection guides are discoverable and their local file links resolve", () => {
+test("the user, connection and action guides are discoverable and their local file links resolve", () => {
   const readme = read("README.md");
   assert.match(readme, /docs\/COLLECTOR-GUIDE\.md/);
   assert.match(readme, /docs\/VISUAL-TOUR\.md/);
-  for (const name of ["docs/COLLECTOR-GUIDE.md", "docs/VISUAL-TOUR.md"]) {
+  assert.match(readme, /docs\/ACTION-WORKFLOW\.md/);
+  for (const name of ["docs/COLLECTOR-GUIDE.md", "docs/VISUAL-TOUR.md", "docs/ACTION-WORKFLOW.md"]) {
     const content = read(name);
     for (const match of content.matchAll(/\]\(([^)\s]+)\)/g)) {
       const target = match[1];
