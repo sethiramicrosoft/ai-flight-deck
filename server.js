@@ -993,6 +993,15 @@ function createApp({
           if (!cohort || cohort.approved !== true) {
             throw new Error("The attestation must target an explicitly approved baseline cohort.");
           }
+          if ("actionId" in input || "actionRevision" in input) {
+            const action = actionStore.list().actions.find(a => a.id === input.actionId);
+            if (!action || action.historical || action.state !== "ReportedComplete" ||
+                action.revision !== input.actionRevision || action.controlId !== input.controlId ||
+                action.context.tenantId !== input.tenantId || action.context.cohort.id !== input.cohortId) {
+              json(res, 409, { error: "The action or pilot changed. Reload and review before saving its statement." });
+              return;
+            }
+          }
           const record = createSignedAttestation({
             catalog,
             input: {

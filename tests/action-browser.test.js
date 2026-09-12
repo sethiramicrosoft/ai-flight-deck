@@ -3,6 +3,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const path = require("node:path");
 const { fixture } = require("./action-fixture");
+const { observations } = require("../authority-test-fixtures");
+const { policy } = require("./conditional-access-fixture");
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE ||
   path.join(__dirname, "..", "reviews", "value-realization-postbuild-e2e-tester-e2e",
     "node_modules", "@playwright", "test"));
@@ -35,12 +37,16 @@ async function choose(page, control) {
   await page.waitForSelector("#action-owner");
 }
 async function fill(page, shared = false) {
+  await expand(page, "action-plan");
   await page.fill("#action-scopeDescription", "Only the synthetic approved pilot, not production.");
   await page.fill("#action-owner", "Synthetic local owner");
   await page.fill("#action-team", "Synthetic local team");
   await page.selectOption("#action-responsibility", shared ? "shared" : "local");
   await page.fill("#action-prerequisites", "Reviewed synthetic-only impact and rollback.");
   await page.check("#action-prerequisitesConfirmed");
+}
+async function expand(page, id) {
+  if (!await page.locator(`#${id}`).evaluate(node => node.open)) await page.locator(`#${id} > summary`).click();
 }
 async function saved(page) {
   await page.waitForFunction(() => document.querySelector("#actions-status").textContent.startsWith("Saved locally."));
@@ -66,6 +72,7 @@ test("desktop browser: finding → saved action → approval → progress → co
     await page.fill("#action-approvalRecord", "Synthetic approver, decision recorded by operator, ref review:approval");
     await page.click("#action-save"); await saved(page);
     await page.click("#action-start"); await saved(page);
+    await expand(page, "action-guidance");
     await page.check('[data-action-step="0"]');
     await page.click("#action-save"); await saved(page);
     await page.fill("#action-completion", "Synthetic administrator reports the approved work complete.");
@@ -90,6 +97,7 @@ test("desktop browser: finding → saved action → approval → progress → co
     assert.match(await page.textContent("#action-verification"), /Settings verified by a supported check/);
     await page.click("#action-reopen"); await saved(page);
     assert.match(await page.textContent("#action-verification"), /Needs attention again/);
+    await expand(page, "action-plan");
     await page.fill("#action-owner", "Resumed owner");
     await page.click("#action-save"); await saved(page);
   });
@@ -110,6 +118,7 @@ test("mobile browser: shared responsibility, full manual draft copy, missing res
     await page.fill("#action-centralEvidence", "review:central-response-001");
     assert.match(await page.inputValue("#action-handoff-preview"), /central-response-001/);
     assert.equal(await page.locator("#guided-actions img").count(), 0);
+    await expand(page, "action-handoff");
     await page.click("#action-copy");
     await page.waitForFunction(() => /Nothing was sent/.test(document.querySelector("#actions-status").textContent));
     const clipboard = await page.evaluate(() => navigator.clipboard.readText());
@@ -125,6 +134,86 @@ test("mobile browser: shared responsibility, full manual draft copy, missing res
     assert.equal(data.actions[0].fields.responsibility, "shared");
     assert.equal(data.actions[0].completionReport, "Local owner recorded work reported complete.");
     assert.ok(data.actions[0].history.some(h => h.event === "complete"));
+  }, { width: 390, height: 844 });
+});
+
+test("identity journey verifies a new supported baseline, exports all requirements and reopens on an exclusion", async () => {
+  await browserFixture(async ({ page, f }) => {
+    await choose(page, "AFD-IAM-003"); await fill(page);
+    assert.match(await page.textContent("#action-next-step"), /Record who/);
+    await page.fill("#action-approvalRecord", "Synthetic review: approved in isolated fixture only.");
+    await page.click("#action-start"); await saved(page);
+    assert.equal(await page.locator("#action-plan").evaluate(n => n.open), false);
+    assert.equal(await page.locator("#action-guidance").evaluate(n => n.open), true);
+    await page.fill("#action-completion", "Synthetic administrator reports the reviewed policy change.");
+    await page.click("#action-complete"); await saved(page);
+    await page.click("#action-check"); await saved(page);
+    assert.match(await page.textContent("#action-verification"), /Not verified/);
+    await f.assessment({ observations: { ...observations, conditionalAccess: [policy()] } });
+    await expand(page, "action-scan-consent");
+    await page.check("#action-scan-agree"); await page.click("#action-scan");
+    await page.waitForFunction(() => /Settings verified/.test(document.querySelector("#action-verification")?.textContent || ""));
+    await page.locator("#action-decision > summary").focus();
+    await page.keyboard.press("Enter");
+    assert.equal(await page.locator("#action-decision").evaluate(n => n.open), true);
+    assert.match(await page.textContent("#action-decision-preview"), /Not cleared for rollout/);
+    assert.match(await page.textContent("#action-decision-preview"), /AFD-SPO-003/);
+    const download = page.waitForEvent("download");
+    await page.click("#action-decision-download");
+    const file = await download;
+    assert.equal(file.suggestedFilename(), "flight-deck-pilot-decision.txt");
+    const text = require("node:fs").readFileSync(await file.path(), "utf8");
+    assert.equal((text.match(/^AFD-[A-Z]+-\d{3} - /gm) || []).length, 77);
+    assert.match(text, /conditional|Conditional/);
+    assert.match(text, /not rollout authorisation/);
+    const excluded = policy(); excluded.conditions.users.excludeUsers = ["user-1"];
+    f.seal(await f.assessment({ observations: { ...observations, conditionalAccess: [excluded] } }), "action-assessment");
+    await page.click("#actions-reload");
+    await page.waitForFunction(() => /Needs attention again/.test(document.querySelector("#action-verification")?.textContent || ""));
+    await noOverflow(page);
+  });
+});
+
+test("mobile governance journeys record real form fields without JSON and retain owner-statement boundaries", async () => {
+  await browserFixture(async ({ page, f }) => {
+    for (const controlId of ["AFD-OPS-005", "AFD-ADOPT-003"]) {
+      await choose(page, controlId); await fill(page, true);
+      await page.fill("#action-approvalRecord", "Synthetic governance review reference.");
+      await page.fill("#action-centralRequest", "Confirm the pilot support and escalation arrangements.");
+      await page.fill("#action-centralResponse", "Synthetic central owner supplied a reviewed response.");
+      await page.fill("#action-centralEvidence", "review:synthetic-central-response");
+      await page.click("#action-start"); await saved(page);
+      await page.fill("#action-completion", "Recorded the responsible team's review, not a technical inspection.");
+      await page.click("#action-complete"); await saved(page);
+      await page.click("#action-statement-save");
+      await page.waitForFunction(() => /Fill every review field/.test(document.querySelector("#actions-status").textContent));
+      if (controlId === "AFD-OPS-005") {
+        await page.fill("#action-statement-technicalContact", "Synthetic technical escalation owner");
+        await page.fill("#action-statement-executiveContact", "Synthetic executive escalation owner");
+      } else {
+        await page.fill("#action-statement-intake", "review:synthetic-support-queue");
+        await page.fill("#action-statement-owner", "Synthetic support owner");
+        await page.fill("#action-statement-responseTarget", "One business day");
+        const delivered = new Date(Date.now() - 3600000);
+        delivered.setMinutes(delivered.getMinutes() - delivered.getTimezoneOffset());
+        await page.fill("#action-statement-deliveredAt", delivered.toISOString().slice(0, 16));
+      }
+      await page.fill("#action-statement-statement", "The responsible owners reviewed the synthetic pilot's support arrangements.");
+      await page.fill("#action-statement-references", "review:synthetic-support-record");
+      const expiry = new Date(Date.now() + 3600000);
+      expiry.setMinutes(expiry.getMinutes() - expiry.getTimezoneOffset());
+      await page.fill("#action-statement-expiresAt", expiry.toISOString().slice(0, 16));
+      await page.click("#action-statement-save");
+      await page.waitForFunction(() => /Owner statement saved locally/.test(document.querySelector("#actions-status").textContent));
+      assert.match(await page.textContent("#action-verification"), /Not verified/);
+      await expand(page, "action-scan-consent");
+      await page.check("#action-scan-agree"); await page.click("#action-scan");
+      await page.waitForFunction(() => /Owner statement accepted/.test(document.querySelector("#action-verification")?.textContent || ""));
+      assert.match(await page.textContent("#action-verification"), /not a technical check/);
+      const record = (await f.request("/api/attestations")).body.attestations.find(a => a.controlId === controlId);
+      assert.ok(record.data && record.evidenceReferences.includes("review:synthetic-support-record"));
+      await noOverflow(page);
+    }
   }, { width: 390, height: 844 });
 });
 

@@ -12,13 +12,18 @@ it does not enable Copilot, change Microsoft settings or approve a production
 rollout on your behalf.
 
 The application can use collected information to confirm three licensing checks
+and one bounded Conditional Access baseline check,
 and can accept written answers for eleven checks that require a person to
-confirm the result. The other 63 checks do not yet have the software rules needed
+confirm the result. The other 62 checks do not yet have the software rules needed
 to confirm their results. They can still show useful information and instructions.
 Their presence on a page does not mean they have been completed.
 
 All 16 screenshots were captured on **11 September 2026** to show the
-current interface, revised Setup order and guided action workflow. Every image is labelled
+then-current interface, revised Setup order and guided action workflow.
+The **12 September** upgrade adds a suggested next action, expandable work
+stages, no-JSON support/escalation forms and a complete pilot decision download;
+see [the current workflow guide](ACTION-WORKFLOW.md).
+Every image is labelled
 as a synthetic example, not a real Microsoft 365 assessment. The examples
 include incomplete collections and checks the app cannot yet confirm; they
 are not demonstrations of a fully approved rollout.

@@ -5409,6 +5409,14 @@
     actionUI = window.FlightDeckActions.mount({
       container: document.getElementById("guided-actions"),
       navigate,
+      openStatement: controlId => {
+        navigate("guide");
+        const select = document.getElementById("attestation-control");
+        select.value = controlId;
+        select.dispatchEvent(new Event("change"));
+        document.getElementById("attestation-statement").focus();
+        document.getElementById("attestation-statement").scrollIntoView({ block: "center" });
+      },
       collect: async () => {
         navigate("guide");
         const job = await apiJson("/api/jobs", { method: "POST",

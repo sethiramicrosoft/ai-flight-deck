@@ -75,7 +75,8 @@
   const VALIDATED_GRAPH_SCOPES = Object.freeze({
     "AFD-LIC-001": ["Directory.Read.All", "Organization.Read.All"],
     "AFD-LIC-002": ["Directory.Read.All", "Organization.Read.All"],
-    "AFD-LIC-004": ["Directory.Read.All", "Organization.Read.All"]
+    "AFD-LIC-004": ["Directory.Read.All", "Organization.Read.All"],
+    "AFD-IAM-003": ["Policy.Read.All"]
   });
   const PERMISSION_CODES = new Set([
     "403", "HTTP_403", "PERMISSION_DENIED", "COMMAND_ACCESS_DENIED",

@@ -2,10 +2,31 @@
 
 [README](../README.md) · [Visual tour](VISUAL-TOUR.md) · [Collector guide](COLLECTOR-GUIDE.md)
 
-Corrections now includes **Take action: save, guide and check**, above the
+Corrections now includes **Move your pilot forward**, above the
 optional legacy review-file export. This is persistent local workflow, not a
 Microsoft 365 change service. The app sends no email, Teams message or tracker
 task; copying a draft is not sending it. No new tenant permissions are requested.
+
+The customer path is **choose pilot > see blockers > complete next action >
+check evidence > review decision**. **Work on this next** selects an unresolved
+supported check, prioritising an observed failure. It is not a risk ranking of
+all requirements: unsupported checks remain in the decision snapshot.
+The current work stage opens automatically; scope, guidance, central response,
+the draft preview and technical history remain expandable.
+
+After reporting completion, `AFD-OPS-005` (escalation contacts) and
+`AFD-ADOPT-003` (training and support) have plain-language review fields inside
+the action workspace, with no JSON required. Provide real reviewed references
+and a future expiry within the control's limit. Training must already have
+occurred in the last 30 days. Saving is not validation: collect fresh evidence
+afterward. Other supported statements link directly to their selected Set up form.
+
+**Review pilot decision** and **Download current decision snapshot** include
+all 77 checks, exact pilot context, evidence dates, recorded owners, action
+verification and next steps. Download refreshes the source first and fails on
+unreadable evidence rather than exporting an older successful snapshot.
+The snapshot distinguishes a current passing check from evidence acquired
+after an action's completion. It is not organisational rollout approval.
 
 ## Walk through an action
 
@@ -65,7 +86,7 @@ task; copying a draft is not sending it. No new tenant permissions are requested
 | Result shown in the app | Meaning |
 |---|---|
 | Not verified | Work may be reported complete, but qualifying evidence is missing, too old, outside the exact context, unsupported or not yet checked |
-| Settings verified by a supported check | One of AFD-LIC-001, AFD-LIC-002 or AFD-LIC-004 meets its existing bounded licensing observation contract after reported completion |
+| Settings verified by a supported check | One of AFD-LIC-001, AFD-LIC-002, AFD-LIC-004 or AFD-IAM-003 meets its bounded source-observation contract after reported completion |
 | Owner statement accepted (not a technical check) | One of the eleven supported statement contracts is current, locally signed, bound to the exact control/context and accepted by the existing authority validator; not independent technical proof of settings |
 | Needs attention again | Previously satisfied evidence is no longer sufficient, the context changed, or the operator explicitly reopened the work |
 
@@ -75,13 +96,29 @@ AFD-ADOPT-003, AFD-ADOPT-004 and AFD-ADOPT-006. Use the existing control-specifi
 statement form in Set up when applicable; a central response note is not a
 substitute for that exact contract.
 
-The remaining **63 of 77** catalogue controls can have guided work and completion
+The remaining **62 of 77** catalogue controls can have guided work and completion
 reports, but remain unverified. A closed task, a document link, a CSV, a
 hand-off response or an old Pass re-sealed today cannot close that gap.
 AFD-LIC-002 is a cohort-wide licensing contract, not proof of per-user causation.
 Reverification compares current state with the frozen app criterion; it does
 not establish who caused a change. Actions never promote control or mission
 gates themselves: the existing evidence-authority engine remains the proof source.
+
+`AFD-IAM-003` supports a deliberately bounded policy shape: enabled, all pilot
+users explicitly or All users, All cloud apps, all client types, MFA AND
+compliant device, no exclusions or extra targeting conditions. No enabled
+policies is Fail; unproven policy shapes, incomplete collection and read errors
+remain Unknown. Do not weaken or broaden an approved policy to fit the checker.
+An accepted configuration is not proof of runtime enforcement.
+
+### Implementation lesson: verify the real API, not only its fixture
+
+The previous identity/device collectors requested the nonexistent
+`/policies/conditionalAccessPolicies` route, and the pagination fixture repeated
+it. The supported route is `/identity/conditionalAccess/policies`. The bounded
+contract now rejects source truncation, unsupported policy targeting and
+pagination that changes collection endpoint. Regression coverage is in
+`conditional-access-evidence.test.js`; both collectors use the corrected route.
 
 ## Persistence, integrity and current context
 
@@ -115,7 +152,7 @@ archival, externally authenticated approval, assignment, reminder or deletion UI
 From the repository directory:
 
 ```powershell
-node --test action-workflow.test.js evidence-authority.test.js setup-decisions-server.test.js enablement-playbook.test.js
+node --test conditional-access-evidence.test.js action-workflow.test.js evidence-authority.test.js setup-decisions-server.test.js enablement-playbook.test.js
 node tests\action-browser.test.js
 ```
 

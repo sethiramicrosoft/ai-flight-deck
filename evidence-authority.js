@@ -5,6 +5,7 @@ const attestationExamples = require("./schema/attestation-data-examples.v1.json"
 const { createEvidenceEnvelope, verifyEvidenceEnvelope, sha256Digest } = require("./evidence-integrity");
 const { verifySignedAttestation } = require("./attestation-evidence");
 const { hasConclusiveCoverage, hasCurrentFreshness, admitValidatedResult } = require("./evidence-admissibility");
+const { assessConditionalAccess } = require("./conditional-access-evidence");
 
 const AUTHORITY_VERSION = "2.0.0";
 // Microsoft Entra's licensing reference: M365_COPILOT_APPS, not Copilot Studio or a name substring.
@@ -48,6 +49,14 @@ function captureCollectorEvidence(collector, observations, context, results) {
     if (result.provenance?.collectorId !== collector.id ||
         result.provenance?.collectorVersion !== collector.version ||
         !collector.domainIds.includes(result.domainId)) continue;
+    if (collector.id === "microsoft-graph-identity-and-access" && result.controlId === "AFD-IAM-003") {
+      const baseline = assessConditionalAccess(observations.conditionalAccess, context.cohort);
+      if (baseline.status !== "Unknown" && result.status === baseline.status &&
+          same(result.observedValue, { matchingPolicies: baseline.matchingPolicies })) {
+        recordObservation(result, context, "LiveGraph", "conditional-access-baseline-v1",
+          { outcome: baseline.status, population: baseline.population }, observations.conditionalAccess);
+      }
+    }
     if (collector.id === "microsoft-graph-licensing") {
       const { skus, users } = observations;
       if (!Array.isArray(skus) || !Array.isArray(users) ||
@@ -220,7 +229,7 @@ function validateControlResultAuthority(result, control, validatedAt = new Date(
       Object.keys(attestationExamples[control.id] || {}).join(", ")}. Fill the control-specific example in Set up; empty objects cannot close this control.`);
   }
   if (!record && control.automation !== "Attested" &&
-      !["AFD-LIC-001", "AFD-LIC-002", "AFD-LIC-004"].includes(control.id)) {
+      !["AFD-LIC-001", "AFD-LIC-002", "AFD-LIC-004", "AFD-IAM-003"].includes(control.id)) {
     failures.push(`No source-observation validation contract is implemented for ${control.id}. Retain its reported finding for owner review; connect and validate the required observation path before using it in readiness decisions. Rescanning or sealing an import alone will not close this gap.`);
   }
   if (record) {
@@ -229,7 +238,8 @@ function validateControlResultAuthority(result, control, validatedAt = new Date(
     const supported = {
       "licence-inventory-v1": ["AFD-LIC-004"],
       "cohort-licence-assignment-v1": ["AFD-LIC-002"],
-      "copilot-capacity-v1": ["AFD-LIC-001"]
+      "copilot-capacity-v1": ["AFD-LIC-001"],
+      "conditional-access-baseline-v1": ["AFD-IAM-003"]
     };
     if (record.contract === "accountable-statement-v1" && context?.cohort?.id) {
       const att = record.facts.record;

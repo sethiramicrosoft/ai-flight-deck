@@ -22,7 +22,7 @@ function seedScan(selectedCohort = cohort) {
     configHash: sha256Digest("synthetic-config").slice(7), generatedAt: new Date().toISOString(),
     tenant: { tenantId, displayName: "Synthetic guided-action tenant" },
     auth: { mode: "device-code", actor: { id: "synthetic-actor" } },
-    scope: { grantedScopes: ["Directory.Read.All", "Organization.Read.All", "Reports.Read.All"], fingerprint: sha256Digest("offline").slice(7) },
+    scope: { grantedScopes: ["Directory.Read.All", "Organization.Read.All", "Reports.Read.All", "Policy.Read.All"], fingerprint: sha256Digest("offline").slice(7) },
     completeness: { requiredEvidenceComplete: false },
     coverage: { sitesDiscovered: 0, sitesSelected: 0, sitesScanned: 0, discoveryComplete: true,
       selectionComplete: true, limitReached: false, complete: true },
@@ -61,11 +61,14 @@ async function fixture({ workspace, statements = [], start = true } = {}) {
   const integrity = { key, keyId: `local-workspace-${crypto.createHash("sha256").update(key).digest("hex").slice(0, 16)}` };
   fs.writeFileSync(path.join(workspace, "integrity-key.bin"), key, { mode: 0o600 });
   let selectedCohort = structuredClone(cohort), source = structuredClone(observations);
-  async function assessment({ statementIds = statements, cohort: nextCohort = selectedCohort,
+  async function assessment({ statementIds, cohort: nextCohort = selectedCohort,
     observations: nextSource = source, mutate } = {}) {
     selectedCohort = structuredClone(nextCohort); source = structuredClone(nextSource);
     const now = new Date();
-    const records = statementIds.map(id => createSignedAttestation({
+    const storedPath = path.join(workspace, "attestations.json");
+    const records = statementIds === undefined && fs.existsSync(storedPath)
+      ? JSON.parse(fs.readFileSync(storedPath, "utf8")).attestations
+      : (statementIds || statements).map(id => createSignedAttestation({
       catalog, ...integrity, now, input: { tenantId, cohortId: selectedCohort.id,
         controlId: id, decision: "Pass", statement: "Synthetic owner reviewed the referenced evidence.",
         attestedBy: "Synthetic owner", expiresAt: new Date(now.getTime() + 3600000).toISOString(),
@@ -78,7 +81,8 @@ async function fixture({ workspace, statements = [], start = true } = {}) {
       verifyEvidencePackage: () => false,
       adapters: {
         graphRequest: async ({ url }) => ({ value: structuredClone(url.includes("subscribedSkus")
-          ? source.skus : url.includes("/users") ? source.users : []) }),
+          ? source.skus : url.includes("/identity/conditionalAccess/policies") ? source.conditionalAccess || []
+            : url.includes("/users") ? source.users : []) }),
         adminCommand: async () => { throw Object.assign(new Error("Offline fixture"), { code: "COMMAND_UNAVAILABLE" }); },
         networkProbe: { probe: async () => ({ unavailable: true, reason: "Offline fixture" }) },
         powerPlatformClient: { query: async () => ({ value: [] }) },

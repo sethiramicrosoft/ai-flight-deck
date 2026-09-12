@@ -3,6 +3,17 @@
 **A prototype for organizing Microsoft 365 Copilot pilot evidence, findings
 and decisions.**
 
+## Demo
+
+[Watch or download the updated demo](docs/demo/AIFlightDeckDemoV6.mp4)
+([captions](docs/demo/AIFlightDeckCaptionsV6.srt)).
+
+The 114.5-second video shows the guided identity-policy action, fresh evidence,
+plain-language governance review, pilot decision snapshot and reopening when
+later evidence no longer supports the result. It uses actual application screens
+with isolated synthetic data, not a live customer deployment. Connection steps
+are explained; no live Microsoft sign-in or tenant changes are demonstrated.
+
 ## Documentation
 
 - **[How to use each page](docs/VISUAL-TOUR.md)** — what each page is for,
@@ -15,7 +26,7 @@ and decisions.**
 - [Windows installation](#install-ai-flight-deck-on-a-windows-computer) —
   prerequisites, sign-in and troubleshooting.
 - [Which results can support a rollout decision](#evidence-authority-and-supported-boundaries) —
-  the three supported automated checks and eleven types of owner statement.
+  the four supported automated checks and eleven types of owner statement.
 
 ## Project vision
 
@@ -56,8 +67,9 @@ These capabilities are implemented, with the boundaries shown below.
 | What still needs to be checked | Shows decisions for you, help needed from an administrator, settings to review and checks this version cannot perform | A missing result may mean the app cannot check it—not that your settings are wrong. Suggested owners are not automatically assigned tasks |
 | Local decisions and statements | Records pilot approval, whether on-premises Exchange applies, whether Copilot should use public web information, and supported owner statements | Recording a choice does not change a Microsoft setting. An owner name or local signature does not independently prove authority or confirm the setting |
 | Persistent guided actions | Creates or resumes one saved action per control and exact tenant/cohort/catalogue context; preserves starting evidence, guidance, ownership records, dependencies, progress, hand-off drafts and history | Local records only: no authenticated approval, external assignment, notification or tenant write. Administrators act through their existing process |
-| Action-linked verification | Rechecks reported completion against admissible, freshly collected evidence; reopens previous satisfaction on expiry, later failure/unknown or context changes | Three licensing contracts can support technical verification; eleven contracts support separately labelled owner statements. The other 63 remain unverified. Completion, a link or an imported CSV is not proof |
-| Limited checks for rollout decisions | Checks that supported results describe the right organization and pilot users, are recent enough and contain the required facts | Implemented for three automated licensing checks and eleven types of owner statement—not all 77 checks |
+| Action-linked verification | Rechecks reported completion against admissible, freshly collected evidence; reopens previous satisfaction on expiry, later failure/unknown or context changes | Three licensing contracts and one bounded Conditional Access baseline contract support technical verification; eleven support separately labelled owner statements. The other 62 remain unverified. Completion, a link or an imported CSV is not proof |
+| Guided next step and pilot snapshot | Suggests the next supported action, expands the current work stage, offers no-JSON escalation/support statement forms and downloads a text decision snapshot containing all 77 requirements | Unsupported checks remain visible; the snapshot is not organisational approval, an authenticated assignment, a live customer outcome or continuous monitoring |
+| Limited checks for rollout decisions | Checks that supported results describe the right organization and pilot users, are recent enough and contain the required facts | Implemented for four automated checks and eleven types of owner statement—not all 77 checks |
 | Reassessment and comparison | Lets you run another collection and compare saved sharing results; information that has become too old no longer satisfies a check when reevaluated | It does not continuously monitor Microsoft 365. A comparison of sampled sharing records does not prove that every proposed change was completed |
 | Microsoft report imports | Accepts Microsoft readiness reports and recognizes a small set of recommendations from the automated assessment CSV | Nine exact check names from the supported Microsoft assessment version map to three Flight Deck checks. Other rows or versions are retained for review, not automatically interpreted |
 
@@ -79,7 +91,7 @@ This is a policy catalogue, not 77 fully validated automated checks or a claim
 of broader coverage than Microsoft's differently grouped service areas.
 
 **Not yet implemented:** the rules needed to confirm the remaining
-**63 checks** from collected information; an operational task-assignment, reminder and approval system;
+**62 checks** from collected information; an operational task-assignment, reminder and approval system;
 continuous change monitoring and automatic follow-up; and a production-scale,
 complete effective-access collection service. Flight Deck also does not
 automatically launch Microsoft's assessment or correlate its entire output.
@@ -159,13 +171,19 @@ checks those facts against the normalized decision and creates a locally
 HMAC-sealed, source-bound observation receipt. Each new `evidenceRefs` entry resolves
 to that receipt's record, rather than to a decorative string.
 
-The three automated checks with implemented source verification are:
+The four automated checks with implemented source verification are:
 
 | Control | Validated observation boundary |
 |---|---|
 | AFD-LIC-001 | Complete Graph SKU/user enumeration, resolved approved cohort, active Copilot subscriptions, and **prepaid minus consumed** units covering the cohort, matching the catalogue criterion |
 | AFD-LIC-002 | Complete Graph user enumeration, approved cohort membership, and enabled Copilot service-plan assignments with no missing members or licensed users outside the cohort; an assigned SKU alone is insufficient |
 | AFD-LIC-004 | Complete, well-formed SKU/add-on inventory, with a matching normalized inventory; this does not independently prove entitlement to every downstream feature |
+| AFD-IAM-003 | Complete Graph Conditional Access policy enumeration for the exact approved pilot; an enabled policy explicitly includes all pilot users or All users, All cloud apps, all client types, MFA AND compliant device, with no exclusions or extra targeting. No enabled policies is Fail; other unproven policy shapes are Unknown, not a recommendation to weaken policies |
+
+The identity contract checks configuration, not runtime enforcement or MFA registration.
+Its documented read endpoint is [`/v1.0/identity/conditionalAccess/policies`](https://learn.microsoft.com/en-us/graph/api/conditionalaccessroot-list-policies?view=graph-rest-1.0).
+It requires `Policy.Read.All` and a supported reader role. Pagination stays on the
+same Graph collection; oversized/truncated, denied or malformed reads cannot pass.
 
 The automated Copilot entitlement contracts identify the
 `M365_COPILOT_APPS` service plan by its documented identifier
@@ -737,7 +755,7 @@ the app does not change persisted policy or override organization-enforced
 restrictions.
 
 Successful collection does **not** automatically satisfy a rollout requirement.
-The app can verify only the three automated checks and eleven types of owner
+The app can verify only the four automated checks and eleven types of owner
 statement listed above. Other checks remain unresolved. Signing in again or
 protecting a local file against edits does not add the missing verification.
 
@@ -911,7 +929,7 @@ Do not copy the local evidence workspace into the repository.
 | A module was already loaded outside the private/native machine paths | Restart through the launcher or use a fresh `-NoProfile` PowerShell host; do not reuse a session that imported Documents modules. |
 | Device sign-in requires approval | Ask a tenant administrator to grant the displayed delegated read permissions. |
 | The page says the integrated scanner is unavailable | Start the product with `Start-AI-Flight-Deck.cmd`; do not open `index.html` directly or use a generic static server. |
-| Many checks remain `Unknown` | Open **What still needs to be checked** and the [connection guide](docs/COLLECTOR-GUIDE.md#a-gap-is-not-always-a-tenant-fault). This version cannot verify 63 checks from returned records; granting more permissions or rescanning will not add that feature. Other checks may need administrator access, licences or a specific owner statement. |
+| Many checks remain `Unknown` | Open **What still needs to be checked** and the [connection guide](docs/COLLECTOR-GUIDE.md#a-gap-is-not-always-a-tenant-fault). This version cannot verify 62 checks from returned records; granting more permissions or rescanning will not add that feature. Other checks may need administrator access, licences or a specific owner statement. |
 | A pilot user list cannot be approved | Check the user/group lookup limits and use the same account that created the scan. Hidden or mixed identities in a readiness CSV cannot identify pilot users; select users from the directory or use an approved report with visible identities. Do not assume you must change your organization's privacy settings. |
 
 ## Quick start for returning users

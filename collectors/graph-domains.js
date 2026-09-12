@@ -1,6 +1,7 @@
 "use strict";
 
 const catalog = require("../schema/readiness-catalog.v1.json");
+const { assessConditionalAccess } = require("../conditional-access-evidence");
 
 const GRAPH = "https://graph.microsoft.com";
 const VERSION = "1.0.0";
@@ -19,7 +20,7 @@ const domains = new Map(catalog.domains
 
 const ENDPOINTS = Object.freeze({
   identityAndAccess: [
-    `${GRAPH}/v1.0/policies/conditionalAccessPolicies`,
+    `${GRAPH}/v1.0/identity/conditionalAccess/policies`,
     `${GRAPH}/v1.0/policies/identitySecurityDefaultsEnforcementPolicy`,
     `${GRAPH}/beta/reports/authenticationMethods/userRegistrationDetails`,
     `${GRAPH}/beta/auditLogs/signIns`,
@@ -39,7 +40,7 @@ const ENDPOINTS = Object.freeze({
     `${GRAPH}/beta/deviceAppManagement/managedAppPolicies`,
     `${GRAPH}/beta/deviceManagement/deviceEnrollmentConfigurations`,
     `${GRAPH}/beta/deviceManagement/detectedApps`,
-    `${GRAPH}/v1.0/policies/conditionalAccessPolicies`,
+    `${GRAPH}/v1.0/identity/conditionalAccess/policies`,
     `${GRAPH}/v1.0/applications`
   ],
   serviceHealthOperations: [
@@ -91,6 +92,11 @@ async function readGraph({ request, url, budget, signal, collection = true, limi
   try {
     while (next) {
       throwIfAborted(signal);
+      const target = new URL(next);
+      if (target.origin !== GRAPH || target.pathname !== new URL(url).pathname ||
+          target.username || target.password || target.hash) {
+        throw new Error("Graph pagination must stay on the requested collection endpoint.");
+      }
       if (pages >= MAX_PAGES || values.length >= limit) {
         return { ok: true, value: values.slice(0, limit), truncated: true };
       }
@@ -109,7 +115,9 @@ async function readGraph({ request, url, budget, signal, collection = true, limi
       if (!Array.isArray(response.value)) {
         throw new Error(`Invalid Microsoft Graph collection response for '${url}'.`);
       }
-      values.push(...response.value.slice(0, Math.max(0, limit - values.length)));
+      const remaining = Math.max(0, limit - values.length);
+      values.push(...response.value.slice(0, remaining));
+      if (response.value.length > remaining) return { ok: true, value: values, truncated: true };
       pages++;
       next = response["@odata.nextLink"] || null;
     }
@@ -304,25 +312,20 @@ function normalizeIdentity(observations, context) {
       }));
   }
 
-  if (caLimit.length || !context.cohort?.approved) {
+  const baseline = assessConditionalAccess(observations.conditionalAccess, context.cohort);
+  if (baseline.status === "Unknown") {
     results.push(unknown(domainId, "AFD-IAM-003", context, [
       ...caLimit,
-      ...(!context.cohort?.approved
-        ? [limitation("APPROVED_COHORT_REQUIRED", "Conditional Access scope cannot be verified without an approved cohort.")]
-        : [])
+      limitation("CONDITIONAL_ACCESS_COVERAGE_UNPROVEN", baseline.reason)
     ]));
   } else {
-    const matching = policies.filter(policy => enabled(policy) &&
-      targetsCohort(policy, context) &&
-      targetsCopilotApps(policy, context) &&
-      (policy.grantControls?.builtInControls || []).some(value =>
-        ["mfa", "compliantdevice", "domainjoineddevice", "authenticationstrength"]
-          .includes(String(value).toLowerCase())));
-    results.push(result(domainId, "AFD-IAM-003", matching.length ? "Pass" : "Fail", context, {
-      population: policies.length,
-      evaluated: policies.length,
+    results.push(result(domainId, "AFD-IAM-003", baseline.status, context, {
+      population: baseline.population,
+      evaluated: baseline.population,
       complete: true,
-      observedValue: { matchingPolicies: matching.map(item => item.id).sort() }
+      source: `${GRAPH}/v1.0/identity/conditionalAccess/policies`,
+      sourceVersion: "v1.0",
+      observedValue: { matchingPolicies: baseline.matchingPolicies }
     }));
   }
 
@@ -906,7 +909,7 @@ async function collectIdentity(request, args) {
   const { budget, signal, context } = args;
   const since = new Date(Date.parse(context.observedAt || new Date()) - 7 * 86400000).toISOString();
   const observations = {
-    conditionalAccess: await readGraph({ request, budget, signal, url: `${GRAPH}/v1.0/policies/conditionalAccessPolicies?$top=100` }),
+    conditionalAccess: await readGraph({ request, budget, signal, url: `${GRAPH}/v1.0/identity/conditionalAccess/policies?$top=100` }),
     securityDefaults: await readGraph({ request, budget, signal, collection: false, url: `${GRAPH}/v1.0/policies/identitySecurityDefaultsEnforcementPolicy` }),
     authRegistration: await readGraph({ request, budget, signal, url: `${GRAPH}/beta/reports/authenticationMethods/userRegistrationDetails?$top=999` }),
     signIns: await readGraph({ request, budget, signal, url: `${GRAPH}/beta/auditLogs/signIns?$filter=createdDateTime%20ge%20${encodeURIComponent(since)}&$select=id,userId,createdDateTime,clientAppUsed,status&$top=999` }),
@@ -943,7 +946,7 @@ async function collectDevices(request, { budget, signal }) {
     managedAppPolicies: await readGraph({ request, budget, signal, url: `${GRAPH}/beta/deviceAppManagement/managedAppPolicies?$top=999` }),
     enrollmentConfigurations: await readGraph({ request, budget, signal, url: `${GRAPH}/beta/deviceManagement/deviceEnrollmentConfigurations?$top=999` }),
     detectedApps: await readGraph({ request, budget, signal, url: `${GRAPH}/beta/deviceManagement/detectedApps?$select=id,displayName,version,platform,deviceCount&$top=999` }),
-    conditionalAccess: await readGraph({ request, budget, signal, url: `${GRAPH}/v1.0/policies/conditionalAccessPolicies?$top=100` }),
+    conditionalAccess: await readGraph({ request, budget, signal, url: `${GRAPH}/v1.0/identity/conditionalAccess/policies?$top=100` }),
     applications: await readGraph({ request, budget, signal, url: `${GRAPH}/v1.0/applications?$select=id,appId,displayName,tags&$top=999` })
   };
 }
@@ -1022,6 +1025,7 @@ function createCollector(domainId, { request }) {
   return {
     id: `microsoft-graph-${domainId.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}`,
     version: VERSION,
+    acquisitionMode: "LiveGraph",
     domainIds: [domainId],
     controlIds: domain.controls.map(control => control.id),
     // Query each source independently so one unavailable permission does not

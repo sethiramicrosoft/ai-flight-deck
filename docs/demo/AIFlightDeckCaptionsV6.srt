@@ -1,0 +1,59 @@
+1
+00:00:00,300 --> 00:00:06,787
+Microsoft already provides readiness assessments. But a findings report does not complete the work.
+
+2
+00:00:07,000 --> 00:00:14,971
+Customers still need to know who acts next, what evidence is needed, and what remains blocked.
+
+3
+00:00:15,200 --> 00:00:21,846
+Meet AI Flight Deck: a guided follow-through workspace for Microsoft 365 pilots.
+
+4
+00:00:26,200 --> 00:00:34,211
+Start with Connect and scan tenant. Review Microsoft sign-in and permissions; other services can need separate connections.
+
+5
+00:00:38,200 --> 00:00:44,859
+Then select and approve your pilot people. This demonstration uses an isolated synthetic tenant.
+
+6
+00:00:45,200 --> 00:00:52,323
+Review thirteen domains. Technical checks, owner statements, and checks this version cannot perform remain distinct.
+
+7
+00:00:56,200 --> 00:01:01,229
+Here, an identity baseline needs work. Choose the suggested next action.
+
+8
+00:01:01,433 --> 00:01:07,664
+Record scope, owner and approval reference. Follow the administrator guidance outside Flight Deck.
+
+9
+00:01:07,867 --> 00:01:12,189
+Report completion. Notice: the action is still not verified.
+
+10
+00:01:12,400 --> 00:01:19,537
+Consent to a fresh read-only collection. New policy evidence now verifies this supported identity check.
+
+11
+00:01:19,767 --> 00:01:28,323
+For governance, record reviewed escalation contacts and references using simple fields. No JSON is required.
+
+12
+00:01:28,533 --> 00:01:34,896
+The owner statement is accepted separately. It is not a technical check.
+
+13
+00:01:35,100 --> 00:01:40,775
+Download the pilot decision: supported checks, recorded owners, and what remains open.
+
+14
+00:01:41,000 --> 00:01:47,679
+An exclusion in later evidence reopens the identity action. Other requirements still block rollout.
+
+15
+00:01:47,900 --> 00:01:53,751
+AI Flight Deck: clear next steps, honest evidence, and no premature green light.

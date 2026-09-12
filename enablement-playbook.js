@@ -654,6 +654,15 @@
   });
 
   function collectionGuidance(domain, control) {
+    if (control.id === "AFD-IAM-003") return {
+      kind: "LiveCollectionRequired",
+      limitation: "This bounded configuration check supports an enabled policy covering every pilot user explicitly or All users, All cloud apps, all client types, and MFA AND compliant device with no exclusions or extra targeting conditions. Other policy shapes remain unconfirmed. Do not weaken a policy to fit this checker. This is not a sign-in simulation or proof of runtime enforcement.",
+      steps: [
+        "Ask the identity administrator to review the approved pilot baseline in Microsoft Entra. Policy.Read.All and a supported directory reader role are required to read policies.",
+        "If a change is approved, the administrator applies it outside Flight Deck through the normal change process, including impact review, emergency access and rollback planning.",
+        "Report the work completed, then consent to a fresh read-only collection. Flight Deck checks the policy configuration for the exact pilot; exclusions, incomplete reads and unsupported targeting cannot close the check."
+      ]
+    };
     if (UNCONNECTED_INPUTS[control.id]) {
       return {
         kind: "IntegrationRequired",

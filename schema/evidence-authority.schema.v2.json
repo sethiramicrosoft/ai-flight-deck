@@ -35,7 +35,7 @@
               "required": ["id", "contract", "acquisitionMode", "binding", "sourceDigest", "resultDigest", "facts"],
               "properties": {
                 "id": { "type": "string", "minLength": 1 },
-                "contract": { "enum": ["licence-inventory-v1", "cohort-licence-assignment-v1", "copilot-capacity-v1", "accountable-statement-v1"] },
+                "contract": { "enum": ["licence-inventory-v1", "cohort-licence-assignment-v1", "copilot-capacity-v1", "conditional-access-baseline-v1", "accountable-statement-v1"] },
                 "acquisitionMode": { "enum": ["LiveGraph", "SignedAttestation"] },
                 "sourceDigest": { "$ref": "#/$defs/digest" },
                 "resultDigest": { "$ref": "#/$defs/digest" },

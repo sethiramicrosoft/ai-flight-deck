@@ -9,7 +9,7 @@ const { handoff } = require("./action-workflow-ui");
 const { validateAssessmentAuthority } = require("./evidence-authority");
 const { createEvidenceEnvelope, verifyEvidenceEnvelope, sha256Digest } = require("./evidence-integrity");
 
-const TECHNICAL = ["AFD-LIC-001", "AFD-LIC-002", "AFD-LIC-004"];
+const TECHNICAL = ["AFD-LIC-001", "AFD-LIC-002", "AFD-LIC-004", "AFD-IAM-003"];
 const STATEMENTS = ["AFD-IAM-007", "AFD-DEV-005", "AFD-OPS-004", "AFD-OPS-005",
   "AFD-COPILOT-006", "AFD-PPA-005", "AFD-ADOPT-001", "AFD-ADOPT-002",
   "AFD-ADOPT-003", "AFD-ADOPT-004", "AFD-ADOPT-006"];
@@ -175,7 +175,9 @@ function createActionStore({ workspace, integrity, writeJsonAtomic, readBaseline
       : STATEMENTS.includes(a.controlId) ? "SupportedOwnerStatement" : "TechnicalVerification";
     return { disposition, reason: reason || (disposition === "SupportedOwnerStatement"
       ? "A supported accountable statement was accepted, not independent proof of service settings."
-      : "Current source observations meet the frozen catalogue criterion. This does not prove who caused the change; LIC-002 is cohort-wide, not per-user causation."),
+      : "Current source observations meet the frozen catalogue criterion. This does not prove who caused the change." +
+        (a.controlId === "AFD-LIC-002" ? " LIC-002 is cohort-wide, not per-user causation." : "") +
+        (a.controlId === "AFD-IAM-003" ? " This verifies policy configuration, not effective sign-in enforcement." : "")),
     everSatisfied: a.verification.everSatisfied || SATISFIED.includes(disposition),
     evidence: r ? { status: r.status, observedAt: r.observedAt, freshUntil: r.freshUntil,
       collectorRunId: r.provenance?.collectorRunId, receiptDigest: receipt ? sha256Digest(receipt) : null,
@@ -199,7 +201,37 @@ function createActionStore({ workspace, integrity, writeJsonAtomic, readBaseline
   }
   function response(doc, baseline) {
     const availableContexts = currentContexts(baseline);
+    const assessment = readAssessment();
+    validateAssessmentAuthority(assessment, integrity, clock());
+    const decisions = availableContexts.map(context => {
+      const matches = contexts(assessment).some(c => c.id === context.id);
+      const checks = catalog.domains.flatMap(domain => domain.controls.map(control => {
+        const r = matches ? assessment.estateAssessment?.controlResults?.find(r =>
+          r.controlId === control.id && r.cohortId === context.cohort.id) : null;
+        const action = doc.actions.find(a => a.controlId === control.id && a.context.id === context.id);
+        const accepted = r?.authority?.validationStatus === "Accepted";
+        const satisfied = accepted && ["Pass", "NotApplicable"].includes(r.status);
+        const method = TECHNICAL.includes(control.id) ? "Technical check" :
+          STATEMENTS.includes(control.id) ? "Owner statement" : "Not supported by this version";
+        return { id: control.id, title: control.title, domain: domain.name, method,
+          status: satisfied ? "Meets current rules" : accepted && r.status === "Fail" ? "Needs corrective work" : "Not confirmed",
+          satisfied, owner: action?.fields.owner || "", team: action?.fields.team || "",
+          actionState: action?.verification.disposition || "No saved action",
+          observedAt: r?.observedAt || null, freshUntil: r?.freshUntil || null,
+          nextAction: satisfied ? "Review again when evidence expires or scope/settings change." :
+            method === "Not supported by this version" ? "Review outside Flight Deck with the service owner; a rescan cannot add missing checking rules." :
+              action?.state === "ReportedComplete" ? "Collect and check evidence newer than the completion report." :
+                method === "Owner statement" ? "Record the responsible person's review and supporting references." : control.remediation };
+      }));
+      const remaining = checks.filter(c => !c.satisfied).length;
+      return { contextId: context.id, tenantId: context.tenantId, pilot: context.cohort.name || context.cohort.id,
+        people: context.cohort.principalIds.length, generatedAt: clock().toISOString(),
+        assessmentAt: matches ? assessment.generatedAt : null, catalogueVersion: catalog.catalogVersion,
+        outcome: remaining ? "Not cleared for rollout" : "Catalogue checks satisfied; organisational approval still required",
+        remaining, checks };
+    });
     return { schemaVersion: 1, contexts: availableContexts,
+      decisions,
       controls: catalog.domains.flatMap(d => d.controls.map(c => ({
         id: c.id, title: c.title, domain: d.name,
         support: TECHNICAL.includes(c.id) ? "TechnicalVerification" :

@@ -9,6 +9,7 @@ const { createEvidenceEnvelope } = require("./evidence-integrity");
 const { GRAPH_SCOPE_LIST } = require("./server");
 const { handoff } = require("./action-workflow-ui");
 const { observations, catalog } = require("./authority-test-fixtures");
+const { policy } = require("./tests/conditional-access-fixture");
 
 const fields = { scopeDescription: "Exact synthetic pilot; no production resources", owner: "Synthetic owner",
   team: "Synthetic team", responsibility: "local", prerequisitesConfirmed: true,
@@ -109,7 +110,8 @@ test("dependencies enforce existence, same context, no cycles/self and reported 
   assert.equal((await f.request(`/api/actions/${c.id}`, { revision: c.revision, operation: "save", fields: { dependencies: [a.id] } })).status, 400);
 }));
 
-test("three licensing contracts require genuinely new observations; old pass/reseal cannot close work", async () => withFixture(async f => {
+test("four technical contracts require genuinely new observations; old pass/reseal cannot close work", async () => withFixture(async f => {
+  f.seal(await f.assessment({ observations: { ...observations, conditionalAccess: [policy()] } }));
   for (const id of TECHNICAL) await complete(f, id);
   let actions = (await list(f)).actions;
   assert.ok(actions.every(a => a.verification.disposition === "Unverified"));
@@ -129,9 +131,9 @@ test("three licensing contracts require genuinely new observations; old pass/res
   assert.equal((await list(f)).actions.find(x => x.id === a.id).verification.disposition, "Reopened");
 }));
 
-test("all eleven accountable statements are distinct from technical proof; all other 63 controls remain unverified", async () => withFixture(async f => {
+test("all eleven accountable statements are distinct from technical proof; all other 62 controls remain unverified", async () => withFixture(async f => {
   const unsupported = catalog.domains.flatMap(d => d.controls).filter(c => ![...TECHNICAL, ...STATEMENTS].includes(c.id));
-  assert.equal(unsupported.length, 63);
+  assert.equal(unsupported.length, 62);
   for (const id of STATEMENTS) await complete(f, id);
   for (const c of unsupported) await complete(f, c.id);
   await new Promise(r => setTimeout(r, 5));
@@ -141,6 +143,21 @@ test("all eleven accountable statements are distinct from technical proof; all o
     assert.equal(a.verification.disposition, STATEMENTS.includes(a.controlId) ? "SupportedOwnerStatement" : "Unverified",
       `${a.controlId}: ${a.verification.reason}`);
   }
+}));
+
+test("action-linked statements reject stale revisions and changed pilot scope before saving", async () => withFixture(async f => {
+  await complete(f, "AFD-OPS-005");
+  const a = (await list(f)).actions[0];
+  const input = { actionId: a.id, actionRevision: a.revision, tenantId: a.context.tenantId,
+    cohortId: a.context.cohort.id, controlId: a.controlId, decision: "Pass",
+    expiresAt: new Date(Date.now() + 3600000).toISOString(), statement: "Synthetic review.",
+    evidenceReferences: ["review:synthetic"], data: { technicalContact: "Technical owner",
+      executiveContact: "Executive owner", tenantId: a.context.tenantId, reviewedAt: new Date().toISOString() } };
+  assert.equal((await f.request("/api/attestations", { ...input, actionRevision: a.revision - 1 })).status, 409);
+  assert.equal((await f.request("/api/attestations", input)).status, 201);
+  f.seal(await f.assessment({ cohort: { ...cohort, principalIds: ["user-2"] } }));
+  assert.equal((await f.request("/api/attestations", input)).status, 409);
+  assert.equal((await f.request("/api/attestations")).body.attestations.length, 1);
 }));
 
 test("newer failing/unknown assessment reopens old satisfaction and changed cohorts are historical, never rebound", async () => withFixture(async f => {

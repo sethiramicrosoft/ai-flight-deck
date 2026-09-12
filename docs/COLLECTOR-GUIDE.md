@@ -139,11 +139,12 @@ Reading a setting and confirming a rollout requirement are different things:
    facts, the organization and pilot users they describe, their age, and whether
    the conclusion matches the facts.
 
-This last verification is implemented for **three automated licensing checks**:
-`AFD-LIC-001`, `AFD-LIC-002`, `AFD-LIC-004`. The app also supports **eleven
+This last verification is implemented for **four automated checks**:
+`AFD-LIC-001`, `AFD-LIC-002`, `AFD-LIC-004`, and the bounded identity baseline
+`AFD-IAM-003`. The app also supports **eleven
 specific owner statements** with required facts and references.
 
-The other **63 checks cannot become a readiness Pass just because records were
+The other **62 checks cannot become a readiness Pass just because records were
 returned**. This version has not implemented the necessary source verification.
 Their findings can help an administrator investigate, but signing in again,
 granting more permissions, importing a report or signing unrelated text does
@@ -200,16 +201,19 @@ Code: [licensing.js](../collectors/licensing.js),
 authentication registrations, seven days of sign-ins, risky users, administrative
 roles and their policies, guests, groups and access-review definitions.
 
-**Cannot confirm / your next step:** a policy listing does not prove that every
-pilot user receives the intended protection, including exclusions and privileged
-role activation. Ask the identity owner to review those details. The emergency
-access statement `AFD-IAM-007` is supported; the remaining identity checks cannot
-yet support a verified Pass.
+**Supported bounded check:** `AFD-IAM-003` requires a complete policy listing and
+an enabled baseline explicitly including every pilot user or All users, All
+cloud apps, all client types, MFA AND compliant device, with no exclusions or
+extra targeting conditions. No enabled policies is Fail. Other policy shapes
+remain Unknown: do not weaken approved policy to fit the checker. This is
+configuration evidence, not a sign-in simulation, MFA registration check or
+proof of privileged-role activation. The emergency access owner statement
+`AFD-IAM-007` is also supported; other identity checks remain unverified.
 
 **Limits:** normally 1,000 items / 20 pages per query. Additional membership reads
 visit at most 100 configured integrated groups.
 
-**Technical reads:** `/v1.0/policies/conditionalAccessPolicies`,
+**Technical reads:** `/v1.0/identity/conditionalAccess/policies`,
 `/v1.0/policies/identitySecurityDefaultsEnforcementPolicy`;
 `/beta/reports/authenticationMethods/userRegistrationDetails`,
 `/beta/auditLogs/signIns`, `/beta/identityProtection/riskyUsers`;

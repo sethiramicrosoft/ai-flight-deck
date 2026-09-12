@@ -90,10 +90,10 @@ test("all requests are GET, pagination is followed, and the budget is consumed",
   const collector = createIdentityAndAccessCollector({
     request: async request => {
       calls.push(request);
-      if (request.url.includes("conditionalAccessPolicies") && !request.url.includes("page=2")) {
+      if (request.url.includes("/identity/conditionalAccess/policies") && !request.url.includes("page=2")) {
         return {
           value: [],
-          "@odata.nextLink": "https://graph.microsoft.com/v1.0/policies/conditionalAccessPolicies?page=2"
+          "@odata.nextLink": "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?page=2"
         };
       }
       return emptyResponse(request.url);
