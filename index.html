@@ -2818,6 +2818,9 @@
     }
 
     function renderRemediations() {
+      const escapeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[character]);
       if (!remediations.length) {
         document.getElementById("remediation-list").innerHTML = '<div class="empty-state">No proposed corrections are available for this scan. Review Assessment for collection gaps and unsupported checks; an empty action list does not prove readiness.</div>';
         document.getElementById("generate-package").disabled = true;
@@ -2826,15 +2829,15 @@
         return;
       }
       document.getElementById("remediation-list").innerHTML = remediations.map(r => `
-        <article class="remediation ${applied.has(r.id) ? "applied" : ""}" data-remediation="${r.id}">
-          <button class="check" aria-pressed="${applied.has(r.id)}" aria-label="${applied.has(r.id) ? "Remove from" : "Include in"} administrator review plan: ${r.title}"></button>
+        <article class="remediation ${applied.has(r.id) ? "applied" : ""}" data-remediation="${escapeText(r.id)}">
+          <button class="check" aria-pressed="${applied.has(r.id)}" aria-label="${applied.has(r.id) ? "Remove from" : "Include in"} administrator review plan: ${escapeText(r.title)}"></button>
           <div>
-            <h3>${r.title}</h3>
-            <p>${r.copy}</p>
+            <h3>${escapeText(r.title)}</h3>
+            <p>${escapeText(r.copy)}</p>
             ${domainDocumentation[r.domainId]
-              ? `<p><a class="doc-link" href="${domainDocumentation[r.domainId].url}" target="_blank" rel="noopener noreferrer">Microsoft documentation: ${domainDocumentation[r.domainId].title}</a></p>`
+              ? `<p><a class="doc-link" href="${escapeText(domainDocumentation[r.domainId].url)}" target="_blank" rel="noopener noreferrer">Microsoft documentation: ${escapeText(domainDocumentation[r.domainId].title)}</a></p>`
               : ""}
-            <span class="badge">${r.currentStatus ? `${readableCheckStatus(r.currentStatus)} / ` : ""}${r.effort}</span>
+            <span class="badge">${r.currentStatus ? `${escapeText(readableCheckStatus(r.currentStatus))} / ` : ""}${escapeText(r.effort)}</span>
           </div>
           <div class="impact"><strong>${Number.isFinite(r.gain) ? `+${r.gain} score points` : "Later scan needed"}</strong><small>${Number.isFinite(r.gain) ? "fictional estimate, not a measured improvement" : "to measure whether this action helped"}</small></div>
         </article>`).join("");
