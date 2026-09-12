@@ -5,12 +5,13 @@ and decisions.**
 
 ## Demo
 
-[Watch or download the updated demo](docs/demo/AIFlightDeckDemoV6.mp4)
-([captions](docs/demo/AIFlightDeckCaptionsV6.srt)).
+[Watch or download the updated demo](docs/demo/AIFlightDeckDemoV7.mp4)
+([captions](docs/demo/AIFlightDeckCaptionsV7.srt)).
 
-The 114.5-second video shows the guided identity-policy action, fresh evidence,
-plain-language governance review, pilot decision snapshot and reopening when
-later evidence no longer supports the result. It uses actual application screens
+The 115-second video introduces the Microsoft 365 Copilot pilot workflow and
+shows the interactive 3D domain map, guided identity-policy action, fresh
+evidence, plain-language governance review, pilot decision snapshot and
+reopening when later evidence no longer supports the result. It uses actual application screens
 with isolated synthetic data, not a live customer deployment. Connection steps
 are explained; no live Microsoft sign-in or tenant changes are demonstrated.
 
