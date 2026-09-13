@@ -1,0 +1,111 @@
+1
+00:00:00,180 --> 00:00:03,373
+You want to put AI to work.
+
+2
+00:00:03,450 --> 00:00:06,653
+But can it access the wrong information?
+
+3
+00:00:06,750 --> 00:00:09,450
+Are the right protections in place?
+
+4
+00:00:09,550 --> 00:00:12,231
+And who fixes what is missing?
+
+5
+00:00:12,317 --> 00:00:17,645
+Meet AI Flight Deck—an orchestration tool for Copilot readiness and rollout.
+
+6
+00:00:18,317 --> 00:00:23,261
+It brings together visibility, clear next actions, and evidence of progress.
+
+7
+00:00:23,350 --> 00:00:25,204
+Not just another assessment.
+
+8
+00:00:25,650 --> 00:00:31,097
+Connect your organisation, review the read permissions, and define your pilot group.
+
+9
+00:00:33,150 --> 00:00:36,742
+Flight Deck brings the findings into one workspace.
+
+10
+00:00:37,850 --> 00:00:39,842
+Explore thirteen readiness domains.
+
+11
+00:00:40,850 --> 00:00:47,803
+See what needs attention, what needs an owner’s review, and what the tool cannot yet verify.
+
+12
+00:00:47,883 --> 00:00:51,080
+Here, an identity protection check needs attention.
+
+13
+00:00:51,150 --> 00:00:54,900
+Record the scope, responsible owner and approval reference.
+
+14
+00:00:57,150 --> 00:01:02,223
+Follow the guidance, with changes made through your normal administration process.
+
+15
+00:01:02,317 --> 00:01:04,791
+Now report the work complete.
+
+16
+00:01:04,883 --> 00:01:06,265
+Is it resolved?
+
+17
+00:01:06,350 --> 00:01:07,325
+Not yet.
+
+18
+00:01:08,250 --> 00:01:11,055
+A completed task is not proof.
+
+19
+00:01:11,150 --> 00:01:15,635
+Collect fresh evidence: this supported configuration check is now verified.
+
+20
+00:01:18,450 --> 00:01:20,725
+Come back and check again.
+
+21
+00:01:20,817 --> 00:01:25,559
+If later evidence no longer supports the result, the action reopens.
+
+22
+00:01:25,650 --> 00:01:29,763
+Progress stays connected to evidence—not yesterday’s tick box.
+
+23
+00:01:29,850 --> 00:01:33,111
+Governance reviews stay distinct from technical checks.
+
+24
+00:01:35,350 --> 00:01:40,903
+The decision snapshot brings together recorded owners, supporting evidence and remaining blockers.
+
+25
+00:01:41,350 --> 00:01:43,155
+Start with a pilot.
+
+26
+00:01:43,250 --> 00:01:47,917
+As rollout expands, repeat the cycle: understand, act, verify, decide.
+
+27
+00:01:48,017 --> 00:01:51,567
+AI Flight Deck—do not just assess readiness.
+
+28
+00:01:51,650 --> 00:01:56,203
+Orchestrate the next steps, and move forward with evidence.

@@ -1,19 +1,29 @@
 # AI Flight Deck
 
-**A prototype for organizing Microsoft 365 Copilot pilot evidence, findings
-and decisions.**
+**A prototype for orchestrating Copilot readiness and rollout: visibility,
+clear next actions and evidence of progress. Built for Microsoft 365 Copilot.**
 
 ## Demo
 
-[Watch or download the updated demo](docs/demo/AIFlightDeckDemoV7.mp4)
-([captions](docs/demo/AIFlightDeckCaptionsV7.srt)).
+### Latest video: V8
 
-The 115-second video introduces the Microsoft 365 Copilot pilot workflow and
-shows the interactive 3D domain map, guided identity-policy action, fresh
-evidence, plain-language governance review, pilot decision snapshot and
-reopening when later evidence no longer supports the result. It uses actual application screens
-with isolated synthetic data, not a live customer deployment. Connection steps
-are explained; no live Microsoft sign-in or tenant changes are demonstrated.
+https://github.com/user-attachments/assets/f835247c-ea47-4828-8f65-e9049909c503
+
+[Download the V8 video](docs/demo/AIFlightDeckDemoV8.mp4)
+([captions](docs/demo/AIFlightDeckCaptionsV8.srt)).
+
+The 118-second video follows the cycle: understand, act, verify, decide.
+It shows the interactive 3D domain map, guided identity-policy action,
+verification from fresh evidence, reopening after a later collection,
+distinct governance reviews and a decision snapshot. Start with a pilot and
+repeat the cycle as rollout expands; the prototype does not demonstrate
+comprehensive rollout clearance or continuous monitoring.
+
+The video uses actual application screens with isolated synthetic data, not
+a live customer deployment. Connection steps are explained; no live Microsoft
+sign-in or tenant changes are demonstrated. While this repository is private,
+viewers need repository access to watch the embedded video. Earlier demo
+versions remain in `docs/demo`.
 
 ## Documentation
 
