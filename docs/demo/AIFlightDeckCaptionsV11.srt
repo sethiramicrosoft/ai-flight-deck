@@ -1,0 +1,115 @@
+1
+00:00:00,080 --> 00:00:03,532
+Your organisation wants to put AI to work.
+
+2
+00:00:03,647 --> 00:00:07,832
+But the teams responsible for introducing it are already stretched.
+
+3
+00:00:07,947 --> 00:00:14,398
+Are the right protections in place? Where should they start? And who needs to act?
+
+4
+00:00:14,513 --> 00:00:17,198
+A readiness report can identify gaps.
+
+5
+00:00:17,313 --> 00:00:21,198
+Turning those findings into progress is the next challenge.
+
+6
+00:00:21,313 --> 00:00:26,632
+Meet AI Flight Deck—an orchestration tool for Copilot readiness and rollout.
+
+7
+00:00:26,747 --> 00:00:35,032
+Built for Microsoft 365 Copilot, it brings together three things: visibility, clear next actions, and evidence of progress.
+
+8
+00:00:35,567 --> 00:00:40,532
+Connect your tenant, select your pilot group, and run read-only checks.
+
+9
+00:00:40,647 --> 00:00:44,065
+Explore thirteen readiness domains, from SharePoint and OneDrive
+
+10
+00:00:44,180 --> 00:00:46,432
+to adoption, measurement, and governance,
+
+11
+00:00:46,547 --> 00:00:48,332
+then identity and access.
+
+12
+00:00:48,447 --> 00:00:51,532
+Here, an identity protection check needs attention.
+
+13
+00:00:51,647 --> 00:00:57,832
+Instead of leaving the team with a finding, Flight Deck provides a path forward:
+
+14
+00:00:57,947 --> 00:00:59,732
+record the responsible owner,
+
+15
+00:00:59,847 --> 00:01:01,198
+follow the guidance,
+
+16
+00:01:01,313 --> 00:01:05,132
+and make the change through the normal administration process.
+
+17
+00:01:05,247 --> 00:01:09,132
+The work is marked complete. But did it work?
+
+18
+00:01:09,247 --> 00:01:11,998
+A completed task is not proof.
+
+19
+00:01:12,113 --> 00:01:13,632
+Collect fresh evidence.
+
+20
+00:01:13,747 --> 00:01:16,932
+This supported configuration check is now verified.
+
+21
+00:01:17,047 --> 00:01:18,865
+Other gaps remain visible.
+
+22
+00:01:18,980 --> 00:01:25,598
+The team can see what changed, what remains unresolved, and what needs a decision.
+
+23
+00:01:25,713 --> 00:01:31,998
+When they check again, if the evidence no longer supports the result, the action reopens.
+
+24
+00:01:32,113 --> 00:01:35,932
+For customers, a clearer path from uncertainty to action.
+
+25
+00:01:36,047 --> 00:01:42,165
+For Microsoft and partners, a repeatable way to help customers address Copilot adoption blockers.
+
+26
+00:01:42,280 --> 00:01:45,698
+Start with a pilot. Repeat as rollout expands.
+
+27
+00:01:45,813 --> 00:01:47,165
+AI Flight Deck.
+
+28
+00:01:47,280 --> 00:01:49,498
+Do not just assess readiness.
+
+29
+00:01:49,613 --> 00:01:53,865
+Turn findings into a flight plan—and progress into evidence.

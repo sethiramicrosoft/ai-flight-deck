@@ -5,19 +5,18 @@ clear next actions and evidence of progress. Built for Microsoft 365 Copilot.**
 
 ## Demo
 
-### Latest video: V8
+### Latest video: V11
 
-https://github.com/user-attachments/assets/f835247c-ea47-4828-8f65-e9049909c503
+<video controls src="https://github.com/user-attachments/assets/09df481b-4e0b-4d4b-8bb6-af571d2aecba" title="AI Flight Deck Demo V11 (~114 seconds)"></video>
 
-[Download the V8 video](docs/demo/AIFlightDeckDemoV8.mp4)
-([captions](docs/demo/AIFlightDeckCaptionsV8.srt)).
+[Download the V11 video](docs/demo/AIFlightDeckDemoV11.mp4)
+([captions](docs/demo/AIFlightDeckCaptionsV11.srt)).
 
-The 118-second video follows the cycle: understand, act, verify, decide.
-It shows the interactive 3D domain map, guided identity-policy action,
-verification from fresh evidence, reopening after a later collection,
-distinct governance reviews and a decision snapshot. Start with a pilot and
-repeat the cycle as rollout expands; the prototype does not demonstrate
-comprehensive rollout clearance or continuous monitoring.
+The narrated ~114-second video tours the 3D domain map, setup boundaries,
+guided action flow, evidence re-checks and a pilot decision snapshot to show
+how the prototype can improve customer rollout coordination. It remains a
+bounded prototype demonstration, not proof of comprehensive rollout clearance
+or continuous monitoring.
 
 The video uses actual application screens with isolated synthetic data, not
 a live customer deployment. Connection steps are explained; no live Microsoft
