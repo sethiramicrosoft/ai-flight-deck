@@ -2,6 +2,9 @@
 
 [README](../README.md) · [Visual tour](VISUAL-TOUR.md) · [Collector guide](COLLECTOR-GUIDE.md)
 
+For exact proof contracts, required statement data, report imports and controlled
+before/after sharing comparisons, see [Evidence and verification](EVIDENCE-AND-VERIFICATION.md).
+
 Corrections now includes **Move your pilot forward**, above the
 optional legacy review-file export. This is persistent local workflow, not a
 Microsoft 365 change service. The app sends no email, Teams message or tracker

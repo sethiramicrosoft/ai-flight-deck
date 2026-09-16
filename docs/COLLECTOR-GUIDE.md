@@ -1,7 +1,8 @@
 # What Flight Deck connects to and what it checks
 
 [README](../README.md) · [How to use each page](VISUAL-TOUR.md) ·
-[Which results can support a rollout decision](../README.md#evidence-authority-and-supported-boundaries)
+[Which results can support a rollout decision](EVIDENCE-AND-VERIFICATION.md#evidence-authority-and-supported-boundaries) ·
+[Collection runtime contracts](COLLECTION-REFERENCE.md)
 
 This guide answers five questions for each topic: **Which Microsoft service
 connects? How do I sign in? What does the app read? What can it not check?
@@ -52,7 +53,7 @@ Administrators make approved changes outside Flight Deck.
 
 | Service or source | How you sign in | What limits access |
 |---|---|---|
-| Microsoft Graph | Enter Microsoft's device code using the Microsoft Graph Command Line Tools client; local module: `Microsoft.Graph.Authentication` | [These read permissions](../README.md#delegated-permissions-requested-by-the-live-scanner) are requested by `GRAPH_SCOPE_LIST` in [server.js](../server.js). Your account's roles, licences and the availability of each Microsoft interface still matter |
+| Microsoft Graph | Enter Microsoft's device code using the Microsoft Graph Command Line Tools client; local module: `Microsoft.Graph.Authentication` | [These read permissions](PERMISSIONS-AND-SECURITY.md#delegated-permissions-requested-by-the-live-scanner) are requested by `GRAPH_SCOPE_LIST` in [server.js](../server.js). Your account's roles, licences and the availability of each Microsoft interface still matter |
 | Exchange Online | Separate Microsoft sign-in using `ExchangeOnlineManagement` (minimum 3.7.2), `Connect-ExchangeOnline -DisableWAM` | Exchange permissions attached to your account. The connection reports the organization and account used |
 | SharePoint Online | Separate browser sign-in using `Microsoft.Online.SharePoint.PowerShell`, `Connect-SPOService -Url … -UseSystemBrowser $true` | Connects to the administration address found through Graph. The module must support browser sign-in. It does not report enough identity information for the app to independently confirm the signed-in account and organization |
 | Microsoft Purview | Separate compliance-service sign-in using `Connect-IPPSSession -DisableWAM`; another Exchange Online connection reads audit records later | Compliance roles and licences. The later audit connection must report the same account and organization as the compliance connection |
@@ -159,7 +160,7 @@ For developers, the rules for required evidence are called *contracts*;
 checking whether a result can be used is called *admission*.
 Source verification is in [evidence-authority.js](../evidence-authority.js), and
 the shared decision rule is in [evidence-admissibility.js](../evidence-admissibility.js).
-See the [full list of supported checks and required statements](../README.md#evidence-authority-and-supported-boundaries).
+See the [full list of supported checks and required statements](EVIDENCE-AND-VERIFICATION.md#evidence-authority-and-supported-boundaries).
 
 ## Domain reference
 
@@ -386,7 +387,7 @@ No Graph site-permissions endpoint requiring `Sites.FullControl.All` is called.
 Code: [initial scan](../scanner/scan-tenant.ps1),
 `sharePointPlan` in [governance-domains.js](../collectors/governance-domains.js),
 [administrator script](../scanner/collect-admin-evidence.ps1).
-See also [how the sharing review works](../README.md#how-the-sharepoint-access-and-sharing-review-works).
+See also [how the sharing review works](EVIDENCE-AND-VERIFICATION.md#how-the-sharepoint-access-and-sharing-review-works).
 
 ### Purview
 
@@ -528,7 +529,7 @@ support a verified Pass.
 with `$format=application/json`, using `Reports.Read.All`.
 Code: `ADOPTION_REPORT_QUERY_PLAN` in [operational-domains.js](../collectors/operational-domains.js),
 `createGraphReportsClient` in [collector-adapters.js](../collector-adapters.js).
-See [required statement information](../README.md#evidence-authority-and-supported-boundaries).
+See [required statement information](EVIDENCE-AND-VERIFICATION.md#evidence-authority-and-supported-boundaries).
 
 ## Pilot selection is its own evidence boundary
 
