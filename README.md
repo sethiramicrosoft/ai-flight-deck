@@ -14,8 +14,9 @@ After assessment: “For this pilot, what blocks us, who needs to act,
 and what evidence supports the next decision?”
 
 Microsoft already provides automated checks, recommendations and repeatable
-reports. Flight Deck adds scoped follow-through: pilot membership, guided work
-and supported verification—not superior collection or greater authority.
+reports. Flight Deck helps teams follow through by defining pilot membership,
+guiding the work and checking results where verification is supported.
+It does not collect better evidence or carry greater authority.
 
 If automated checks are all you need, start with
 [Microsoft's assessment](https://github.com/microsoft/m365-copilot-automated-readiness-assessment).
@@ -34,23 +35,24 @@ Your existing tracker may be simpler; coordination savings remain unproven.
 In ~114 seconds: the 3D domain map, setup boundaries, guided actions,
 evidence re-checks and a pilot decision snapshot.
 
-Actual application screens, isolated synthetic data—not a live customer
-deployment. No live Microsoft sign-in or tenant changes are demonstrated.
+The demo uses actual application screens with isolated synthetic data.
+It does not show a live customer deployment, Microsoft sign-in or tenant changes.
 Repository access is required while this repository is private.
 Earlier demo versions remain in `docs/demo`.
 
 ## How it works
 
-1. **Connect** — sign in for read-only collection;
-   select and explicitly approve pilot users.
-2. **Understand** — see findings, missing evidence and checks the app cannot
+1. **Connect:** Sign in for read-only collection, then select and explicitly
+   approve the pilot users.
+2. **Understand:** See findings, missing evidence and checks the app cannot
    perform. “Unknown” does not necessarily mean your tenant is misconfigured.
-3. **Act** — save guided work and a manual hand-off.
+3. **Act:** Save guided work and prepare a manual hand-off.
    Administrators make approved changes through their existing process.
-4. **Verify** — collect fresh evidence and check supported results.
-   Task completion or an imported report is not proof of a corrected setting.
-5. **Decide** — review remaining blockers and download the pilot snapshot.
-   The accountable owner makes the real decision.
+4. **Verify:** Collect fresh evidence and check supported results.
+   Completing a task or importing a report does not prove that a setting
+   has been corrected.
+5. **Decide:** Review remaining blockers and download the pilot snapshot.
+   The accountable owner makes the decision.
 
 The interface follows **Set up → Assessment → Corrections → Decision**.
 [Explore each page with screenshots](docs/VISUAL-TOUR.md).
@@ -81,7 +83,7 @@ not 77 validated automated checks or a Microsoft certification.
 | Evidence supported today | Boundary |
 |---|---|
 | **4 technical checks** | Three licensing contracts and one bounded Conditional Access configuration contract |
-| **11 owner-statement checks** | Required facts, references and local integrity—not independent proof of settings or approval authority |
+| **11 owner-statement checks** | Required facts, references and local integrity checks. These do not independently prove settings or establish approval authority. |
 | **62 unsupported verification checks** | Findings and guided work remain available, but completion cannot make them verified |
 
 No automatic remediation, external task assignment, authenticated approval
@@ -142,7 +144,7 @@ Legacy reference links:
 
 ## Credits and sources
 
-Independent hackathon prototype—not a Microsoft product or service.
+An independent hackathon prototype. Not a Microsoft product or service.
 Built on the Microsoft 365 Copilot Readiness report, Microsoft's open-source
 automated readiness assessment, Microsoft Graph and Microsoft Learn.
 [Acknowledgements and licensing](ACKNOWLEDGEMENTS.md) ·
